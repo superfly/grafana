@@ -49,7 +49,7 @@ type Implementation struct {
 
 // CreateUser creates inserts a new one.
 func (ls *Implementation) CreateUser(cmd user.CreateUserCommand) (*user.User, error) {
-	return ls.SQLStore.CreateUser(context.Background(), cmd)
+	return ls.userService.Create(context.Background(), &cmd)
 }
 
 // UpsertUser updates an existing user, or if it doesn't exist, inserts a new one.
