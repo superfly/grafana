@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
+	"net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -179,7 +180,7 @@ Timestamps will line up evenly on timeStepSeconds (For example, 60 seconds means
 	s.registerScenario(&Scenario{
 		ID:      string(pluginQueryError),
 		Name:    "Plugin Query Error",
-		handler: s.handleDataResponseErrorScenario,
+		handler: s.handleDataResponseErrorStatusScenario,
 	})
 
 	s.registerScenario(&Scenario{
@@ -377,14 +378,14 @@ func (s *Service) handleRandomWalkWithErrorScenario(ctx context.Context, req *ba
 	return resp, nil
 }
 
-func (s *Service) handleDataResponseErrorScenario(_ context.Context, req *backend.QueryDataRequest) (*backend.QueryDataResponse, error) {
+func (s *Service) handleDataResponseErrorStatusScenario(_ context.Context, req *backend.QueryDataRequest) (*backend.QueryDataResponse, error) {
 	resp := backend.NewQueryDataResponse()
 
 	rand.Seed(time.Now().Unix())
 	for _, q := range req.Queries {
 		respD := resp.Responses[q.RefID]
-		errStatus := []backend.ErrorStatus{backend.UnauthorizedErrorStatus, backend.TooManyRequestsErrorStatus, backend.ValidationFailedErrorStatus}[rand.Intn(3)]
-		respD.Error = backend.NewError(errStatus, "Something bad happened")
+		respD.Error = fmt.Errorf("something bad happened")
+		respD.ErrorStatus = []int{http.StatusConflict, http.StatusForbidden, http.StatusTooManyRequests}[rand.Intn(3)]
 		resp.Responses[q.RefID] = respD
 	}
 

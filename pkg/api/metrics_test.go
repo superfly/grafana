@@ -58,24 +58,9 @@ func (ts *fakeOAuthTokenService) IsOAuthPassThruEnabled(*datasources.DataSource)
 
 // `/ds/query` endpoint test
 func TestAPIEndpoint_Metrics_QueryMetricsV2(t *testing.T) {
-	qds := query.ProvideService(
-		nil,
-		nil,
-		nil,
-		&fakePluginRequestValidator{},
-		&fakeDatasources.FakeDataSourceService{},
-		&fakePluginClient{
-			QueryDataHandlerFunc: func(ctx context.Context, req *backend.QueryDataRequest) (*backend.QueryDataResponse, error) {
-				resp := backend.Responses{
-					"A": backend.DataResponse{
-						Error: fmt.Errorf("query failed"),
-					},
-				}
-				return &backend.QueryDataResponse{Responses: resp}, nil
-			},
-		},
-		&fakeOAuthTokenService{},
-	)
+	qds := mockQueryResponse(backend.Responses{
+		"A": backend.DataResponse{Error: fmt.Errorf("query failed")},
+	})
 	serverFeatureEnabled := SetupAPITestServer(t, func(hs *HTTPServer) {
 		hs.queryDataService = qds
 		hs.Features = featuremgmt.WithFeatures(featuremgmt.FlagDatasourceQueryMultiStatus, true)
@@ -96,14 +81,77 @@ func TestAPIEndpoint_Metrics_QueryMetricsV2(t *testing.T) {
 		require.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	})
 
-	t.Run("Status code is 207 when data source response has an error and feature toggle is enabled", func(t *testing.T) {
+	t.Run("Status code is 207 and body contains status field when data source response has an error and feature toggle is enabled", func(t *testing.T) {
 		req := serverFeatureEnabled.NewPostRequest("/api/ds/query", strings.NewReader(reqValid))
 		webtest.RequestWithSignedInUser(req, &user.SignedInUser{UserID: 1, OrgID: 1, OrgRole: org.RoleViewer})
 		resp, err := serverFeatureEnabled.SendJSON(req)
 		require.NoError(t, err)
-		require.NoError(t, resp.Body.Close())
+		b, err := io.ReadAll(resp.Body)
+		require.NoError(t, err)
 		require.Equal(t, http.StatusMultiStatus, resp.StatusCode)
+		require.JSONEq(t, "{\"results\":{\"A\":{\"error\":\"query failed\",\"status\":500}}}", string(b))
+		require.NoError(t, resp.Body.Close())
 	})
+
+	t.Run("Response body contains relevant status and error fields when plugin query returns error status and feature toggle is enabled", func(t *testing.T) {
+		tcs := []struct {
+			err                error
+			status             int
+			multiStatusEnabled bool
+			expectedRespBody   string
+			expectedRespStatus int
+		}{
+			{err: fmt.Errorf("query failed"), status: 504, expectedRespStatus: 207, expectedRespBody: queryResponseWithErrorAndStatus("query failed", 504), multiStatusEnabled: true},
+			{err: fmt.Errorf("query failed"), expectedRespStatus: 400, expectedRespBody: queryResponseWithError("query failed"), multiStatusEnabled: false},
+		}
+
+		for _, tc := range tcs {
+			server := SetupAPITestServer(t, func(hs *HTTPServer) {
+				hs.queryDataService = mockQueryResponse(backend.Responses{
+					"A": backend.DataResponse{
+						Error:       tc.err,
+						ErrorStatus: tc.status,
+					},
+				})
+				hs.Features = featuremgmt.WithFeatures(featuremgmt.FlagDatasourceQueryMultiStatus, tc.multiStatusEnabled)
+				hs.QuotaService = quotatest.NewQuotaServiceFake()
+			})
+
+			req := server.NewPostRequest("/api/ds/query", strings.NewReader(reqValid))
+			webtest.RequestWithSignedInUser(req, &user.SignedInUser{UserID: 1, OrgID: 1, OrgRole: org.RoleViewer})
+			resp, err := server.SendJSON(req)
+			require.NoError(t, err)
+			b, err := io.ReadAll(resp.Body)
+			require.NoError(t, err)
+			require.Equal(t, tc.expectedRespStatus, resp.StatusCode)
+			require.JSONEq(t, tc.expectedRespBody, string(b))
+			require.NoError(t, resp.Body.Close())
+		}
+	})
+}
+
+func queryResponseWithErrorAndStatus(err string, status int) string {
+	return fmt.Sprintf("{\"results\":{\"A\":{\"error\":\"%s\",\"status\":%d}}}", err, status)
+}
+
+func queryResponseWithError(err string) string {
+	return fmt.Sprintf("{\"results\":{\"A\":{\"error\":\"%s\"}}}", err)
+}
+
+func mockQueryResponse(resp backend.Responses) *query.Service {
+	return query.ProvideService(
+		nil,
+		nil,
+		nil,
+		&fakePluginRequestValidator{},
+		&fakeDatasources.FakeDataSourceService{},
+		&fakePluginClient{
+			QueryDataHandlerFunc: func(ctx context.Context, req *backend.QueryDataRequest) (*backend.QueryDataResponse, error) {
+				return &backend.QueryDataResponse{Responses: resp}, nil
+			},
+		},
+		&fakeOAuthTokenService{},
+	)
 }
 
 func TestAPIEndpoint_Metrics_PluginDecryptionFailure(t *testing.T) {
