@@ -72,7 +72,7 @@ func (hs *HTTPServer) populateDashboardsByTag(ctx context.Context, orgID int64, 
 func (hs *HTTPServer) LoadPlaylistDashboards(ctx context.Context, orgID int64, signedInUser *user.SignedInUser, playlistUID string) (dtos.PlaylistDashboardsSlice, error) {
 	result := make(dtos.PlaylistDashboardsSlice, 0)
 	dto, err := hs.playlistService.Read(ctx,
-		&playlist.GetPlaylistByUidQuery{UID: playlistUID, OrgId: orgID})
+		&playlist.ReadPlaylistByUidQuery{UID: playlistUID, OrgId: orgID})
 	if err != nil || dto == nil || dto.Items == nil {
 		return result, err
 	}

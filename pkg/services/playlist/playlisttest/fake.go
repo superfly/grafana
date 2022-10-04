@@ -25,7 +25,7 @@ func (f *FakePlaylistService) Create(context.Context, *playlist.CreatePlaylistCo
 	return f.ExpectedPlaylist, f.ExpectedError
 }
 
-func (f *FakePlaylistService) Read(context.Context, *playlist.GetPlaylistByUidQuery) (*playlist.PlaylistDTO, error) {
+func (f *FakePlaylistService) Read(context.Context, *playlist.ReadPlaylistByUidQuery) (*playlist.PlaylistDTO, error) {
 	return f.ExpectedPlaylistDTO, f.ExpectedError
 }
 
@@ -33,7 +33,7 @@ func (f *FakePlaylistService) Update(context.Context, *playlist.UpdatePlaylistCo
 	return f.ExpectedPlaylistDTO, f.ExpectedError
 }
 
-func (f *FakePlaylistService) GetWithoutItems(context.Context, *playlist.GetPlaylistByUidQuery) (*playlist.Playlist, error) {
+func (f *FakePlaylistService) GetWithoutItems(context.Context, *playlist.ReadPlaylistByUidQuery) (*playlist.Playlist, error) {
 	return f.ExpectedPlaylist, f.ExpectedError
 }
 

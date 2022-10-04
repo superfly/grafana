@@ -105,7 +105,7 @@ func (s *sqlStore) Update(ctx context.Context, cmd *playlist.UpdatePlaylistComma
 	return &dto, err
 }
 
-func (s *sqlStore) Get(ctx context.Context, query *playlist.GetPlaylistByUidQuery) (*playlist.Playlist, error) {
+func (s *sqlStore) Get(ctx context.Context, query *playlist.ReadPlaylistByUidQuery) (*playlist.Playlist, error) {
 	if query.UID == "" || query.OrgId == 0 {
 		return nil, playlist.ErrCommandValidationFailed
 	}
@@ -176,7 +176,7 @@ func (s *sqlStore) GetItems(ctx context.Context, query *playlist.GetPlaylistItem
 	}
 	err := s.db.WithDbSession(ctx, func(sess *sqlstore.DBSession) error {
 		// getQuery the playlist Id
-		getQuery := &playlist.GetPlaylistByUidQuery{UID: query.PlaylistUID, OrgId: query.OrgId}
+		getQuery := &playlist.ReadPlaylistByUidQuery{UID: query.PlaylistUID, OrgId: query.OrgId}
 		p, err := s.Get(ctx, getQuery)
 		if err != nil {
 			return err

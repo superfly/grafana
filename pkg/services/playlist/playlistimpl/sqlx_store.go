@@ -64,7 +64,7 @@ func (s *sqlxStore) Update(ctx context.Context, cmd *playlist.UpdatePlaylistComm
 	dto := playlist.PlaylistDTO{}
 
 	// Get the id of playlist to be updated with orgId and UID
-	existingPlaylist, err := s.Get(ctx, &playlist.GetPlaylistByUidQuery{UID: cmd.UID, OrgId: cmd.OrgId})
+	existingPlaylist, err := s.Get(ctx, &playlist.ReadPlaylistByUidQuery{UID: cmd.UID, OrgId: cmd.OrgId})
 	if err != nil {
 		return nil, err
 	}
@@ -108,7 +108,7 @@ func (s *sqlxStore) Update(ctx context.Context, cmd *playlist.UpdatePlaylistComm
 	return &dto, err
 }
 
-func (s *sqlxStore) Get(ctx context.Context, query *playlist.GetPlaylistByUidQuery) (*playlist.Playlist, error) {
+func (s *sqlxStore) Get(ctx context.Context, query *playlist.ReadPlaylistByUidQuery) (*playlist.Playlist, error) {
 	if query.UID == "" || query.OrgId == 0 {
 		return nil, playlist.ErrCommandValidationFailed
 	}

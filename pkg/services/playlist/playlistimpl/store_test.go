@@ -30,7 +30,7 @@ func testIntegrationPlaylistDataAccess(t *testing.T, fn getStore) {
 		uid := p.UID
 
 		t.Run("Can get playlist", func(t *testing.T) {
-			get := &playlist.GetPlaylistByUidQuery{UID: uid, OrgId: 1}
+			get := &playlist.ReadPlaylistByUidQuery{UID: uid, OrgId: 1}
 			pl, err := playlistStore.Get(context.Background(), get)
 			require.NoError(t, err)
 			require.Equal(t, p.Id, pl.Id)
@@ -58,7 +58,7 @@ func testIntegrationPlaylistDataAccess(t *testing.T, fn getStore) {
 			err = playlistStore.Delete(context.Background(), &deleteQuery)
 			require.NoError(t, err)
 
-			getQuery := playlist.GetPlaylistByUidQuery{UID: uid, OrgId: 1}
+			getQuery := playlist.ReadPlaylistByUidQuery{UID: uid, OrgId: 1}
 			_, err := playlistStore.Get(context.Background(), &getQuery)
 			require.Error(t, err)
 			require.ErrorIs(t, err, playlist.ErrPlaylistNotFound)

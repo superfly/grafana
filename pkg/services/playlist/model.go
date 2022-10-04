@@ -72,7 +72,7 @@ type GetPlaylistsQuery struct {
 	OrgId int64
 }
 
-type GetPlaylistByUidQuery struct {
+type ReadPlaylistByUidQuery struct {
 	UID   string
 	OrgId int64
 }

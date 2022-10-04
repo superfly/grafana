@@ -12,7 +12,7 @@ import (
 
 func (hs *HTTPServer) ValidateOrgPlaylist(c *models.ReqContext) {
 	uid := web.Params(c.Req)[":uid"]
-	query := playlist.GetPlaylistByUidQuery{UID: uid, OrgId: c.OrgID}
+	query := playlist.ReadPlaylistByUidQuery{UID: uid, OrgId: c.OrgID}
 	p, err := hs.playlistService.GetWithoutItems(c.Req.Context(), &query)
 
 	if err != nil {
@@ -72,7 +72,7 @@ func (hs *HTTPServer) SearchPlaylists(c *models.ReqContext) response.Response {
 // 500: internalServerError
 func (hs *HTTPServer) GetPlaylist(c *models.ReqContext) response.Response {
 	uid := web.Params(c.Req)[":uid"]
-	cmd := playlist.GetPlaylistByUidQuery{UID: uid, OrgId: c.OrgID}
+	cmd := playlist.ReadPlaylistByUidQuery{UID: uid, OrgId: c.OrgID}
 
 	dto, err := hs.playlistService.Read(c.Req.Context(), &cmd)
 	if err != nil {
@@ -94,7 +94,7 @@ func (hs *HTTPServer) GetPlaylist(c *models.ReqContext) response.Response {
 // 500: internalServerError
 func (hs *HTTPServer) GetPlaylistItems(c *models.ReqContext) response.Response {
 	uid := web.Params(c.Req)[":uid"]
-	cmd := playlist.GetPlaylistByUidQuery{UID: uid, OrgId: c.OrgID}
+	cmd := playlist.ReadPlaylistByUidQuery{UID: uid, OrgId: c.OrgID}
 
 	dto, err := hs.playlistService.Read(c.Req.Context(), &cmd)
 	if err != nil {
@@ -194,7 +194,7 @@ func (hs *HTTPServer) UpdatePlaylist(c *models.ReqContext) response.Response {
 		return response.Error(500, "Failed to save playlist", err)
 	}
 
-	dto, err := hs.playlistService.Read(c.Req.Context(), &playlist.GetPlaylistByUidQuery{
+	dto, err := hs.playlistService.Read(c.Req.Context(), &playlist.ReadPlaylistByUidQuery{
 		UID:   cmd.UID,
 		OrgId: c.OrgID,
 	})
