@@ -28,7 +28,7 @@ func exportSystemPlaylists(helper *commitHelper, job *gitExportJob) error {
 	}
 
 	for _, item := range res {
-		playlist, err := job.playlistService.Get(helper.ctx, &playlist.GetPlaylistByUidQuery{
+		playlist, err := job.playlistService.Read(helper.ctx, &playlist.GetPlaylistByUidQuery{
 			UID:   item.UID,
 			OrgId: helper.orgID,
 		})

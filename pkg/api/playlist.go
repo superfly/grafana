@@ -74,7 +74,7 @@ func (hs *HTTPServer) GetPlaylist(c *models.ReqContext) response.Response {
 	uid := web.Params(c.Req)[":uid"]
 	cmd := playlist.GetPlaylistByUidQuery{UID: uid, OrgId: c.OrgID}
 
-	dto, err := hs.playlistService.Get(c.Req.Context(), &cmd)
+	dto, err := hs.playlistService.Read(c.Req.Context(), &cmd)
 	if err != nil {
 		return response.Error(500, "Playlist not found", err)
 	}
@@ -96,7 +96,7 @@ func (hs *HTTPServer) GetPlaylistItems(c *models.ReqContext) response.Response {
 	uid := web.Params(c.Req)[":uid"]
 	cmd := playlist.GetPlaylistByUidQuery{UID: uid, OrgId: c.OrgID}
 
-	dto, err := hs.playlistService.Get(c.Req.Context(), &cmd)
+	dto, err := hs.playlistService.Read(c.Req.Context(), &cmd)
 	if err != nil {
 		return response.Error(500, "Playlist not found", err)
 	}
@@ -194,7 +194,7 @@ func (hs *HTTPServer) UpdatePlaylist(c *models.ReqContext) response.Response {
 		return response.Error(500, "Failed to save playlist", err)
 	}
 
-	dto, err := hs.playlistService.Get(c.Req.Context(), &playlist.GetPlaylistByUidQuery{
+	dto, err := hs.playlistService.Read(c.Req.Context(), &playlist.GetPlaylistByUidQuery{
 		UID:   cmd.UID,
 		OrgId: c.OrgID,
 	})

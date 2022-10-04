@@ -14,6 +14,9 @@ type FakePlaylistService struct {
 	ExpectedError         error
 }
 
+// Make sure it implements the service
+var _ playlist.Service = &FakePlaylistService{}
+
 func NewPlaylistServiveFake() *FakePlaylistService {
 	return &FakePlaylistService{}
 }
@@ -22,16 +25,16 @@ func (f *FakePlaylistService) Create(context.Context, *playlist.CreatePlaylistCo
 	return f.ExpectedPlaylist, f.ExpectedError
 }
 
+func (f *FakePlaylistService) Read(context.Context, *playlist.GetPlaylistByUidQuery) (*playlist.PlaylistDTO, error) {
+	return f.ExpectedPlaylistDTO, f.ExpectedError
+}
+
 func (f *FakePlaylistService) Update(context.Context, *playlist.UpdatePlaylistCommand) (*playlist.PlaylistDTO, error) {
 	return f.ExpectedPlaylistDTO, f.ExpectedError
 }
 
-func (f *FakePlaylistService) Get(context.Context, *playlist.GetPlaylistByUidQuery) (*playlist.Playlist, error) {
+func (f *FakePlaylistService) GetWithoutItems(context.Context, *playlist.GetPlaylistByUidQuery) (*playlist.Playlist, error) {
 	return f.ExpectedPlaylist, f.ExpectedError
-}
-
-func (f *FakePlaylistService) GetItems(context.Context, *playlist.GetPlaylistItemsByUidQuery) ([]playlist.PlaylistItem, error) {
-	return f.ExpectedPlaylistItems, f.ExpectedError
 }
 
 func (f *FakePlaylistService) Search(context.Context, *playlist.GetPlaylistsQuery) (playlist.Playlists, error) {

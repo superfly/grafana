@@ -12,6 +12,9 @@ type Service struct {
 	store store
 }
 
+// Make sure it implements the service
+var _ playlist.Service = &Service{}
+
 func ProvideService(db db.DB, cfg *setting.Cfg) playlist.Service {
 	if cfg.IsFeatureToggleEnabled("newDBLibrary") {
 		return &Service{
@@ -39,7 +42,7 @@ func (s *Service) GetWithoutItems(ctx context.Context, q *playlist.GetPlaylistBy
 	return s.store.Get(ctx, q)
 }
 
-func (s *Service) Get(ctx context.Context, q *playlist.GetPlaylistByUidQuery) (*playlist.PlaylistDTO, error) {
+func (s *Service) Read(ctx context.Context, q *playlist.GetPlaylistByUidQuery) (*playlist.PlaylistDTO, error) {
 	v, err := s.store.Get(ctx, q)
 	if err != nil {
 		return nil, err

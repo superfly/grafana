@@ -77,6 +77,7 @@ type GetPlaylistByUidQuery struct {
 	OrgId int64
 }
 
+// This is not exposed externally
 type GetPlaylistItemsByUidQuery struct {
 	PlaylistUID string
 	OrgId       int64
