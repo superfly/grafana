@@ -32,54 +32,76 @@ func NewAnnotationHistorian(annotations annotations.Repository, dashboards dashb
 }
 
 func (h *AnnotationStateHistorian) RecordStates(ctx context.Context, states []state.ContextualState) {
-	go h.recordStatesSync(ctx, states)
+	// Build annotations before starting goroutine, to make sure all data is copied and won't mutate underneath us.
+	annotations := h.buildAnnotations(states)
+	go h.recordAnnotationsSync(ctx, annotations)
 }
 
-func (h *AnnotationStateHistorian) recordStatesSync(ctx context.Context, states []state.ContextualState) {
-	items := make([]annotations.Item, 0, len(states))
+type itemWithMetadata struct {
+	annotations.Item
+	dashUID       string
+	parsedPanelID int64
+}
+
+func (h *AnnotationStateHistorian) buildAnnotations(states []state.ContextualState) []itemWithMetadata {
+	items := make([]itemWithMetadata, 0, len(states))
 	for _, state := range states {
 		h.log.Debug("alert state changed creating annotation", "alertRuleUID", state.AlertRuleUID, "newState", state.Formatted(), "oldState", state.PreviousFormatted())
 
 		labels := removePrivateLabels(state.Labels)
 		annotationText := fmt.Sprintf("%s {%s} - %s", state.Rule.Title, labels.String(), state.Formatted())
 
-		item := annotations.Item{
-			AlertId:   state.Rule.ID,
-			OrgId:     state.OrgID,
-			PrevState: state.PreviousFormatted(),
-			NewState:  state.Formatted(),
-			Text:      annotationText,
-			Epoch:     state.LastEvaluationTime.UnixNano() / int64(time.Millisecond),
+		item := itemWithMetadata{
+			Item: annotations.Item{
+				AlertId:   state.Rule.ID,
+				OrgId:     state.OrgID,
+				PrevState: state.PreviousFormatted(),
+				NewState:  state.Formatted(),
+				Text:      annotationText,
+				Epoch:     state.LastEvaluationTime.UnixNano() / int64(time.Millisecond),
+			},
 		}
 
-		dashUid, ok := state.Annotations[ngmodels.DashboardUIDAnnotation]
+		dashUID, ok := state.Annotations[ngmodels.DashboardUIDAnnotation]
 		if ok {
-			panelUid := state.Annotations[ngmodels.PanelIDAnnotation]
+			panelUID := state.Annotations[ngmodels.PanelIDAnnotation]
 
-			panelId, err := strconv.ParseInt(panelUid, 10, 64)
+			panelID, err := strconv.ParseInt(panelUID, 10, 64)
 			if err != nil {
-				h.log.Error("error parsing panelUID for alert annotation", "panelUID", panelUid, "alertRuleUID", state.AlertRuleUID, "err", err.Error())
-				return
+				h.log.Error("error parsing panelUID for alert annotation", "panelUID", panelUID, "alertRuleUID", state.AlertRuleUID, "err", err.Error())
+				continue
 			}
-
-			query := &models.GetDashboardQuery{
-				Uid:   dashUid,
-				OrgId: state.OrgID,
-			}
-
-			err = h.dashboards.GetDashboard(ctx, query)
-			if err != nil {
-				h.log.Error("error getting dashboard for alert annotation", "dashboardUID", dashUid, "alertRuleUID", state.AlertRuleUID, "err", err.Error())
-				return
-			}
-
-			item.PanelId = panelId
-			item.DashboardId = query.Result.Id
+			item.dashUID = dashUID
+			item.parsedPanelID = panelID
 		}
 		items = append(items, item)
 	}
+	return items
+}
 
-	if err := h.annotations.SaveMany(ctx, items); err != nil {
+func (h *AnnotationStateHistorian) recordAnnotationsSync(ctx context.Context, items []itemWithMetadata) {
+	annotations := make([]annotations.Item, 0, len(items))
+
+	for _, item := range items {
+		if item.dashUID != "" {
+			query := &models.GetDashboardQuery{
+				Uid:   item.dashUID,
+				OrgId: item.Item.OrgId,
+			}
+
+			err := h.dashboards.GetDashboard(ctx, query)
+			if err != nil {
+				h.log.Error("error getting dashboard for alert annotation", "dashboardUID", item.dashUID, "alertRuleID", item.AlertId, "err", err.Error())
+				return
+			}
+
+			item.Item.PanelId = item.parsedPanelID
+			item.Item.DashboardId = query.Result.Id
+		}
+		annotations = append(annotations, item.Item)
+	}
+
+	if err := h.annotations.SaveMany(ctx, annotations); err != nil {
 		affectedIDs := make([]int64, 0, len(items))
 		for _, i := range items {
 			affectedIDs = append(affectedIDs, i.AlertId)
