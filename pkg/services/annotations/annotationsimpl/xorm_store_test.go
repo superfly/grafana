@@ -169,6 +169,7 @@ func TestIntegrationAnnotations(t *testing.T) {
 				items[i] = annotations.Item{
 					OrgId: 100,
 					Type:  "batch",
+					Epoch: 12,
 				}
 			}
 
@@ -188,6 +189,7 @@ func TestIntegrationAnnotations(t *testing.T) {
 				items[i] = annotations.Item{
 					OrgId: 100,
 					Type:  "batch",
+					Epoch: 12,
 				}
 			}
 			items[0].Tags = []string{"type:test"}
