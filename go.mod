@@ -61,7 +61,7 @@ require (
 	github.com/grafana/thema v0.0.0-20220929145912-2c7c4a7bb20b
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0
 	github.com/hashicorp/go-hclog v1.0.0
-	github.com/hashicorp/go-plugin v1.4.3
+	github.com/hashicorp/go-plugin v1.4.5
 	github.com/hashicorp/go-version v1.3.0
 	github.com/influxdata/influxdb-client-go/v2 v2.6.0
 	github.com/influxdata/line-protocol v0.0.0-20210311194329-9aa0e372d097
