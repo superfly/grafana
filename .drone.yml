@@ -1802,10 +1802,10 @@ steps:
   image: alpine:3.15.6
   name: identify-runner
 - commands:
-  - ./bin/grabpl publish packages --edition oss --gcp-key /tmp/gcpkey.json --build-id
+  - ./bin/build publish packages --edition oss --gcp-key /tmp/gcpkey.json --build-id
     ${DRONE_BUILD_NUMBER}
   depends_on:
-  - grabpl
+  - compile-build-cmd
   environment:
     GCP_KEY:
       from_secret: gcp_key
@@ -3799,9 +3799,9 @@ steps:
   image: golang:1.19.2
   name: compile-build-cmd
 - commands:
-  - ./bin/grabpl publish packages --edition oss --gcp-key /tmp/gcpkey.json ${DRONE_TAG}
+  - ./bin/build publish packages --edition oss --gcp-key /tmp/gcpkey.json ${DRONE_TAG}
   depends_on:
-  - grabpl
+  - compile-build-cmd
   environment:
     GCP_KEY:
       from_secret: gcp_key
@@ -3888,10 +3888,9 @@ steps:
   image: golang:1.19.2
   name: compile-build-cmd
 - commands:
-  - ./bin/grabpl publish packages --edition enterprise --gcp-key /tmp/gcpkey.json
-    ${DRONE_TAG}
+  - ./bin/build publish packages --edition enterprise --gcp-key /tmp/gcpkey.json ${DRONE_TAG}
   depends_on:
-  - grabpl
+  - compile-build-cmd
   environment:
     GCP_KEY:
       from_secret: gcp_key
@@ -5602,6 +5601,6 @@ kind: secret
 name: packages_secret_access_key
 ---
 kind: signature
-hmac: d5d39719ea023fdedb6cfa303ed2acac29fe23060c9679c0c40511b3cc215738
+hmac: e6ea88265c5106c89b3334ea68e326a8279869ed76acd49e567e8be13cbd7c75
 
 ...
