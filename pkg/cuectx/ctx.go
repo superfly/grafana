@@ -62,7 +62,7 @@ func JSONtoCUE(path string, b []byte) (cue.Value, error) {
 // TODO this approach is complicated and confusing, refactor to something understandable
 func LoadGrafanaInstancesWithThema(path string, cueFS fs.FS, rt *thema.Runtime, opts ...thema.BindOption) (thema.Lineage, error) {
 	prefix := filepath.FromSlash(path)
-	fs, err := prefixWithGrafanaCUE(prefix, cueFS)
+	fs, err := PrefixWithGrafanaCUE(prefix, cueFS)
 	if err != nil {
 		return nil, err
 	}
@@ -84,13 +84,15 @@ func LoadGrafanaInstancesWithThema(path string, cueFS fs.FS, rt *thema.Runtime, 
 	return lin, nil
 }
 
-// prefixWithGrafanaCUE constructs an fs.FS that merges the provided fs.FS with one
+// PrefixWithGrafanaCUE constructs an fs.FS that merges the provided fs.FS with one
 // containing grafana's cue.mod at the root. The provided prefix should be the
 //
 // The returned fs.FS is suitable for passing to a CUE loader, such as
 // cuelang.org/cue/load.Instances or
 // github.com/grafana/thema/load.InstancesWithThema.
-func prefixWithGrafanaCUE(prefix string, inputfs fs.FS) (fs.FS, error) {
+//
+// TODO replace this with a generic, modular CUE FS loader/combiner
+func PrefixWithGrafanaCUE(prefix string, inputfs fs.FS) (fs.FS, error) {
 	m := fstest.MapFS{
 		// fstest can recognize only forward slashes.
 		filepath.ToSlash(filepath.Join("cue.mod", "module.cue")): &fstest.MapFile{Data: []byte(`module: "github.com/grafana/grafana"`)},

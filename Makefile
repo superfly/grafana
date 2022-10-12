@@ -63,12 +63,18 @@ openapi3-gen: swagger-api-spec ## Generates OpenApi 3 specs from the Swagger 2 a
 	$(GO) run scripts/openapi3/openapi3conv.go $(MERGED_SPEC_TARGET) $(OAPI_SPEC_TARGET)
 
 ##@ Building
-gen-cue: ## Do all CUE/Thema code generation
-	@echo "generate code from .cue files"
-	go generate ./pkg/framework/coremodel
-	go generate ./public/app/plugins
+.PHONY: gen-cue
+gen-cue: schemagen
 
-gen-go: $(WIRE) gen-cue
+schemagen: ## Do all CUE/Thema code generation
+	@echo "generate code from .cue files"
+	thema lineage gen gobindings -l pkg/plugins/plugindef/plugindef.cue \
+		--no-embed --bindtype '*Plugindef' --private > pkg/plugins/plugindef/thema_bindings_gen.go
+	thema lineage gen gotypes -l pkg/plugins/plugindef/plugindef.cue > pkg/plugins/plugindef/plugindef_gen.go
+	$(GO) generate ./pkg/framework/coremodel
+	$(GO) generate ./public/app/plugins
+
+gen-go: $(WIRE) schemagen
 	@echo "generate go files"
 	$(WIRE) gen -tags $(WIRE_TAGS) ./pkg/server ./pkg/cmd/grafana-cli/runner
 

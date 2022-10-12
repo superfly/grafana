@@ -1,4 +1,4 @@
-package pluginmeta
+package plugindef
 
 import (
 	"strings"
@@ -7,7 +7,7 @@ import (
 )
 
 thema.#Lineage
-name: "pluginmeta"
+name: "plugindef"
 seqs: [
 	{
 		schemas: [
