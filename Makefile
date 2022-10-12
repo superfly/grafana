@@ -68,9 +68,9 @@ gen-cue: schemagen
 
 schemagen: ## Do all CUE/Thema code generation
 	@echo "generate code from .cue files"
-	thema lineage gen gobindings -l pkg/plugins/plugindef/plugindef.cue \
+	$(THEMA) lineage gen gobindings -l pkg/plugins/plugindef/plugindef.cue \
 		--no-embed --bindtype '*Plugindef' --private > pkg/plugins/plugindef/thema_bindings_gen.go
-	thema lineage gen gotypes -l pkg/plugins/plugindef/plugindef.cue > pkg/plugins/plugindef/plugindef_gen.go
+	$(THEMA) lineage gen gotypes -l pkg/plugins/plugindef/plugindef.cue > pkg/plugins/plugindef/plugindef_gen.go
 	$(GO) generate ./pkg/framework/coremodel
 	$(GO) generate ./public/app/plugins
 

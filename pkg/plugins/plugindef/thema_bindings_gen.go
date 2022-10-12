@@ -46,7 +46,7 @@ func doLineage(rt *thema.Runtime, opts ...thema.BindOption) (thema.ConvergentLin
 
 func baseLineage(rt *thema.Runtime, opts ...thema.BindOption) (thema.Lineage, error) {
 	// Load a build instance from the embedded fs
-	inst, err := load.InstancesWithThema(themaFS, path.Base("pkg/plugins/plugindef/plugindef.cue"))
+	inst, err := load.InstancesWithThema(themaFS, path.Dir("pkg/plugins/plugindef/plugindef.cue"))
 	if err != nil {
 		// Errors at this point indicate a problem with basic loading of .cue file bytes,
 		// which typically means the code generator was misconfigured and a path input
