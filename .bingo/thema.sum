@@ -11,6 +11,8 @@ github.com/grafana/thema v0.0.0-20221012032358-245a35a3a696 h1:AS4IUoxWGNsQFcwJD
 github.com/grafana/thema v0.0.0-20221012032358-245a35a3a696/go.mod h1:oC05ks9htgsS7MyyWjpk3aZt/HjvXcVVbZbMVwaY2eU=
 github.com/grafana/thema v0.0.0-20221012033050-093d90ecc6d0 h1:29+7ASAMS3/nc3PNNhvRQmg/93wVP/nwk7B+Hc8bvSc=
 github.com/grafana/thema v0.0.0-20221012033050-093d90ecc6d0/go.mod h1:oC05ks9htgsS7MyyWjpk3aZt/HjvXcVVbZbMVwaY2eU=
+github.com/grafana/thema v0.0.0-20221012035236-bae1cc0acd26 h1:NYT66x/d4CTLRtjsgG8b9DvCGteK4eXeVGz5rZuDGTY=
+github.com/grafana/thema v0.0.0-20221012035236-bae1cc0acd26/go.mod h1:oC05ks9htgsS7MyyWjpk3aZt/HjvXcVVbZbMVwaY2eU=
 github.com/invopop/yaml v0.1.0 h1:YW3WGUoJEXYfzWBjn00zIlrw7brGVD0fUKRYDPAPhrc=
 github.com/josharian/intern v1.0.0 h1:vlS4z54oSdjm0bgjRigI+G1HpF+tI+9rE5LLzOg8HmY=
 github.com/labstack/echo/v4 v4.7.2 h1:Kv2/p8OaQ+M6Ex4eGimg9b9e6icoxA42JSlOR3msKtI=

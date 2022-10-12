@@ -41,11 +41,11 @@ $(SWAGGER): $(BINGO_DIR)/swagger.mod
 	@echo "(re)installing $(GOBIN)/swagger-v0.30.2"
 	@cd $(BINGO_DIR) && $(GO) build -mod=mod -modfile=swagger.mod -o=$(GOBIN)/swagger-v0.30.2 "github.com/go-swagger/go-swagger/cmd/swagger"
 
-THEMA := $(GOBIN)/thema-v0.0.0-20221012033050-093d90ecc6d0
+THEMA := $(GOBIN)/thema-v0.0.0-20221012035236-bae1cc0acd26
 $(THEMA): $(BINGO_DIR)/thema.mod
 	@# Install binary/ries using Go 1.14+ build command. This is using bwplotka/bingo-controlled, separate go module with pinned dependencies.
-	@echo "(re)installing $(GOBIN)/thema-v0.0.0-20221012033050-093d90ecc6d0"
-	@cd $(BINGO_DIR) && $(GO) build -mod=mod -modfile=thema.mod -o=$(GOBIN)/thema-v0.0.0-20221012033050-093d90ecc6d0 "github.com/grafana/thema/cmd/thema"
+	@echo "(re)installing $(GOBIN)/thema-v0.0.0-20221012035236-bae1cc0acd26"
+	@cd $(BINGO_DIR) && $(GO) build -mod=mod -modfile=thema.mod -o=$(GOBIN)/thema-v0.0.0-20221012035236-bae1cc0acd26 "github.com/grafana/thema/cmd/thema"
 
 WIRE := $(GOBIN)/wire-v0.5.0
 $(WIRE): $(BINGO_DIR)/wire.mod
