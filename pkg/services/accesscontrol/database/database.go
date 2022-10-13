@@ -9,10 +9,6 @@ import (
 	"github.com/grafana/grafana/pkg/services/sqlstore"
 )
 
-const (
-	globalOrgID = 0
-)
-
 func ProvideService(sql sqlstore.Store) *AccessControlStore {
 	return &AccessControlStore{sql}
 }
