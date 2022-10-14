@@ -103,7 +103,7 @@ func (cmd *ConditionsCmd) Execute(_ context.Context, vars mathexp.Vars) (mathexp
 				number = mathexp.NewNumber("no data", nil)
 				number.SetValue(nil)
 			case mathexp.Number:
-				if len(v.Frame.Fields) >= 1 {
+				if len(v.Frame.Fields) > 0 {
 					name = v.Frame.Fields[0].Name
 				}
 				number = v
