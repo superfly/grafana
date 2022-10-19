@@ -77,6 +77,9 @@ func (e *invalidEvalResultFormatError) Unwrap() error {
 // ExecutionResults contains the unevaluated results from executing
 // a condition.
 type ExecutionResults struct {
+	// RefID is the RefID of the condition
+	RefID string
+
 	// Condition contains the results of the condition
 	Condition data.Frames
 
@@ -254,7 +257,7 @@ func queryDataResponseToExecutionResults(c models.Condition, execResp *backend.Q
 	// datasourceExprUID is a special DatasourceUID for expressions
 	datasourceExprUID := strconv.FormatInt(expr.DatasourceID, 10)
 
-	result := ExecutionResults{Results: make(map[string]data.Frames)}
+	result := ExecutionResults{Results: make(map[string]data.Frames), RefID: c.Condition}
 	for refID, res := range execResp.Responses {
 		if len(res.Frames) == 0 {
 			// to ensure that NoData is consistent with Results we do not initialize NoData
@@ -486,7 +489,7 @@ func evaluateExecutionResult(execResults ExecutionResults, ts time.Time) Results
 			Instance:           f.Fields[0].Labels,
 			EvaluatedAt:        ts,
 			EvaluationDuration: time.Since(ts),
-			EvaluationString:   extractEvalString(f),
+			EvaluationString:   extractEvalString(f, execResults.RefID),
 			Values:             extractValues(f),
 		}
 

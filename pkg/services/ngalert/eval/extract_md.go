@@ -8,7 +8,7 @@ import (
 	"github.com/grafana/grafana/pkg/expr/classic"
 )
 
-func extractEvalString(frame *data.Frame) (s string) {
+func extractEvalString(frame *data.Frame, refID string) (s string) {
 	if frame == nil {
 		return "empty frame"
 	}
@@ -21,19 +21,16 @@ func extractEvalString(frame *data.Frame) (s string) {
 		sb := strings.Builder{}
 
 		for i, m := range evalMatches {
-			sb.WriteString("[ ")
-			sb.WriteString(fmt.Sprintf("var='%s%v' ", frame.RefID, i))
-			sb.WriteString(fmt.Sprintf("metric='%s' ", m.Metric))
-			sb.WriteString(fmt.Sprintf("labels={%s} ", m.Labels))
-
 			valString := "null"
 			if m.Value != nil {
-				valString = fmt.Sprintf("%v", *m.Value)
+				if *m.Value == float64(int64(*m.Value)) {
+					valString = fmt.Sprintf("%d", int64(*m.Value))
+				} else {
+					valString = fmt.Sprintf("%.3f", *m.Value)
+				}
 			}
+			sb.WriteString(fmt.Sprintf("'%s'=%s", m.Metric, valString))
 
-			sb.WriteString(fmt.Sprintf("value=%v ", valString))
-
-			sb.WriteString("]")
 			if i < len(evalMatches)-1 {
 				sb.WriteString(", ")
 			}
@@ -43,23 +40,17 @@ func extractEvalString(frame *data.Frame) (s string) {
 
 	if caps, ok := frame.Meta.Custom.([]NumberValueCapture); ok {
 		sb := strings.Builder{}
-
-		for i, c := range caps {
-			sb.WriteString("[ ")
-			sb.WriteString(fmt.Sprintf("var='%s' ", c.Var))
-			sb.WriteString(fmt.Sprintf("metric='%s' ", c.Metric))
-			sb.WriteString(fmt.Sprintf("labels={%s} ", c.Labels))
-
-			valString := "null"
-			if c.Value != nil {
-				valString = fmt.Sprintf("%v", *c.Value)
-			}
-
-			sb.WriteString(fmt.Sprintf("value=%v ", valString))
-
-			sb.WriteString("]")
-			if i < len(caps)-1 {
-				sb.WriteString(", ")
+		for _, c := range caps {
+			if c.Var == refID {
+				valString := "null"
+				if c.Value != nil {
+					if *c.Value == float64(int64(*c.Value)) {
+						valString = fmt.Sprintf("%d", int64(*c.Value))
+					} else {
+						valString = fmt.Sprintf("%.3f", *c.Value)
+					}
+				}
+				sb.WriteString(fmt.Sprintf("'%s'=%s", c.Metric, valString))
 			}
 		}
 		return sb.String()

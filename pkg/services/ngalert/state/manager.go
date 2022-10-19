@@ -216,12 +216,27 @@ func (st *Manager) setNextState(ctx context.Context, alertRule *ngModels.AlertRu
 
 	currentState.LastEvaluationTime = result.EvaluatedAt
 	currentState.EvaluationDuration = result.EvaluationDuration
+	values := NewEvaluationValues(result.Values)
+
 	currentState.Results = append(currentState.Results, Evaluation{
 		EvaluationTime:  result.EvaluatedAt,
 		EvaluationState: result.State,
-		Values:          NewEvaluationValues(result.Values),
+		Values:          values,
 		Condition:       alertRule.Condition,
 	})
+
+	currentValues := make(map[string]float64)
+	for _, v := range result.Values {
+		if v.Value != nil {
+			if v.Metric != "" {
+				currentValues[v.Metric] = *v.Value
+			} else {
+				currentValues[v.Var] = *v.Value
+			}
+		}
+	}
+	currentState.Values = currentValues
+
 	currentState.LastEvaluationString = result.EvaluationString
 	currentState.TrimResults(alertRule)
 	oldState := currentState.State

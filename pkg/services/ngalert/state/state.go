@@ -85,7 +85,11 @@ type Evaluation struct {
 func NewEvaluationValues(m map[string]eval.NumberValueCapture) map[string]*float64 {
 	result := make(map[string]*float64, len(m))
 	for k, v := range m {
-		result[k] = v.Value
+		if v.Metric == "" {
+			result[k] = v.Value
+		} else {
+			result[v.Metric] = v.Value
+		}
 	}
 	return result
 }
