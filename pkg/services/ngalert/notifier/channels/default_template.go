@@ -66,6 +66,14 @@ Annotations:
 
 {{ end }}{{ end }}{{ if gt (len .Alerts.Resolved) 0 }}**Resolved**
 {{ template "__teams_text_alert_list" .Alerts.Resolved }}{{ end }}{{ end }}
+
+{{ define "slack.default.title" }}{{ template "slack.alert_emoji" . }} {{ .CommonLabels.alertname }}{{ end }}
+{{ define "slack.alert_emoji" }}{{ if eq .Status "resolved" }}:white_check_mark:{{ else }}:rotating_light:{{ end }}{{ end }}
+
+{{ define "slack.default.text" -}}
+{{ if eq .Status "firing" -}}
+{{ .CommonAnnotations.summary }}{{ .CommonAnnotations.message -}}
+{{ end }}{{ end }}
 `
 
 // TemplateForTestsString is the template used for unit tests and integration tests.
