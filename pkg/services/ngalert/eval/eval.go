@@ -77,9 +77,6 @@ func (e *invalidEvalResultFormatError) Unwrap() error {
 // ExecutionResults contains the unevaluated results from executing
 // a condition.
 type ExecutionResults struct {
-	// RefID is the RefID of the condition
-	RefID string
-
 	// Condition contains the results of the condition
 	Condition data.Frames
 
@@ -116,9 +113,7 @@ type Result struct {
 	// Results contains the results of all queries, reduce and math expressions
 	Results map[string]data.Frames
 
-	// Values contains the RefID and value of reduce and math expressions.
-	// It does not contain values for classic conditions as the values
-	// in classic conditions do not have a RefID.
+	// Values contains the metric and value of the condition's reduce or math expression.
 	Values map[string]NumberValueCapture
 
 	EvaluatedAt        time.Time
@@ -257,7 +252,7 @@ func queryDataResponseToExecutionResults(c models.Condition, execResp *backend.Q
 	// datasourceExprUID is a special DatasourceUID for expressions
 	datasourceExprUID := strconv.FormatInt(expr.DatasourceID, 10)
 
-	result := ExecutionResults{Results: make(map[string]data.Frames), RefID: c.Condition}
+	result := ExecutionResults{Results: make(map[string]data.Frames)}
 	for refID, res := range execResp.Responses {
 		if len(res.Frames) == 0 {
 			// to ensure that NoData is consistent with Results we do not initialize NoData
@@ -489,7 +484,7 @@ func evaluateExecutionResult(execResults ExecutionResults, ts time.Time) Results
 			Instance:           f.Fields[0].Labels,
 			EvaluatedAt:        ts,
 			EvaluationDuration: time.Since(ts),
-			EvaluationString:   extractEvalString(f, execResults.RefID),
+			EvaluationString:   extractEvalString(f),
 			Values:             extractValues(f),
 		}
 
