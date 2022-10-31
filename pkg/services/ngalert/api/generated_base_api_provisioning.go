@@ -7,6 +7,7 @@
 package api
 
 import (
+	alerting_models "github.com/grafana/grafana/pkg/services/ngalert/models"
 	"net/http"
 
 	"github.com/grafana/grafana/pkg/api/response"
@@ -98,7 +99,7 @@ func (f *ProvisioningApiHandler) RouteGetTemplates(ctx *models.ReqContext) respo
 }
 func (f *ProvisioningApiHandler) RoutePostAlertRule(ctx *models.ReqContext) response.Response {
 	// Parse Request Body
-	conf := apimodels.ProvisionedAlertRule{}
+	conf := apimodels.ProvisionedAlertRule{Provenance: alerting_models.ProvenanceAPI}
 	if err := web.Bind(ctx.Req, &conf); err != nil {
 		return response.Error(http.StatusBadRequest, "bad request data", err)
 	}
@@ -124,7 +125,7 @@ func (f *ProvisioningApiHandler) RoutePutAlertRule(ctx *models.ReqContext) respo
 	// Parse Path Parameters
 	uIDParam := web.Params(ctx.Req)[":UID"]
 	// Parse Request Body
-	conf := apimodels.ProvisionedAlertRule{}
+	conf := apimodels.ProvisionedAlertRule{Provenance: alerting_models.ProvenanceAPI}
 	if err := web.Bind(ctx.Req, &conf); err != nil {
 		return response.Error(http.StatusBadRequest, "bad request data", err)
 	}
