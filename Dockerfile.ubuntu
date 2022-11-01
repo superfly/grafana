@@ -39,7 +39,7 @@ RUN make build-go
 
 FROM ubuntu:20.04
 
-LABEL maintainer="Grafana team <hello@grafana.com>"
+LABEL maintainer="Will Jordan <will@fly.io>"
 EXPOSE 3000
 
 ARG GF_UID="472"
