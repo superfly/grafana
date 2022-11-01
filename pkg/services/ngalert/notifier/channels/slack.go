@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	ngmodels "github.com/grafana/grafana/pkg/services/ngalert/models"
 	"io"
 	"net"
 	"net/http"
@@ -20,9 +21,7 @@ import (
 
 	"github.com/grafana/grafana/pkg/infra/log"
 	"github.com/grafana/grafana/pkg/models"
-	ngmodels "github.com/grafana/grafana/pkg/services/ngalert/models"
 	"github.com/grafana/grafana/pkg/services/notifications"
-	"github.com/grafana/grafana/pkg/setting"
 )
 
 var SlackAPIEndpoint = "https://slack.com/api/chat.postMessage"
@@ -51,6 +50,7 @@ type slackSettings struct {
 	MentionChannel string                `json:"mentionChannel,omitempty" yaml:"mentionChannel,omitempty"`
 	MentionUsers   CommaSeparatedStrings `json:"mentionUsers,omitempty" yaml:"mentionUsers,omitempty"`
 	MentionGroups  CommaSeparatedStrings `json:"mentionGroups,omitempty" yaml:"mentionGroups,omitempty"`
+	IncludeFields  bool                  `json:"includeFields,omitempty" yaml:"includeFields,omitempty"`
 }
 
 // SlackFactory creates a new NotificationChannel that sends notifications to Slack.
@@ -101,10 +101,10 @@ func buildSlackNotifier(factoryConfig FactoryConfig) (*SlackNotifier, error) {
 		settings.Username = "Grafana"
 	}
 	if settings.Text == "" {
-		settings.Text = DefaultMessageEmbed
+		settings.Text = config.DefaultSlackConfig.Text
 	}
 	if settings.Title == "" {
-		settings.Title = DefaultMessageTitleEmbed
+		settings.Title = config.DefaultSlackConfig.Title
 	}
 
 	return &SlackNotifier{
@@ -126,13 +126,13 @@ func buildSlackNotifier(factoryConfig FactoryConfig) (*SlackNotifier, error) {
 
 // slackMessage is the slackMessage for sending a slack notification.
 type slackMessage struct {
-	Channel     string                   `json:"channel,omitempty"`
-	Text        string                   `json:"text,omitempty"`
-	Username    string                   `json:"username,omitempty"`
-	IconEmoji   string                   `json:"icon_emoji,omitempty"`
-	IconURL     string                   `json:"icon_url,omitempty"`
-	Attachments []attachment             `json:"attachments"`
-	Blocks      []map[string]interface{} `json:"blocks"`
+	Channel     string       `json:"channel,omitempty"`
+	Text        string       `json:"text,omitempty"`
+	Username    string       `json:"username,omitempty"`
+	IconEmoji   string       `json:"icon_emoji,omitempty"`
+	IconURL     string       `json:"icon_url,omitempty"`
+	Attachments []attachment `json:"attachments,omitempty"`
+	Blocks      []block      `json:"blocks"`
 }
 
 // attachment is used to display a richly-formatted message block.
@@ -147,6 +147,29 @@ type attachment struct {
 	FooterIcon string              `json:"footer_icon"`
 	Color      string              `json:"color,omitempty"`
 	Ts         int64               `json:"ts,omitempty"`
+	Blocks     []block             `json:"blocks"`
+}
+
+type slackText struct {
+	Type string `json:"type"`
+	Text string `json:"text"`
+}
+
+type element struct {
+	Type     string `json:"type"`
+	Text     string `json:"text,omitempty"`
+	ImageURL string `json:"image_url,omitempty"`
+	AltText  string `json:"alt_text,omitempty"`
+}
+
+type block struct {
+	Type      string      `json:"type"`
+	Text      *slackText  `json:"text,omitempty"`
+	Fields    []slackText `json:"fields,omitempty"`    // section
+	Accessory *element    `json:"accessory,omitempty"` // section
+	Elements  []element   `json:"elements,omitempty"`  // context block
+	ImageURL  string      `json:"image_url,omitempty"` // image block
+	AltText   string      `json:"alt_text,omitempty"`  // image block
 }
 
 // Notify sends an alert notification to Slack.
@@ -253,42 +276,96 @@ var sendSlackRequest = func(request *http.Request, logger log.Logger) (retErr er
 }
 
 func (sn *SlackNotifier) buildSlackMessage(ctx context.Context, alrts []*types.Alert) (*slackMessage, error) {
-	alerts := types.Alerts(alrts...)
 	var tmplErr error
-	tmpl, _ := TmplText(ctx, sn.tmpl, alrts, sn.log, &tmplErr)
+	tmpl, data := TmplText(ctx, sn.tmpl, alrts, sn.log, &tmplErr)
 
 	ruleURL := joinUrlPath(sn.tmpl.ExternalURL.String(), "/alerting/list", sn.log)
+	if len(alrts) > 0 && alrts[0].GeneratorURL != "" {
+		ruleURL = alrts[0].GeneratorURL
+	}
+
+	title := tmpl(sn.settings.Title)
+	if title == "" {
+		if len(alrts) > 0 {
+			title = alrts[0].Name()
+		} else {
+			title = "Alert"
+		}
+	}
+	titleString := title
+	if sn.settings.IncludeFields {
+		var alertStrings []string
+		for i, alert := range data.Alerts.Firing() {
+			if i < 10 {
+				alertStrings = append(alertStrings, alert.ValueString)
+			}
+		}
+		if len(alertStrings) > 0 {
+			titleString += "\n" + strings.Join(alertStrings, ", ")
+		}
+	}
 
 	req := &slackMessage{
 		Channel:   tmpl(sn.settings.Recipient),
-		Text:      tmpl(sn.settings.Title),
+		Text:      titleString,
 		Username:  tmpl(sn.settings.Username),
 		IconEmoji: tmpl(sn.settings.IconEmoji),
 		IconURL:   tmpl(sn.settings.IconURL),
-		// TODO: We should use the Block Kit API instead:
-		// https://api.slack.com/messaging/composing/layouts#when-to-use-attachments
-		Attachments: []attachment{
+		Blocks: []block{
 			{
-				Color:      getAlertStatusColor(alerts.Status()),
-				Title:      tmpl(sn.settings.Title),
-				Fallback:   tmpl(sn.settings.Title),
-				Footer:     "Grafana v" + setting.BuildVersion,
-				FooterIcon: FooterIconURL,
-				Ts:         time.Now().Unix(),
-				TitleLink:  ruleURL,
-				Text:       tmpl(sn.settings.Text),
-				Fields:     nil, // TODO. Should be a config.
+				Type: "section",
+				Text: &slackText{Type: "mrkdwn", Text: fmt.Sprintf("<%s|%s>", ruleURL, title)},
 			},
 		},
 	}
+	var sectionBlock *block
+	mainText := tmpl(sn.settings.Text)
+	if mainText != "" {
+		sectionBlock = &block{Type: "section"}
+		sectionBlock.Text = &slackText{Text: tmpl(sn.settings.Text), Type: "mrkdwn"}
+	}
 
+	// Append up to 10 firing-alert Values as fields.
+	if sn.settings.IncludeFields {
+		for _, alert := range data.Alerts.Firing() {
+			for name, value := range alert.Values {
+				if sectionBlock == nil {
+					sectionBlock = &block{Type: "section"}
+				}
+				if len(sectionBlock.Fields) < 10 {
+					valString := fmt.Sprintf("%.3f", value)
+					if value == float64(int64(value)) {
+						valString = fmt.Sprintf("%d", int64(value))
+					}
+					sectionBlock.Fields = append(sectionBlock.Fields, slackText{
+						Type: "mrkdwn",
+						Text: fmt.Sprintf("*%s*\n%s", name, valString),
+					})
+				}
+			}
+		}
+	}
+
+	// Attach stored image.
 	_ = withStoredImages(ctx, sn.log, sn.images, func(index int, image ngmodels.Image) error {
-		req.Attachments[0].ImageURL = image.URL
+		if sectionBlock == nil {
+			sectionBlock = &block{
+				Type:     "image",
+				ImageURL: image.URL,
+				AltText:  image.URL,
+			}
+		} else {
+			sectionBlock.Accessory = &element{
+				Type:     "image",
+				ImageURL: image.URL,
+				AltText:  image.URL,
+			}
+		}
 		return ErrImagesDone
 	}, alrts...)
 
-	if tmplErr != nil {
-		sn.log.Warn("failed to template Slack message", "error", tmplErr.Error())
+	if sectionBlock != nil {
+		req.Blocks = append(req.Blocks, *sectionBlock)
 	}
 
 	mentionsBuilder := strings.Builder{}
@@ -315,15 +392,16 @@ func (sn *SlackNotifier) buildSlackMessage(ctx context.Context, alrts []*types.A
 	}
 
 	if mentionsBuilder.Len() > 0 {
-		req.Blocks = []map[string]interface{}{
-			{
-				"type": "section",
-				"text": map[string]interface{}{
-					"type": "mrkdwn",
-					"text": mentionsBuilder.String(),
-				},
+		req.Blocks = append(req.Blocks, block{
+			Type: "section",
+			Text: &slackText{
+				Type: "mrkdwn",
+				Text: mentionsBuilder.String(),
 			},
-		}
+		})
+	}
+	if tmplErr != nil {
+		sn.log.Warn("failed to template Slack message", "error", tmplErr.Error())
 	}
 
 	return req, nil

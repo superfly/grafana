@@ -5,6 +5,7 @@ package eval
 import (
 	"errors"
 	"fmt"
+	"github.com/grafana/grafana/pkg/expr/mathexp"
 	"runtime/debug"
 	"sort"
 	"strconv"
@@ -109,9 +110,7 @@ type Result struct {
 	// Results contains the results of all queries, reduce and math expressions
 	Results map[string]data.Frames
 
-	// Values contains the RefID and value of reduce and math expressions.
-	// It does not contain values for classic conditions as the values
-	// in classic conditions do not have a RefID.
+	// Values contains the metric and value of the condition's reduce or math expression.
 	Values map[string]NumberValueCapture
 
 	EvaluatedAt        time.Time
@@ -230,16 +229,18 @@ type NumberValueCapture struct {
 	Var    string // RefID
 	Labels data.Labels
 	Value  *float64
+	Metric string
 }
 
 func queryDataResponseToExecutionResults(c models.Condition, execResp *backend.QueryDataResponse) ExecutionResults {
 	// eval captures for the '__value_string__' annotation and the Value property of the API response.
 	captures := make([]NumberValueCapture, 0, len(execResp.Responses))
-	captureVal := func(refID string, labels data.Labels, value *float64) {
+	captureVal := func(refID string, labels data.Labels, name string, value *float64) {
 		captures = append(captures, NumberValueCapture{
 			Var:    refID,
 			Value:  value,
 			Labels: labels.Copy(),
+			Metric: name,
 		})
 	}
 
@@ -266,16 +267,19 @@ func queryDataResponseToExecutionResults(c models.Condition, execResp *backend.Q
 		}
 
 		// for each frame within each response, the response can contain several data types including time-series data.
-		// For now, we favour simplicity and only care about single scalar values.
 		for _, frame := range res.Frames {
 			if len(frame.Fields) != 1 || frame.Fields[0].Type() != data.FieldTypeNullableFloat64 {
+				if series, err := mathexp.SeriesFromFrame(frame); err == nil {
+					// Capture nil value for time series data that contains multiple values.
+					captureVal(frame.RefID, series.GetLabels(), series.GetName(), nil)
+				}
 				continue
 			}
 			var v *float64
 			if frame.Fields[0].Len() == 1 {
 				v = frame.At(0, 0).(*float64) // type checked above
 			}
-			captureVal(frame.RefID, frame.Fields[0].Labels, v)
+			captureVal(frame.RefID, frame.Fields[0].Labels, frame.Fields[0].Name, v)
 		}
 
 		if refID == c.Condition {
