@@ -133,7 +133,7 @@ type slackMessage struct {
 	IconEmoji   string                   `json:"icon_emoji,omitempty"`
 	IconURL     string                   `json:"icon_url,omitempty"`
 	Attachments []attachment             `json:"attachments"`
-	Blocks      []map[string]interface{} `json:"blocks"`
+	Blocks      []map[string]interface{} `json:"blocks,omitempty"`
 }
 
 // attachment is used to display a richly-formatted message block.
