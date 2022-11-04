@@ -3,12 +3,13 @@ import React, { useState } from 'react';
 
 import { GrafanaTheme2 } from '@grafana/data';
 import { Card, Link, useStyles2, useTheme2 } from '@grafana/ui';
+import { config } from '@grafana/runtime';
 
 import LabelsField from './LabelsField';
 import { RuleEditorSection } from './RuleEditorSection';
 
 export const NotificationsStep = () => {
-  const [hideFlowChart, setHideFlowChart] = useState(false);
+  const [hideFlowChart, setHideFlowChart] = useState(config.unifiedAlerting.hideFlowChart);
   const styles = useStyles2(getStyles);
   const theme = useTheme2();
 
@@ -33,14 +34,16 @@ export const NotificationsStep = () => {
         )}
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           <LabelsField />
-          <Card className={styles.card}>
-            <Card.Heading>Root route – default for all alerts</Card.Heading>
-            <Card.Description>
-              Without custom labels, your alert will be routed through the root route. To view and edit the root route,
-              go to <Link href="/alerting/routes">notification policies</Link> or contact your admin in case you are
-              using non-Grafana alert management.
-            </Card.Description>
-          </Card>
+          {!hideFlowChart && (
+            <Card className={styles.card}>
+              <Card.Heading>Root route – default for all alerts</Card.Heading>
+              <Card.Description>
+                Without custom labels, your alert will be routed through the root route. To view and edit the root route,
+                go to <Link href="/alerting/routes">notification policies</Link> or contact your admin in case you are
+                using non-Grafana alert management.
+              </Card.Description>
+            </Card>
+          )}
         </div>
       </div>
     </RuleEditorSection>
