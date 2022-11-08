@@ -124,16 +124,16 @@ export class GrafanaBootConfig implements GrafanaConfig {
   unifiedAlertingEnabled = false;
   unifiedAlerting = {
     minInterval: '',
-    externalAlertingEnabled: true,
-    defaultGroup: '',
+    externalAlertingEnabled: false, //true,
+    defaultGroup: 'test', //'',
     defaultFolder: null,
-    defaultNoDataState: 'NoData',
+    defaultNoDataState: 'OK', //'NoData',
     defaultExecErrState: 'Error',
     defaultEvaluateEvery: '1m',
-    defaultEvaluateFor: '5m',
-    defaultAnnotationKeys: ['summary', 'description', 'runbookURL'],
+    defaultEvaluateFor: '0s', //'5m',
+    defaultAnnotationKeys: ['summary'], //, 'description', 'runbookURL'],
     defaultLabelKeys: [''],
-    hideFlowChart: false
+    hideFlowChart: true //false
   };
   applicationInsightsConnectionString?: string;
   applicationInsightsEndpointUrl?: string;
