@@ -3,7 +3,6 @@ package setting
 import (
 	"errors"
 	"fmt"
-	"github.com/grafana/grafana/pkg/services/ngalert/models"
 	"strconv"
 	"strings"
 	"time"
@@ -62,8 +61,8 @@ const (
 	alertingDefaultExternalEnabled     = true
 	alertingDefaultGroup               = ""
 	alertingDefaultFolderUID           = ""
-	alertingDefaultNoDataState         = models.NoData
-	alertingDefaultExecutionErrorState = models.ErrorErrState
+	alertingDefaultNoDataState         = "NoData"
+	alertingDefaultExecutionErrorState = "Error"
 	alertingDefaultEvaluateEvery       = 1 * time.Minute
 	alertingDefaultEvaluateFor         = 1 * time.Minute
 	alertingDefaultHideFlowChart       = false
@@ -97,8 +96,8 @@ type UnifiedAlertingSettings struct {
 	DefaultExternalEnabled        bool
 	DefaultGroup                  string
 	DefaultFolderUID              string
-	DefaultNoDataState            models.NoDataState
-	DefaultExecutionErrorState    models.ExecutionErrorState
+	DefaultNoDataState            string
+	DefaultExecutionErrorState    string
 	DefaultEvaluateEvery          time.Duration
 	DefaultEvaluateFor            time.Duration
 	DefaultHideFlowChart          bool
@@ -318,16 +317,8 @@ func (cfg *Cfg) ReadUnifiedAlertingSettings(iniFile *ini.File) error {
 	uaCfg.DefaultExternalEnabled = ua.Key("external_enabled").MustBool(alertingDefaultExternalEnabled)
 	uaCfg.DefaultGroup = ua.Key("default_group").MustString(alertingDefaultGroup)
 	uaCfg.DefaultFolderUID = ua.Key("default_folder").MustString(alertingDefaultFolderUID)
-	uaCfg.DefaultNoDataState, err = models.NoDataStateFromString(ua.Key("default_no_data_state").
-		MustString(alertingDefaultNoDataState.String()))
-	if err != nil {
-		return err
-	}
-	uaCfg.DefaultExecutionErrorState, err = models.ErrStateFromString(ua.Key("default_execution_error_state").
-		MustString(alertingDefaultExecutionErrorState.String()))
-	if err != nil {
-		return err
-	}
+	uaCfg.DefaultNoDataState = ua.Key("default_no_data_state").MustString(alertingDefaultNoDataState)
+	uaCfg.DefaultExecutionErrorState = ua.Key("default_execution_error_state").MustString(alertingDefaultExecutionErrorState)
 	uaCfg.DefaultEvaluateEvery, err = gtime.ParseDuration(valueAsString(ua, "default_evaluate_every", alertingDefaultEvaluateEvery.String()))
 	if err != nil {
 		return err
