@@ -2,9 +2,6 @@ package api
 
 import (
 	"context"
-	"net/http"
-	"strconv"
-
 	"github.com/grafana/grafana/pkg/models"
 	"github.com/grafana/grafana/pkg/plugins"
 	"github.com/grafana/grafana/pkg/services/accesscontrol"
@@ -16,6 +13,8 @@ import (
 	"github.com/grafana/grafana/pkg/setting"
 	"github.com/grafana/grafana/pkg/tsdb/grafanads"
 	"github.com/grafana/grafana/pkg/util"
+	"net/http"
+	"strconv"
 )
 
 func (hs *HTTPServer) GetFrontendSettings(c *models.ReqContext) {
@@ -199,7 +198,7 @@ func (hs *HTTPServer) getFrontendSettingsMap(c *models.ReqContext) (map[string]i
 			"minInterval":             hs.Cfg.UnifiedAlerting.MinInterval.String(),
 			"externalAlertingEnabled": hs.Cfg.UnifiedAlerting.DefaultExternalEnabled,
 			"defaultGroup":            hs.Cfg.UnifiedAlerting.DefaultGroup,
-			"defaultFolder":           hs.Cfg.UnifiedAlerting.DefaultFolderUID,
+			"defaultFolder":           map[string]interface{}{"title": hs.Cfg.UnifiedAlerting.DefaultFolder},
 			"defaultNoDataState":      hs.Cfg.UnifiedAlerting.DefaultNoDataState,
 			"defaultExecErrState":     hs.Cfg.UnifiedAlerting.DefaultExecutionErrorState,
 			"defaultEvaluateEvery":    hs.Cfg.UnifiedAlerting.DefaultEvaluateEvery.String(),

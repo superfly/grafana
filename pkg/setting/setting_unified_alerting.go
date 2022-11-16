@@ -59,9 +59,9 @@ const (
 	// DefaultRuleEvaluationInterval indicates a default interval of for how long a rule should be evaluated to change state from Pending to Alerting
 	DefaultRuleEvaluationInterval      = SchedulerBaseInterval * 6 // == 60 seconds
 	alertingDefaultExternalEnabled     = true
-	alertingDefaultGroup               = ""
-	alertingDefaultFolderUID           = ""
-	alertingDefaultNoDataState         = "NoData"
+	alertingDefaultGroup       = ""
+	alertingDefaultFolder      = ""
+	alertingDefaultNoDataState = "NoData"
 	alertingDefaultExecutionErrorState = "Error"
 	alertingDefaultEvaluateEvery       = 1 * time.Minute
 	alertingDefaultEvaluateFor         = 1 * time.Minute
@@ -94,9 +94,9 @@ type UnifiedAlertingSettings struct {
 	Screenshots                   UnifiedAlertingScreenshotSettings
 	ReservedLabels                UnifiedAlertingReservedLabelSettings
 	DefaultExternalEnabled        bool
-	DefaultGroup                  string
-	DefaultFolderUID              string
-	DefaultNoDataState            string
+	DefaultGroup       string
+	DefaultFolder      string
+	DefaultNoDataState string
 	DefaultExecutionErrorState    string
 	DefaultEvaluateEvery          time.Duration
 	DefaultEvaluateFor            time.Duration
@@ -316,7 +316,7 @@ func (cfg *Cfg) ReadUnifiedAlertingSettings(iniFile *ini.File) error {
 
 	uaCfg.DefaultExternalEnabled = ua.Key("external_enabled").MustBool(alertingDefaultExternalEnabled)
 	uaCfg.DefaultGroup = ua.Key("default_group").MustString(alertingDefaultGroup)
-	uaCfg.DefaultFolderUID = ua.Key("default_folder").MustString(alertingDefaultFolderUID)
+	uaCfg.DefaultFolder = ua.Key("default_folder").MustString(alertingDefaultFolder)
 	uaCfg.DefaultNoDataState = ua.Key("default_no_data_state").MustString(alertingDefaultNoDataState)
 	uaCfg.DefaultExecutionErrorState = ua.Key("default_execution_error_state").MustString(alertingDefaultExecutionErrorState)
 	uaCfg.DefaultEvaluateEvery, err = gtime.ParseDuration(valueAsString(ua, "default_evaluate_every", alertingDefaultEvaluateEvery.String()))
