@@ -2,7 +2,6 @@ package eval
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 
 	"github.com/grafana/grafana-plugin-sdk-go/data"
@@ -103,31 +102,4 @@ func extractValues(frame *data.Frame) map[string]NumberValueCapture {
 		return v
 	}
 	return nil
-}
-
-// When a metric is "" or "Value", replace it with formatted labels.
-// Approximates the frontend auto-naming logic in getFrameDisplayName.
-func formatMetric(metric string, labels data.Labels) string {
-	if metric == "" || metric == data.TimeSeriesValueFieldName {
-		if len(labels) == 1 {
-			for _, label := range labels {
-				metric = label
-			}
-		} else if len(labels) > 1 {
-			keys := make([]string, len(labels))
-			i := 0
-			for k := range labels {
-				keys[i] = k
-				i++
-			}
-			sort.Strings(keys)
-
-			var labelStrings []string
-			for _, k := range keys {
-				labelStrings = append(labelStrings, fmt.Sprintf("%s=%s", k, labels[k]))
-			}
-			metric = fmt.Sprintf("{%s}", strings.Join(labelStrings, ", "))
-		}
-	}
-	return metric
 }
