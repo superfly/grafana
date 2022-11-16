@@ -33,6 +33,7 @@ COPY cue.mod cue.mod/
 COPY packages/grafana-schema packages/grafana-schema/
 COPY public/app/plugins public/app/plugins/
 COPY public/api-spec.json public/api-spec.json
+COPY kinds kinds/
 
 RUN go mod verify
 RUN make build-go
