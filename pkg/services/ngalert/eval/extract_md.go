@@ -30,8 +30,7 @@ func extractEvalString(frame *data.Frame) (s string) {
 					valString = fmt.Sprintf("%.3f", *m.Value)
 				}
 			}
-			metric := formatMetric(m.Metric, m.Labels)
-			sb.WriteString(fmt.Sprintf("%s=%s", metric, valString))
+			sb.WriteString(fmt.Sprintf("%s=%s", m.Metric, valString))
 
 			if i < len(evalMatches)-1 {
 				sb.WriteString(", ")
@@ -52,8 +51,7 @@ func extractEvalString(frame *data.Frame) (s string) {
 						valString = fmt.Sprintf("%.3f", *c.Value)
 					}
 				}
-				metric := formatMetric(c.Metric, c.Labels)
-				sb.WriteString(fmt.Sprintf("%s=%s", metric, valString))
+				sb.WriteString(fmt.Sprintf("%s=%s", c.Metric, valString))
 			}
 		}
 		return sb.String()
@@ -81,7 +79,7 @@ func extractValues(frame *data.Frame) map[string]NumberValueCapture {
 		for i, match := range matches {
 			// In classic conditions we can use the condition position as a suffix to distinguish between duplicate names.
 			// We can guarantee determinism as conditions are ordered and this order is preserved when marshaling.
-			metric := formatMetric(match.Metric, match.Labels)
+			metric := match.Metric
 			if _, ok := v[metric]; ok {
 				metric += fmt.Sprintf(" [%d]", i)
 			}
@@ -99,8 +97,7 @@ func extractValues(frame *data.Frame) map[string]NumberValueCapture {
 		v := make(map[string]NumberValueCapture, len(caps))
 		for _, c := range caps {
 			if c.Var == frame.RefID {
-				metric := formatMetric(c.Metric, c.Labels)
-				v[metric] = c
+				v[c.Metric] = c
 			}
 		}
 		return v
