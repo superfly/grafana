@@ -57,7 +57,17 @@ const (
 	// with intervals that are not exactly divided by this number not to be evaluated
 	SchedulerBaseInterval = 10 * time.Second
 	// DefaultRuleEvaluationInterval indicates a default interval of for how long a rule should be evaluated to change state from Pending to Alerting
-	DefaultRuleEvaluationInterval = SchedulerBaseInterval * 6 // == 60 seconds
+	DefaultRuleEvaluationInterval      = SchedulerBaseInterval * 6 // == 60 seconds
+	alertingDefaultExternalEnabled     = true
+	alertingDefaultGroup               = ""
+	alertingDefaultFolderUID           = ""
+	alertingDefaultNoDataState         = "NoData"
+	alertingDefaultExecutionErrorState = "Error"
+	alertingDefaultEvaluateEvery       = 1 * time.Minute
+	alertingDefaultEvaluateFor         = 1 * time.Minute
+	alertingDefaultHideFlowChart       = false
+	alertingDefaultAnnotationKeys      = "summary, description, runbookURL"
+	alertingDefaultLabelKeys           = ""
 )
 
 type UnifiedAlertingSettings struct {
@@ -83,6 +93,16 @@ type UnifiedAlertingSettings struct {
 	DefaultRuleEvaluationInterval time.Duration
 	Screenshots                   UnifiedAlertingScreenshotSettings
 	ReservedLabels                UnifiedAlertingReservedLabelSettings
+	DefaultExternalEnabled        bool
+	DefaultGroup                  string
+	DefaultFolderUID              string
+	DefaultNoDataState            string
+	DefaultExecutionErrorState    string
+	DefaultEvaluateEvery          time.Duration
+	DefaultEvaluateFor            time.Duration
+	DefaultHideFlowChart          bool
+	DefaultAnnotationKeys         []string
+	DefaultLabelKeys              []string
 }
 
 type UnifiedAlertingScreenshotSettings struct {
@@ -293,6 +313,41 @@ func (cfg *Cfg) ReadUnifiedAlertingSettings(iniFile *ini.File) error {
 		uaCfgReservedLabels.DisabledLabels[label] = struct{}{}
 	}
 	uaCfg.ReservedLabels = uaCfgReservedLabels
+
+	uaCfg.DefaultExternalEnabled = ua.Key("external_enabled").MustBool(alertingDefaultExternalEnabled)
+	uaCfg.DefaultGroup = ua.Key("default_group").MustString(alertingDefaultGroup)
+	uaCfg.DefaultFolderUID = ua.Key("default_folder").MustString(alertingDefaultFolderUID)
+	uaCfg.DefaultNoDataState = ua.Key("default_no_data_state").MustString(alertingDefaultNoDataState)
+	uaCfg.DefaultExecutionErrorState = ua.Key("default_execution_error_state").MustString(alertingDefaultExecutionErrorState)
+	uaCfg.DefaultEvaluateEvery, err = gtime.ParseDuration(valueAsString(ua, "default_evaluate_every", alertingDefaultEvaluateEvery.String()))
+	if err != nil {
+		return err
+	}
+	uaCfg.DefaultEvaluateFor, err = gtime.ParseDuration(valueAsString(ua, "default_evaluate_for", alertingDefaultEvaluateFor.String()))
+	if err != nil {
+		return err
+	}
+	uaCfg.DefaultHideFlowChart = ua.Key("default_hide_flow_chart").MustBool(alertingDefaultHideFlowChart)
+
+	uaCfg.DefaultAnnotationKeys = make([]string, 0)
+	annotationKeys := ua.Key("default_annotation_keys").MustString(alertingDefaultAnnotationKeys)
+	if annotationKeys != "" {
+		for _, annotationKey := range strings.Split(annotationKeys, ",") {
+			annotationKey = strings.TrimSpace(annotationKey)
+			uaCfg.DefaultAnnotationKeys = append(uaCfg.DefaultAnnotationKeys, annotationKey)
+		}
+	}
+
+	uaCfg.DefaultLabelKeys = make([]string, 0)
+	labelKeys := ua.Key("default_label_keys").MustString(alertingDefaultLabelKeys)
+	if labelKeys != "" {
+		for _, labelKey := range strings.Split(labelKeys, ",") {
+			labelKey = strings.TrimSpace(labelKey)
+			uaCfg.DefaultLabelKeys = append(uaCfg.DefaultLabelKeys, labelKey)
+		}
+	} else {
+		uaCfg.DefaultLabelKeys = append(uaCfg.DefaultLabelKeys, "")
+	}
 
 	cfg.UnifiedAlerting = uaCfg
 	return nil

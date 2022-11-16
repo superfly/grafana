@@ -122,7 +122,19 @@ export class GrafanaBootConfig implements GrafanaConfig {
   geomapDefaultBaseLayerConfig?: MapLayerOptions;
   geomapDisableCustomBaseLayer?: boolean;
   unifiedAlertingEnabled = false;
-  unifiedAlerting = { minInterval: '' };
+  unifiedAlerting = {
+    minInterval: '',
+    externalAlertingEnabled: false, //true,
+    defaultGroup: 'test', //'',
+    defaultFolder: null,
+    defaultNoDataState: 'OK', //'NoData',
+    defaultExecErrState: 'Error',
+    defaultEvaluateEvery: '1m',
+    defaultEvaluateFor: '0s', //'5m',
+    defaultAnnotationKeys: ['summary'], //, 'description', 'runbookURL'],
+    defaultLabelKeys: [''],
+    hideFlowChart: true //false
+  };
   applicationInsightsConnectionString?: string;
   applicationInsightsEndpointUrl?: string;
   recordedQueries = {

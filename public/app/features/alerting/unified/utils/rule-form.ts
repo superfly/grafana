@@ -19,8 +19,7 @@ import { RuleWithLocation } from 'app/types/unified-alerting';
 import {
   AlertDataQuery,
   AlertQuery,
-  Annotations,
-  GrafanaAlertStateDecision,
+  Annotations, GrafanaAlertStateDecision,
   Labels,
   PostableRuleGrafanaRuleDTO,
   RulerAlertingRuleDTO,
@@ -37,30 +36,29 @@ import { getDefaultOrFirstCompatibleDataSource, isGrafanaRulesSource } from './d
 import { arrayToRecord, recordToArray } from './misc';
 import { isAlertingRulerRule, isGrafanaRulerRule, isRecordingRulerRule } from './rules';
 import { parseInterval } from './time';
+import { config } from '@grafana/runtime';
 
 export const getDefaultFormValues = (): RuleFormValues => {
   const { canCreateGrafanaRules, canCreateCloudRules } = getRulesAccess();
 
   return Object.freeze({
     name: '',
-    labels: [{ key: '', value: '' }],
-    annotations: [
-      { key: Annotation.summary, value: '' },
-      { key: Annotation.description, value: '' },
-      { key: Annotation.runbookURL, value: '' },
-    ],
+    labels: config.unifiedAlerting.defaultLabelKeys
+      .map(key => {return {key: key, value: ''}}),
+    annotations: config.unifiedAlerting.defaultAnnotationKeys
+      .map(key => {return {key: Annotation[key] || key, value: ''}}),
     dataSourceName: null,
     type: canCreateGrafanaRules ? RuleFormType.grafana : canCreateCloudRules ? RuleFormType.cloudAlerting : undefined, // viewers can't create prom alerts
-    group: '',
+    group: config.unifiedAlerting.defaultGroup,
 
     // grafana
-    folder: null,
+    folder: config.unifiedAlerting.defaultFolder,
     queries: [],
     condition: '',
-    noDataState: GrafanaAlertStateDecision.NoData,
-    execErrState: GrafanaAlertStateDecision.Error,
-    evaluateEvery: '1m',
-    evaluateFor: '5m',
+    noDataState: GrafanaAlertStateDecision[config.unifiedAlerting.defaultNoDataState],
+    execErrState: GrafanaAlertStateDecision[config.unifiedAlerting.defaultExecErrState],
+    evaluateEvery: config.unifiedAlerting.defaultEvaluateEvery,
+    evaluateFor: config.unifiedAlerting.defaultEvaluateFor,
 
     // cortex / loki
     namespace: '',

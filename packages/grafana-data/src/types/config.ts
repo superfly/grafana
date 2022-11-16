@@ -74,6 +74,19 @@ export interface GrafanaJavascriptAgentConfig {
 
 export interface UnifiedAlertingConfig {
   minInterval: string;
+  externalAlertingEnabled: boolean;
+  defaultGroup: string;
+  defaultFolder: {
+    title: string;
+    id: number;
+  } | null;
+  defaultNoDataState: string;
+  defaultExecErrState: string;
+  defaultEvaluateEvery: string;
+  defaultEvaluateFor: string;
+  hideFlowChart: boolean;
+  defaultAnnotationKeys: string[];
+  defaultLabelKeys: string[];
 }
 
 /**
