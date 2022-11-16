@@ -124,6 +124,7 @@ func (hs *HTTPServer) getFrontendSettingsMap(c *models.ReqContext) (map[string]i
 		"queryHistoryEnabled":                 hs.Cfg.QueryHistoryEnabled,
 		"googleAnalyticsId":                   setting.GoogleAnalyticsId,
 		"googleAnalytics4Id":                  setting.GoogleAnalytics4Id,
+		"GoogleAnalytics4SendManualPageViews": setting.GoogleAnalytics4SendManualPageViews,
 		"rudderstackWriteKey":                 setting.RudderstackWriteKey,
 		"rudderstackDataPlaneUrl":             setting.RudderstackDataPlaneUrl,
 		"rudderstackSdkUrl":                   setting.RudderstackSdkUrl,
@@ -207,6 +208,9 @@ func (hs *HTTPServer) getFrontendSettingsMap(c *models.ReqContext) (map[string]i
 			"defaultLabelKeys":        hs.Cfg.UnifiedAlerting.DefaultLabelKeys,
 			"hideFlowChart":           hs.Cfg.UnifiedAlerting.DefaultHideFlowChart,
 		},
+		"oauth":       hs.getEnabledOAuthProviders(),
+		"samlEnabled": hs.samlEnabled(),
+		"samlName":    hs.samlName(),
 	}
 
 	if hs.ThumbService != nil {
@@ -509,4 +513,15 @@ func (hs *HTTPServer) pluginSettings(ctx context.Context, orgID int64) (map[stri
 	}
 
 	return pluginSettings, nil
+}
+
+func (hs *HTTPServer) getEnabledOAuthProviders() map[string]interface{} {
+	providers := make(map[string]interface{})
+	for key, oauth := range hs.SocialService.GetOAuthInfoProviders() {
+		providers[key] = map[string]string{
+			"name": oauth.Name,
+			"icon": oauth.Icon,
+		}
+	}
+	return providers
 }
