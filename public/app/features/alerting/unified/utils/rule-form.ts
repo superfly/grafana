@@ -124,7 +124,6 @@ export function rulerRuleToFormValues(ruleWithLocation: RuleWithLocation): RuleF
         type: RuleFormType.grafana,
         group: group.name,
         evaluateFor: rule.for || '0',
-        evaluateEvery: group.interval || defaultFormValues.evaluateEvery,
         noDataState: ga.no_data_state,
         execErrState: ga.exec_err_state,
         queries: ga.data,

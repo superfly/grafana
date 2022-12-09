@@ -207,9 +207,10 @@ func (hs *HTTPServer) getFrontendSettingsMap(c *models.ReqContext) (map[string]i
 			"defaultLabelKeys":        hs.Cfg.UnifiedAlerting.DefaultLabelKeys,
 			"hideFlowChart":           hs.Cfg.UnifiedAlerting.DefaultHideFlowChart,
 		},
-		"oauth":       hs.getEnabledOAuthProviders(),
-		"samlEnabled": hs.samlEnabled(),
-		"samlName":    hs.samlName(),
+		"oauth":                   hs.getEnabledOAuthProviders(),
+		"samlEnabled":             hs.samlEnabled(),
+		"samlName":                hs.samlName(),
+		"tokenExpirationDayLimit": hs.Cfg.SATokenExpirationDayLimit,
 	}
 
 	if hs.ThumbService != nil {
