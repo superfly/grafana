@@ -16,44 +16,35 @@
 export interface FeatureToggles {
   [name: string]: boolean | undefined; // support any string value
 
-  returnUnameHeader?: boolean;
   alertingBigTransactions?: boolean;
-  promQueryBuilder?: boolean;
   trimDefaults?: boolean;
   disableEnvelopeEncryption?: boolean;
   database_metrics?: boolean;
   dashboardPreviews?: boolean;
-  dashboardPreviewsAdmin?: boolean;
-  ['live-config']?: boolean;
   ['live-pipeline']?: boolean;
   ['live-service-web-worker']?: boolean;
   queryOverLive?: boolean;
   panelTitleSearch?: boolean;
-  tempoApmTable?: boolean;
   prometheusAzureOverrideAudience?: boolean;
-  influxdbBackendMigration?: boolean;
-  showFeatureFlagsInUI?: boolean;
   publicDashboards?: boolean;
+  publicDashboardsEmailSharing?: boolean;
   lokiLive?: boolean;
   lokiDataframeApi?: boolean;
-  lokiMonacoEditor?: boolean;
   swaggerUi?: boolean;
   featureHighlights?: boolean;
   dashboardComments?: boolean;
   annotationComments?: boolean;
   migrationLocking?: boolean;
   storage?: boolean;
+  k8s?: boolean;
   dashboardsFromStorage?: boolean;
   export?: boolean;
-  azureMonitorResourcePickerForMetrics?: boolean;
   exploreMixedDatasource?: boolean;
   tracing?: boolean;
-  commandPalette?: boolean;
   correlations?: boolean;
   cloudWatchDynamicLabels?: boolean;
   datasourceQueryMultiStatus?: boolean;
   traceToMetrics?: boolean;
-  prometheusBufferedClient?: boolean;
   newDBLibrary?: boolean;
   validateDashboardsOnSave?: boolean;
   autoMigrateGraphPanels?: boolean;
@@ -67,17 +58,14 @@ export interface FeatureToggles {
   topnav?: boolean;
   grpcServer?: boolean;
   entityStore?: boolean;
-  traceqlEditor?: boolean;
   flameGraph?: boolean;
   cloudWatchCrossAccountQuerying?: boolean;
   redshiftAsyncQueryDataSupport?: boolean;
   athenaAsyncQueryDataSupport?: boolean;
-  increaseInMemDatabaseQueryCache?: boolean;
   newPanelChromeUI?: boolean;
   queryLibrary?: boolean;
   showDashboardValidationWarnings?: boolean;
   mysqlAnsiQuotes?: boolean;
-  datasourceLogger?: boolean;
   accessControlOnCall?: boolean;
   nestedFolders?: boolean;
   accessTokenExpirationCheck?: boolean;
@@ -85,5 +73,12 @@ export interface FeatureToggles {
   datasourceOnboarding?: boolean;
   secureSocksDatasourceProxy?: boolean;
   authnService?: boolean;
-  sessionRemoteCache?: boolean;
+  disablePrometheusExemplarSampling?: boolean;
+  alertingBacktesting?: boolean;
+  editPanelCSVDragAndDrop?: boolean;
+  alertingNoNormalState?: boolean;
+  topNavCommandPalette?: boolean;
+  logsSampleInExplore?: boolean;
+  logsContextDatasourceUi?: boolean;
+  lokiQuerySplitting?: boolean;
 }

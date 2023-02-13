@@ -15,6 +15,7 @@ import {
   FieldType,
   MutableDataFrame,
   RawTimeRange,
+  SupplementaryQueryType,
   TimeRange,
   toUtc,
 } from '@grafana/data';
@@ -25,10 +26,9 @@ import { TemplateSrv } from 'app/features/templating/template_srv';
 
 import { createFetchResponse } from '../../../../test/helpers/createFetchResponse';
 
-import { Filters } from './components/QueryEditor/BucketAggregationsEditor/aggregations';
 import { ElasticDatasource, enhanceDataFrame } from './datasource';
 import { createElasticDatasource } from './mocks';
-import { ElasticsearchOptions, ElasticsearchQuery } from './types';
+import { Filters, ElasticsearchOptions, ElasticsearchQuery } from './types';
 
 const ELASTICSEARCH_MOCK_URL = 'http://elasticsearch.local';
 
@@ -81,6 +81,7 @@ interface TestContext {
   jsonData?: Partial<ElasticsearchOptions>;
   database?: string;
   fetchMockImplementation?: (options: BackendSrvRequest) => Observable<FetchResponse>;
+  templateSrvMock?: TemplateSrv;
 }
 
 interface Data {
@@ -92,7 +93,8 @@ function getTestContext({
   from = 'now-5m',
   jsonData,
   database = '[test-]YYYY.MM.DD',
-  fetchMockImplementation = undefined,
+  fetchMockImplementation,
+  templateSrvMock,
 }: TestContext = {}) {
   const defaultMock = (options: BackendSrvRequest) => of(createFetchResponse(data));
 
@@ -113,16 +115,18 @@ function getTestContext({
   const settings: Partial<DataSourceInstanceSettings<ElasticsearchOptions>> = { url: ELASTICSEARCH_MOCK_URL };
   settings.jsonData = jsonData as ElasticsearchOptions;
 
-  const templateSrv = {
-    replace: (text?: string) => {
-      if (text?.startsWith('$')) {
-        return `resolvedVariable`;
-      } else {
-        return text;
-      }
-    },
-    getAdhocFilters: () => [],
-  } as unknown as TemplateSrv;
+  const templateSrv =
+    templateSrvMock ??
+    ({
+      replace: (text?: string) => {
+        if (text?.startsWith('$')) {
+          return `resolvedVariable`;
+        } else {
+          return text;
+        }
+      },
+      getAdhocFilters: () => [],
+    } as unknown as TemplateSrv);
 
   const ds = createElasticDatasource(settings, templateSrv);
 
@@ -309,7 +313,7 @@ describe('ElasticDatasource', () => {
         database: 'mock-index',
       });
 
-      const query: DataQueryRequest<ElasticsearchQuery> = {
+      const query = {
         range: createTimeRange(toUtc([2015, 4, 30, 10]), toUtc([2019, 7, 1, 10])),
         targets: [
           {
@@ -327,7 +331,7 @@ describe('ElasticDatasource', () => {
             timeField: '@timestamp',
           },
         ],
-      } as DataQueryRequest<ElasticsearchQuery>;
+      } as unknown as DataQueryRequest<ElasticsearchQuery>;
 
       const queryBuilderSpy = jest.spyOn(ds.queryBuilder, 'getLogsQuery');
       let response: DataQueryResponse = { data: [] };
@@ -889,6 +893,24 @@ describe('ElasticDatasource', () => {
     expect((interpolatedQuery.bucketAggs![0] as Filters).settings!.filters![0].query).toBe('resolvedVariable');
   });
 
+  it('should correctly add ad hoc filters when interpolating variables in query', () => {
+    const templateSrvMock = {
+      replace: (text?: string) => text,
+      getAdhocFilters: () => [{ key: 'bar', operator: '=', value: 'test' }],
+    } as unknown as TemplateSrv;
+    const { ds } = getTestContext({ templateSrvMock });
+    const query: ElasticsearchQuery = {
+      refId: 'A',
+      bucketAggs: [{ type: 'filters', settings: { filters: [{ query: '$var', label: '' }] }, id: '1' }],
+      metrics: [{ type: 'count', id: '1' }],
+      query: 'foo:"bar"',
+    };
+
+    const interpolatedQuery = ds.interpolateVariablesInQueries([query], {})[0];
+
+    expect(interpolatedQuery.query).toBe('foo:"bar" AND bar:"test"');
+  });
+
   it('should correctly handle empty query strings in filters bucket aggregation', () => {
     const { ds } = getTestContext();
     const query: ElasticsearchQuery = {
@@ -901,6 +923,56 @@ describe('ElasticDatasource', () => {
     const interpolatedQuery = ds.interpolateVariablesInQueries([query], {})[0];
 
     expect((interpolatedQuery.bucketAggs![0] as Filters).settings!.filters![0].query).toBe('*');
+  });
+
+  describe('getSupplementaryQuery', () => {
+    let ds: ElasticDatasource;
+    beforeEach(() => {
+      ds = getTestContext().ds;
+    });
+
+    it('does not return logs volume query for metric query', () => {
+      expect(
+        ds.getSupplementaryQuery(SupplementaryQueryType.LogsVolume, {
+          refId: 'A',
+          metrics: [{ type: 'count', id: '1' }],
+          bucketAggs: [{ type: 'filters', settings: { filters: [{ query: 'foo', label: '' }] }, id: '1' }],
+          query: 'foo="bar"',
+        })
+      ).toEqual(undefined);
+    });
+
+    it('returns logs volume query for log query', () => {
+      expect(
+        ds.getSupplementaryQuery(SupplementaryQueryType.LogsVolume, {
+          refId: 'A',
+          metrics: [{ type: 'logs', id: '1' }],
+          query: 'foo="bar"',
+        })
+      ).toEqual({
+        bucketAggs: [
+          {
+            field: '',
+            id: '3',
+            settings: {
+              interval: 'auto',
+              min_doc_count: '0',
+              trimEdges: '0',
+            },
+            type: 'date_histogram',
+          },
+        ],
+        metrics: [
+          {
+            id: '1',
+            type: 'count',
+          },
+        ],
+        query: 'foo="bar"',
+        refId: 'log-volume-A',
+        timeField: '',
+      });
+    });
   });
 });
 
@@ -1058,6 +1130,81 @@ describe('modifyQuery', () => {
 
     it('should do nothing on unknown type', () => {
       expect(ds.modifyQuery(query, { type: 'unknown', options: { key: 'foo', value: 'bar' } }).query).toBe(query.query);
+    });
+  });
+});
+
+describe('addAdhocFilters', () => {
+  describe('with invalid filters', () => {
+    it('should filter out ad hoc filter without key', () => {
+      const templateSrvMock = {
+        getAdhocFilters: () => [{ key: '', operator: '=', value: 'a' }],
+      } as unknown as TemplateSrv;
+      const { ds } = getTestContext({ templateSrvMock });
+
+      const query = ds.addAdHocFilters('foo:"bar"');
+      expect(query).toBe('foo:"bar"');
+    });
+
+    it('should filter out ad hoc filter without value', () => {
+      const templateSrvMock = {
+        getAdhocFilters: () => [{ key: 'a', operator: '=', value: '' }],
+      } as unknown as TemplateSrv;
+      const { ds } = getTestContext({ templateSrvMock });
+
+      const query = ds.addAdHocFilters('foo:"bar"');
+      expect(query).toBe('foo:"bar"');
+    });
+
+    it('should filter out filter ad hoc filter with invalid operator', () => {
+      const templateSrvMock = {
+        getAdhocFilters: () => [{ key: 'a', operator: 'A', value: '' }],
+      } as unknown as TemplateSrv;
+      const { ds } = getTestContext({ templateSrvMock });
+
+      const query = ds.addAdHocFilters('foo:"bar"');
+      expect(query).toBe('foo:"bar"');
+    });
+  });
+
+  describe('with 1 ad hoc filter', () => {
+    const templateSrvMock = {
+      getAdhocFilters: () => [{ key: 'test', operator: '=', value: 'test1' }],
+    } as unknown as TemplateSrv;
+    const { ds } = getTestContext({ templateSrvMock });
+
+    it('should correctly add 1 ad hoc filter when query is not empty', () => {
+      const query = ds.addAdHocFilters('foo:"bar"');
+      expect(query).toBe('foo:"bar" AND test:"test1"');
+    });
+
+    it('should correctly add 1 ad hoc filter when query is empty', () => {
+      const query = ds.addAdHocFilters('');
+      expect(query).toBe('test:"test1"');
+    });
+  });
+
+  describe('with multiple ad hoc filters', () => {
+    const templateSrvMock = {
+      getAdhocFilters: () => [
+        { key: 'bar', operator: '=', value: 'baz' },
+        { key: 'job', operator: '!=', value: 'grafana' },
+        { key: 'service', operator: '=~', value: 'service' },
+        { key: 'count', operator: '>', value: '1' },
+      ],
+    } as unknown as TemplateSrv;
+    const { ds } = getTestContext({ templateSrvMock });
+
+    it('should correctly add ad hoc filters when query is not empty', () => {
+      const query = ds.addAdHocFilters('foo:"bar" AND test:"test1"');
+      expect(query).toBe(
+        'foo:"bar" AND test:"test1" AND bar:"baz" AND -job:"grafana" AND service:/service/ AND count:>1'
+      );
+    });
+
+    it('should correctly add ad hoc filters when query is  empty', () => {
+      const query = ds.addAdHocFilters('');
+      expect(query).toBe('bar:"baz" AND -job:"grafana" AND service:/service/ AND count:>1');
     });
   });
 });

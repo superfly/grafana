@@ -13,6 +13,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/grafana/grafana-plugin-sdk-go/backend"
+	"github.com/grafana/grafana-plugin-sdk-go/data"
+
 	"github.com/grafana/grafana/pkg/expr"
 	"github.com/grafana/grafana/pkg/expr/classic"
 	"github.com/grafana/grafana/pkg/infra/log"
@@ -20,9 +23,6 @@ import (
 	"github.com/grafana/grafana/pkg/services/datasources"
 	"github.com/grafana/grafana/pkg/services/ngalert/models"
 	"github.com/grafana/grafana/pkg/setting"
-
-	"github.com/grafana/grafana-plugin-sdk-go/backend"
-	"github.com/grafana/grafana-plugin-sdk-go/data"
 )
 
 var logger = log.New("ngalert.eval")
@@ -42,9 +42,13 @@ type ConditionEvaluator interface {
 	Evaluate(ctx context.Context, now time.Time) (Results, error)
 }
 
+type expressionService interface {
+	ExecutePipeline(ctx context.Context, now time.Time, pipeline expr.DataPipeline) (*backend.QueryDataResponse, error)
+}
+
 type conditionEvaluator struct {
 	pipeline          expr.DataPipeline
-	expressionService *expr.Service
+	expressionService expressionService
 	condition         models.Condition
 	evalTimeout       time.Duration
 }
@@ -63,7 +67,7 @@ func (r *conditionEvaluator) EvaluateRaw(ctx context.Context, now time.Time) (re
 	}()
 
 	execCtx := ctx
-	if r.evalTimeout <= 0 {
+	if r.evalTimeout >= 0 {
 		timeoutCtx, cancel := context.WithTimeout(ctx, r.evalTimeout)
 		defer cancel()
 		execCtx = timeoutCtx
@@ -222,9 +226,9 @@ func buildDatasourceHeaders(ctx EvaluationContext) map[string]string {
 		// Note: The spelling of this headers is intentionally degenerate from the others for compatibility reasons.
 		// When sent over a network, the key of this header is canonicalized to "Fromalert".
 		// However, some datasources still compare against the string "FromAlert".
-		"FromAlert": "true",
+		models.FromAlertHeaderName: "true",
 
-		"X-Cache-Skip": "true",
+		models.CacheSkipHeaderName: "true",
 	}
 
 	key, ok := models.RuleKeyFromContext(ctx.Ctx)
@@ -265,7 +269,7 @@ func getExprRequest(ctx EvaluationContext, data []models.AlertQuery, dsCacheServ
 			if expr.IsDataSource(q.DatasourceUID) {
 				ds = expr.DataSourceModel()
 			} else {
-				ds, err = dsCacheService.GetDatasourceByUID(ctx.Ctx, q.DatasourceUID, ctx.User, true)
+				ds, err = dsCacheService.GetDatasourceByUID(ctx.Ctx, q.DatasourceUID, ctx.User, false /*skipCache*/)
 				if err != nil {
 					return nil, fmt.Errorf("failed to build query '%s': %w", q.RefID, err)
 				}
@@ -602,7 +606,7 @@ func (e *evaluatorImpl) Validate(ctx EvaluationContext, condition models.Conditi
 		return err
 	}
 	for _, query := range req.Queries {
-		if query.DataSource == nil || expr.IsDataSource(query.DataSource.Uid) {
+		if query.DataSource == nil || expr.IsDataSource(query.DataSource.UID) {
 			continue
 		}
 		p, found := e.pluginsStore.Plugin(ctx.Ctx, query.DataSource.Type)
