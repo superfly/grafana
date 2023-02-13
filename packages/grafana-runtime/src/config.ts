@@ -154,8 +154,7 @@ export class GrafanaBootConfig implements GrafanaConfig {
     defaultEvaluateEvery: '1m',
     defaultEvaluateFor: '0s', //'5m',
     defaultAnnotationKeys: ['summary'], //, 'description', 'runbookURL'],
-    defaultLabelKeys: [''],
-    hideFlowChart: true //false
+    defaultLabelKeys: ['']
   };
   applicationInsightsConnectionString?: string;
   applicationInsightsEndpointUrl?: string;

@@ -6,7 +6,6 @@ import (
 	"net/http"
 
 	"github.com/grafana/grafana/pkg/api/dtos"
-	"github.com/grafana/grafana/pkg/models"
 	"github.com/grafana/grafana/pkg/plugins"
 	"github.com/grafana/grafana/pkg/services/accesscontrol"
 	contextmodel "github.com/grafana/grafana/pkg/services/contexthandler/model"
@@ -18,8 +17,6 @@ import (
 	"github.com/grafana/grafana/pkg/setting"
 	"github.com/grafana/grafana/pkg/tsdb/grafanads"
 	"github.com/grafana/grafana/pkg/util"
-	"net/http"
-	"strconv"
 )
 
 func (hs *HTTPServer) GetFrontendSettings(c *contextmodel.ReqContext) {
@@ -214,7 +211,7 @@ func (hs *HTTPServer) getFrontendSettings(c *contextmodel.ReqContext) (*dtos.Fro
 		},
 
 		UnifiedAlerting: dtos.FrontendSettingsUnifiedAlertingDTO{
-			MinInterval: hs.Cfg.UnifiedAlerting.MinInterval.String(),
+			MinInterval:             hs.Cfg.UnifiedAlerting.MinInterval.String(),
 			ExternalAlertingEnabled: hs.Cfg.UnifiedAlerting.DefaultExternalEnabled,
 			DefaultGroup:            hs.Cfg.UnifiedAlerting.DefaultGroup,
 			DefaultFolder:           map[string]interface{}{"title": hs.Cfg.UnifiedAlerting.DefaultFolder},
@@ -224,8 +221,6 @@ func (hs *HTTPServer) getFrontendSettings(c *contextmodel.ReqContext) (*dtos.Fro
 			DefaultEvaluateFor:      hs.Cfg.UnifiedAlerting.DefaultEvaluateFor.String(),
 			DefaultAnnotationKeys:   hs.Cfg.UnifiedAlerting.DefaultAnnotationKeys,
 			DefaultLabelKeys:        hs.Cfg.UnifiedAlerting.DefaultLabelKeys,
-			HideFlowChart:           hs.Cfg.UnifiedAlerting.DefaultHideFlowChart,
-
 		},
 
 		Oauth:                   hs.getEnabledOAuthProviders(),
