@@ -1,16 +1,16 @@
-import {css} from '@emotion/css';
-import React, {FC} from 'react';
-import {useFormContext} from 'react-hook-form';
+import { css } from '@emotion/css';
+import React, { FC } from 'react';
+import { useFormContext } from 'react-hook-form';
 
-import {DataSourceInstanceSettings, GrafanaTheme2} from '@grafana/data';
-import {Field, InputControl, useStyles2} from '@grafana/ui';
-import {contextSrv} from 'app/core/services/context_srv';
-import {AccessControlAction} from 'app/types';
+import { DataSourceInstanceSettings, GrafanaTheme2 } from '@grafana/data';
+import { Field, InputControl, useStyles2 } from '@grafana/ui';
+import { contextSrv } from 'app/core/services/context_srv';
+import { AccessControlAction } from 'app/types';
 
-import {RuleFormType, RuleFormValues} from '../../../types/rule-form';
-import {CloudRulesSourcePicker} from '../CloudRulesSourcePicker';
-import {RuleTypePicker} from '../rule-types/RuleTypePicker';
-import {config} from '@grafana/runtime';
+import { RuleFormType, RuleFormValues } from '../../../types/rule-form';
+import { CloudRulesSourcePicker } from '../CloudRulesSourcePicker';
+import { RuleTypePicker } from '../rule-types/RuleTypePicker';
+import { config } from '@grafana/runtime';
 
 interface Props {
   editingExistingRule: boolean;

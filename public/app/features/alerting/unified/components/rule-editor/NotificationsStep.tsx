@@ -4,7 +4,6 @@ import { useFormContext } from 'react-hook-form';
 
 import { GrafanaTheme2 } from '@grafana/data';
 import { Card, Link, useStyles2 } from '@grafana/ui';
-import { config } from '@grafana/runtime';
 
 import { RuleFormType, RuleFormValues } from '../../types/rule-form';
 import { GRAFANA_RULES_SOURCE_NAME } from '../../utils/datasource';
