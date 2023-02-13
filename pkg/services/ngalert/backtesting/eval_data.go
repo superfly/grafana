@@ -43,7 +43,7 @@ func (d *dataEvaluator) Eval(_ context.Context, from, to time.Time, interval tim
 	iterations := 0
 	for _, s := range d.data {
 		// making sure the input data frame is aligned with the interval
-		r, err := s.Resample(d.refID, interval, d.downsampleFunction, d.upsampleFunction, from, to.Add(-interval)) // we want to query [from,to)
+		r, err := s.Resample(interval, d.downsampleFunction, d.upsampleFunction, from, to.Add(-interval)) // we want to query [from,to)
 		if err != nil {
 			return err
 		}
