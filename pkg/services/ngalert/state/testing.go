@@ -2,6 +2,7 @@ package state
 
 import (
 	"context"
+	"slices"
 	"sync"
 
 	"github.com/grafana/grafana/pkg/services/ngalert/models"
@@ -13,27 +14,31 @@ var _ InstanceStore = &FakeInstanceStore{}
 
 type FakeInstanceStore struct {
 	mtx         sync.Mutex
-	RecordedOps []interface{}
+	recordedOps []any
 }
 
 type FakeInstanceStoreOp struct {
 	Name string
-	Args []interface{}
+	Args []any
 }
 
-func (f *FakeInstanceStore) ListAlertInstances(_ context.Context, q *models.ListAlertInstancesQuery) error {
+func (f *FakeInstanceStore) RecordedOps() []any {
 	f.mtx.Lock()
 	defer f.mtx.Unlock()
-	f.RecordedOps = append(f.RecordedOps, *q)
-	return nil
+	return slices.Clone(f.recordedOps)
 }
 
-func (f *FakeInstanceStore) SaveAlertInstances(_ context.Context, q ...models.AlertInstance) error {
+func (f *FakeInstanceStore) ListAlertInstances(_ context.Context, q *models.ListAlertInstancesQuery) ([]*models.AlertInstance, error) {
 	f.mtx.Lock()
 	defer f.mtx.Unlock()
-	for _, inst := range q {
-		f.RecordedOps = append(f.RecordedOps, inst)
-	}
+	f.recordedOps = append(f.recordedOps, *q)
+	return nil, nil
+}
+
+func (f *FakeInstanceStore) SaveAlertInstance(_ context.Context, q models.AlertInstance) error {
+	f.mtx.Lock()
+	defer f.mtx.Unlock()
+	f.recordedOps = append(f.recordedOps, q)
 	return nil
 }
 
@@ -42,8 +47,8 @@ func (f *FakeInstanceStore) FetchOrgIds(_ context.Context) ([]int64, error) { re
 func (f *FakeInstanceStore) DeleteAlertInstances(ctx context.Context, q ...models.AlertInstanceKey) error {
 	f.mtx.Lock()
 	defer f.mtx.Unlock()
-	f.RecordedOps = append(f.RecordedOps, FakeInstanceStoreOp{
-		Name: "DeleteAlertInstances", Args: []interface{}{
+	f.recordedOps = append(f.recordedOps, FakeInstanceStoreOp{
+		Name: "DeleteAlertInstances", Args: []any{
 			ctx,
 			q,
 		},
@@ -55,17 +60,27 @@ func (f *FakeInstanceStore) DeleteAlertInstancesByRule(ctx context.Context, key 
 	return nil
 }
 
+func (f *FakeInstanceStore) FullSync(ctx context.Context, instances []models.AlertInstance) error {
+	f.mtx.Lock()
+	defer f.mtx.Unlock()
+	f.recordedOps = []any{}
+	for _, instance := range instances {
+		f.recordedOps = append(f.recordedOps, instance)
+	}
+	return nil
+}
+
 type FakeRuleReader struct{}
 
-func (f *FakeRuleReader) ListAlertRules(_ context.Context, q *models.ListAlertRulesQuery) error {
-	return nil
+func (f *FakeRuleReader) ListAlertRules(_ context.Context, q *models.ListAlertRulesQuery) (models.RulesGroup, error) {
+	return nil, nil
 }
 
 type FakeHistorian struct {
 	StateTransitions []StateTransition
 }
 
-func (f *FakeHistorian) RecordStatesAsync(ctx context.Context, rule history_model.RuleMeta, states []StateTransition) <-chan error {
+func (f *FakeHistorian) Record(ctx context.Context, rule history_model.RuleMeta, states []StateTransition) <-chan error {
 	f.StateTransitions = append(f.StateTransitions, states...)
 	errCh := make(chan error)
 	close(errCh)

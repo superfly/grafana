@@ -30,9 +30,10 @@ export const preferredVisualizationTypes = [
   'flamegraph',
   'rawPrometheus',
 ] as const;
-export type PreferredVisualisationType = typeof preferredVisualizationTypes[number];
+export type PreferredVisualisationType = (typeof preferredVisualizationTypes)[number];
 
 /**
+ * Should be kept in sync with https://github.com/grafana/grafana-plugin-sdk-go/blob/main/data/frame_meta.go
  * @public
  */
 export interface QueryResultMeta {
@@ -53,11 +54,15 @@ export interface QueryResultMeta {
   /** Meta Notices */
   notices?: QueryResultMetaNotice[];
 
-  /** Used to track transformation ids that where part of the processing */
-  transformations?: string[];
-
   /** Currently used to show results in Explore only in preferred visualisation option */
   preferredVisualisationType?: PreferredVisualisationType;
+
+  /** Set the panel plugin id to use to render the data when using Explore. If the plugin cannot be found
+   * will fall back to {@link preferredVisualisationType}.
+   *
+   * @alpha
+   */
+  preferredVisualisationPluginId?: string;
 
   /** The path for live stream updates for this frame */
   channel?: string;
@@ -87,6 +92,12 @@ export interface QueryResultMeta {
    */
   pathSeparator?: string;
 
+  /** A time shift metadata indicating a result of comparison */
+  timeCompare?: {
+    diffMs: number;
+    isTimeShiftQuery: boolean;
+  };
+
   /**
    * Legacy data source specific, should be moved to custom
    * */
@@ -94,6 +105,14 @@ export interface QueryResultMeta {
   limit?: number; // used by log models and loki
   json?: boolean; // used to keep track of old json doc values
   instant?: boolean;
+
+  /**
+   * Array of field indices which values create a unique id for each row. Ideally this should be globally unique ID
+   * but that isn't guarantied. Should help with keeping track and deduplicating rows in visualizations, especially
+   * with streaming data with frequent updates.
+   * Example: TraceID in Tempo, table name + primary key in SQL
+   */
+  uniqueRowIdFields?: number[];
 }
 
 export interface QueryResultMetaStat extends FieldConfig {
@@ -146,6 +165,8 @@ export interface QueryResultBase {
 export interface Labels {
   [key: string]: string;
 }
+
+/** @deprecated this is a very old (pre Grafana 7 + DataFrame) representation for tabular data  */
 export interface Column {
   text: string; // For a Column, the 'text' is the field name
   filterable?: boolean;
@@ -153,6 +174,7 @@ export interface Column {
   custom?: Record<string, any>;
 }
 
+/** @deprecated this is a very old (pre Grafana 7 + DataFrame) representation for tabular data  */
 export interface TableData extends QueryResultBase {
   name?: string;
   columns: Column[];
@@ -160,10 +182,13 @@ export interface TableData extends QueryResultBase {
   type?: string;
 }
 
+/** @deprecated this is a very old (pre Grafana 7 + DataFrame) representation for tabular data  */
 export type TimeSeriesValue = number | null;
 
+/** @deprecated this is a very old (pre Grafana 7 + DataFrame) representation for tabular data  */
 export type TimeSeriesPoints = TimeSeriesValue[][];
 
+/** @deprecated this is a very old (pre Grafana 7 + DataFrame) representation for tabular data  */
 export interface TimeSeries extends QueryResultBase {
   target: string;
   /**
@@ -194,3 +219,27 @@ export interface DataConfigSource {
 
 type Truthy<T> = T extends false | '' | 0 | null | undefined ? never : T;
 export const isTruthy = <T>(value: T): value is Truthy<T> => Boolean(value);
+
+/**
+ * Serves no runtime purpose - only used to make typescript check a value has been correctly
+ * narrowed to an object
+ */
+function identityObject(value: object): object {
+  return value;
+}
+
+/**
+ * Utility type predicate to check if a value is typeof object, but excludes "null".
+ *
+ * We normally discourage the use of type predicates in favor of just inline typescript narrowing,
+ * but this is a special case to handle null annoyingly being typeof object
+ */
+export function isObject(value: unknown): value is object {
+  if (typeof value === 'object' && value !== null) {
+    identityObject(value);
+
+    return true;
+  }
+
+  return false;
+}

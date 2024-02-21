@@ -2,16 +2,13 @@ import { css } from '@emotion/css';
 import React, { ReactElement } from 'react';
 import { useLocation } from 'react-router-dom';
 
-import { SelectableValue, GrafanaTheme2 } from '@grafana/data';
-import { config, locationSearchToObject } from '@grafana/runtime';
-import { LoadingPlaceholder, Select, RadioButtonGroup, useStyles2, Tooltip, Field } from '@grafana/ui';
+import { SelectableValue, GrafanaTheme2, PluginType } from '@grafana/data';
+import { locationSearchToObject } from '@grafana/runtime';
+import { Select, RadioButtonGroup, useStyles2, Tooltip, Field } from '@grafana/ui';
 import { Page } from 'app/core/components/Page/Page';
 import { GrafanaRouteComponentProps } from 'app/core/navigation/types';
 import { getNavModel } from 'app/core/selectors/navModel';
-import {
-  ConnectionsRedirectNotice,
-  DestinationPage,
-} from 'app/features/connections/components/ConnectionsRedirectNotice';
+import { ROUTES as CONNECTIONS_ROUTES } from 'app/features/connections/constants';
 import { useSelector } from 'app/types';
 
 import { HorizontalGroup } from '../components/HorizontalGroup';
@@ -19,7 +16,7 @@ import { PluginList } from '../components/PluginList';
 import { SearchField } from '../components/SearchField';
 import { Sorters } from '../helpers';
 import { useHistory } from '../hooks/useHistory';
-import { useGetAllWithFilters, useIsRemotePluginsAvailable, useDisplayMode } from '../state/hooks';
+import { useGetAll, useIsRemotePluginsAvailable, useDisplayMode } from '../state/hooks';
 import { PluginListDisplayMode } from '../types';
 
 export default function Browse({ route }: GrafanaRouteComponentProps): ReactElement | null {
@@ -30,16 +27,19 @@ export default function Browse({ route }: GrafanaRouteComponentProps): ReactElem
   const styles = useStyles2(getStyles);
   const history = useHistory();
   const remotePluginsAvailable = useIsRemotePluginsAvailable();
-  const query = (locationSearch.q as string) || '';
-  const filterBy = (locationSearch.filterBy as string) || 'installed';
-  const filterByType = (locationSearch.filterByType as string) || 'all';
+  const keyword = locationSearch.q?.toString() || '';
+  const filterBy = locationSearch.filterBy?.toString() || 'installed';
+  const filterByType = (locationSearch.filterByType as PluginType | 'all') || 'all';
   const sortBy = (locationSearch.sortBy as Sorters) || Sorters.nameAsc;
-  const { isLoading, error, plugins } = useGetAllWithFilters({
-    query,
-    filterBy,
-    filterByType,
-    sortBy,
-  });
+  const { isLoading, error, plugins } = useGetAll(
+    {
+      keyword,
+      type: filterByType !== 'all' ? filterByType : undefined,
+      isInstalled: filterBy === 'installed' ? true : undefined,
+    },
+    sortBy
+  );
+
   const filterByOptions = [
     { value: 'all', label: 'All' },
     { value: 'installed', label: 'Installed' },
@@ -58,7 +58,7 @@ export default function Browse({ route }: GrafanaRouteComponentProps): ReactElem
   };
 
   const onSearch = (q: string) => {
-    history.push({ query: { filterBy: 'all', filterByType: 'all', q } });
+    history.push({ query: { filterBy, filterByType, q } });
   };
 
   // How should we handle errors?
@@ -67,16 +67,22 @@ export default function Browse({ route }: GrafanaRouteComponentProps): ReactElem
     return null;
   }
 
-  return (
-    <Page navModel={navModel}>
-      <Page.Contents>
-        {config.featureToggles.dataConnectionsConsole && (filterByType === 'all' || filterByType === 'datasource') && (
-          <ConnectionsRedirectNotice destinationPage={DestinationPage.connectData} />
-        )}
+  const subTitle = (
+    <div>
+      Extend the Grafana experience with panel plugins and apps. To find more data sources go to{' '}
+      <a className="external-link" href={`${CONNECTIONS_ROUTES.AddNewConnection}?cat=data-source`}>
+        Connections
+      </a>
+      .
+    </div>
+  );
 
+  return (
+    <Page navModel={navModel} subTitle={subTitle}>
+      <Page.Contents>
         <HorizontalGroup wrap>
           <Field label="Search">
-            <SearchField value={query} onSearch={onSearch} />
+            <SearchField value={keyword} onSearch={onSearch} />
           </Field>
           <HorizontalGroup wrap className={styles.actionBar}>
             {/* Filter by type */}
@@ -154,16 +160,7 @@ export default function Browse({ route }: GrafanaRouteComponentProps): ReactElem
           </HorizontalGroup>
         </HorizontalGroup>
         <div className={styles.listWrap}>
-          {isLoading ? (
-            <LoadingPlaceholder
-              className={css`
-                margin-bottom: 0;
-              `}
-              text="Loading results"
-            />
-          ) : (
-            <PluginList plugins={plugins} displayMode={displayMode} />
-          )}
+          <PluginList plugins={plugins} displayMode={displayMode} isLoading={isLoading} />
         </div>
       </Page.Contents>
     </Page>
@@ -171,17 +168,17 @@ export default function Browse({ route }: GrafanaRouteComponentProps): ReactElem
 }
 
 const getStyles = (theme: GrafanaTheme2) => ({
-  actionBar: css`
-    ${theme.breakpoints.up('xl')} {
-      margin-left: auto;
-    }
-  `,
-  listWrap: css`
-    margin-top: ${theme.spacing(2)};
-  `,
-  displayAs: css`
-    svg {
-      margin-right: 0;
-    }
-  `,
+  actionBar: css({
+    [theme.breakpoints.up('xl')]: {
+      marginLeft: 'auto',
+    },
+  }),
+  listWrap: css({
+    marginTop: theme.spacing(2),
+  }),
+  displayAs: css({
+    svg: {
+      marginRight: 0,
+    },
+  }),
 });

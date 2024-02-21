@@ -1,9 +1,12 @@
 package historian
 
 import (
+	"fmt"
 	"strings"
+	"time"
 
 	"github.com/grafana/grafana-plugin-sdk-go/data"
+	prometheus "github.com/prometheus/common/model"
 
 	"github.com/grafana/grafana/pkg/infra/log"
 	"github.com/grafana/grafana/pkg/services/ngalert/eval"
@@ -11,6 +14,8 @@ import (
 	"github.com/grafana/grafana/pkg/services/ngalert/state"
 	history_model "github.com/grafana/grafana/pkg/services/ngalert/state/historian/model"
 )
+
+const StateHistoryWriteTimeout = time.Minute
 
 func shouldRecord(transition state.StateTransition) bool {
 	if !transition.Changed() {
@@ -29,6 +34,24 @@ func shouldRecord(transition state.StateTransition) bool {
 	return true
 }
 
+// ShouldRecordAnnotation returns true if an annotation should be created for a given state transition.
+// This is stricter than shouldRecord to avoid cluttering panels with state transitions.
+func ShouldRecordAnnotation(t state.StateTransition) bool {
+	if !shouldRecord(t) {
+		return false
+	}
+
+	// Do not record transitions between Normal and Normal (NoData)
+	if t.State.State == eval.Normal && t.PreviousState == eval.Normal {
+		if (t.State.StateReason == "" && t.PreviousStateReason == models.StateReasonNoData) ||
+			(t.State.StateReason == models.StateReasonNoData && t.PreviousStateReason == "") {
+			return false
+		}
+	}
+
+	return true
+}
+
 func removePrivateLabels(labels data.Labels) data.Labels {
 	result := make(data.Labels)
 	for k, v := range labels {
@@ -39,23 +62,46 @@ func removePrivateLabels(labels data.Labels) data.Labels {
 	return result
 }
 
-// panelKey uniquely identifies a panel.
-type panelKey struct {
+// labelFingerprint calculates a stable Prometheus-style signature for a label set.
+func labelFingerprint(labels data.Labels) string {
+	sig := prometheus.LabelsToSignature(labels)
+	return fmt.Sprintf("%016x", sig)
+}
+
+// PanelKey uniquely identifies a panel.
+type PanelKey struct {
 	orgID   int64
 	dashUID string
 	panelID int64
 }
 
-// panelKey attempts to get the key of the panel attached to the given rule. Returns nil if the rule is not attached to a panel.
-func parsePanelKey(rule history_model.RuleMeta, logger log.Logger) *panelKey {
+func NewPanelKey(orgID int64, dashUID string, panelID int64) PanelKey {
+	return PanelKey{
+		orgID:   orgID,
+		dashUID: dashUID,
+		panelID: panelID,
+	}
+}
+
+// PanelKey attempts to get the key of the panel attached to the given rule. Returns nil if the rule is not attached to a panel.
+func parsePanelKey(rule history_model.RuleMeta, logger log.Logger) *PanelKey {
 	if rule.DashboardUID != "" {
-		return &panelKey{
-			orgID:   rule.OrgID,
-			dashUID: rule.DashboardUID,
-			panelID: rule.PanelID,
-		}
+		key := NewPanelKey(rule.OrgID, rule.DashboardUID, rule.PanelID)
+		return &key
 	}
 	return nil
+}
+
+func (p PanelKey) OrgID() int64 {
+	return p.orgID
+}
+
+func (p PanelKey) DashUID() string {
+	return p.dashUID
+}
+
+func (p PanelKey) PanelID() int64 {
+	return p.panelID
 }
 
 func mergeLabels(base, into data.Labels) data.Labels {

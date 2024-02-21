@@ -10,21 +10,22 @@ import (
 	contextmodel "github.com/grafana/grafana/pkg/services/contexthandler/model"
 	"github.com/grafana/grafana/pkg/services/featuremgmt"
 	"github.com/grafana/grafana/pkg/services/navtree"
-	"github.com/grafana/grafana/pkg/services/pluginsettings"
+	"github.com/grafana/grafana/pkg/services/pluginsintegration/pluginaccesscontrol"
+	"github.com/grafana/grafana/pkg/services/pluginsintegration/pluginsettings"
+	"github.com/grafana/grafana/pkg/services/pluginsintegration/pluginstore"
 	"github.com/grafana/grafana/pkg/util"
 )
 
 func (s *ServiceImpl) addAppLinks(treeRoot *navtree.NavTreeRoot, c *contextmodel.ReqContext) error {
-	topNavEnabled := s.features.IsEnabled(featuremgmt.FlagTopnav)
 	hasAccess := ac.HasAccess(s.accessControl, c)
 	appLinks := []*navtree.NavLink{}
 
-	pss, err := s.pluginSettings.GetPluginSettings(c.Req.Context(), &pluginsettings.GetArgs{OrgID: c.OrgID})
+	pss, err := s.pluginSettings.GetPluginSettings(c.Req.Context(), &pluginsettings.GetArgs{OrgID: c.SignedInUser.GetOrgID()})
 	if err != nil {
 		return err
 	}
 
-	isPluginEnabled := func(plugin plugins.PluginDTO) bool {
+	isPluginEnabled := func(plugin pluginstore.Plugin) bool {
 		if plugin.AutoEnabled {
 			return true
 		}
@@ -36,17 +37,16 @@ func (s *ServiceImpl) addAppLinks(treeRoot *navtree.NavTreeRoot, c *contextmodel
 		return false
 	}
 
-	for _, plugin := range s.pluginStore.Plugins(c.Req.Context(), plugins.App) {
+	for _, plugin := range s.pluginStore.Plugins(c.Req.Context(), plugins.TypeApp) {
 		if !isPluginEnabled(plugin) {
 			continue
 		}
 
-		if !hasAccess(ac.ReqSignedIn,
-			ac.EvalPermission(plugins.ActionAppAccess, plugins.ScopeProvider.GetResourceScope(plugin.ID))) {
+		if !hasAccess(ac.EvalPermission(pluginaccesscontrol.ActionAppAccess, pluginaccesscontrol.ScopeProvider.GetResourceScope(plugin.ID))) {
 			continue
 		}
 
-		if appNode := s.processAppPlugin(plugin, c, topNavEnabled, treeRoot); appNode != nil {
+		if appNode := s.processAppPlugin(plugin, c, treeRoot); appNode != nil {
 			appLinks = append(appLinks, appNode)
 		}
 	}
@@ -64,23 +64,17 @@ func (s *ServiceImpl) addAppLinks(treeRoot *navtree.NavTreeRoot, c *contextmodel
 	return nil
 }
 
-func (s *ServiceImpl) processAppPlugin(plugin plugins.PluginDTO, c *contextmodel.ReqContext, topNavEnabled bool, treeRoot *navtree.NavTreeRoot) *navtree.NavLink {
+func (s *ServiceImpl) processAppPlugin(plugin pluginstore.Plugin, c *contextmodel.ReqContext, treeRoot *navtree.NavTreeRoot) *navtree.NavLink {
 	hasAccessToInclude := s.hasAccessToInclude(c, plugin.ID)
 	appLink := &navtree.NavLink{
 		Text:       plugin.Name,
 		Id:         "plugin-page-" + plugin.ID,
 		Img:        plugin.Info.Logos.Small,
 		SubTitle:   plugin.Info.Description,
-		Section:    navtree.NavSectionPlugin,
 		SortWeight: navtree.WeightPlugin,
 		IsSection:  true,
 		PluginID:   plugin.ID,
-	}
-
-	if topNavEnabled {
-		appLink.Url = s.cfg.AppSubURL + "/a/" + plugin.ID
-	} else {
-		appLink.Url = path.Join(s.cfg.AppSubURL, plugin.DefaultNavURL)
+		Url:        s.cfg.AppSubURL + "/a/" + plugin.ID,
 	}
 
 	for _, include := range plugin.Includes {
@@ -158,10 +152,6 @@ func (s *ServiceImpl) processAppPlugin(plugin plugins.PluginDTO, c *contextmodel
 		appLink.Children = []*navtree.NavLink{}
 	}
 
-	if !topNavEnabled {
-		return appLink
-	}
-
 	// Remove default nav child
 	childrenWithoutDefault := []*navtree.NavLink{}
 	for _, child := range appLink.Children {
@@ -176,9 +166,20 @@ func (s *ServiceImpl) processAppPlugin(plugin plugins.PluginDTO, c *contextmodel
 	return nil
 }
 
-func (s *ServiceImpl) addPluginToSection(c *contextmodel.ReqContext, treeRoot *navtree.NavTreeRoot, plugin plugins.PluginDTO, appLink *navtree.NavLink) {
+func (s *ServiceImpl) addPluginToSection(c *contextmodel.ReqContext, treeRoot *navtree.NavTreeRoot, plugin pluginstore.Plugin, appLink *navtree.NavLink) {
 	// Handle moving apps into specific navtree sections
+	var alertingNodes []*navtree.NavLink
 	alertingNode := treeRoot.FindById(navtree.NavIDAlerting)
+	if alertingNode != nil {
+		alertingNodes = append(alertingNodes, alertingNode)
+	}
+	if len(alertingNodes) == 0 || s.features.IsEnabled(c.Req.Context(), featuremgmt.FlagAlertingPreviewUpgrade) {
+		// If FlagAlertingPreviewUpgrade is enabled, we want to add both the legacy and new alerting nodes.
+		alertingNode := treeRoot.FindById(navtree.NavIDAlertingLegacy)
+		if alertingNode != nil {
+			alertingNodes = append(alertingNodes, alertingNode)
+		}
+	}
 	sectionID := navtree.NavIDApps
 
 	if navConfig, hasOverride := s.navigationAppConfig[plugin.ID]; hasOverride {
@@ -206,35 +207,65 @@ func (s *ServiceImpl) addPluginToSection(c *contextmodel.ReqContext, treeRoot *n
 				SubTitle:   "App plugins that extend the Grafana experience",
 				Id:         navtree.NavIDApps,
 				Children:   []*navtree.NavLink{appLink},
-				Section:    navtree.NavSectionCore,
 				SortWeight: navtree.WeightApps,
 				Url:        s.cfg.AppSubURL + "/apps",
 			})
 		case navtree.NavIDMonitoring:
 			treeRoot.AddSection(&navtree.NavLink{
-				Text:       "Monitoring",
+				Text:       "Observability",
 				Id:         navtree.NavIDMonitoring,
-				SubTitle:   "Monitoring and infrastructure apps",
+				SubTitle:   "Observability and infrastructure apps",
 				Icon:       "heart-rate",
-				Section:    navtree.NavSectionCore,
 				SortWeight: navtree.WeightMonitoring,
 				Children:   []*navtree.NavLink{appLink},
 				Url:        s.cfg.AppSubURL + "/monitoring",
 			})
+		case navtree.NavIDInfrastructure:
+			treeRoot.AddSection(&navtree.NavLink{
+				Text:       "Infrastructure",
+				Id:         navtree.NavIDInfrastructure,
+				SubTitle:   "Understand your infrastructure's health",
+				Icon:       "heart-rate",
+				SortWeight: navtree.WeightInfrastructure,
+				Children:   []*navtree.NavLink{appLink},
+				Url:        s.cfg.AppSubURL + "/infrastructure",
+			})
+		case navtree.NavIDFrontend:
+			treeRoot.AddSection(&navtree.NavLink{
+				Text:       "Frontend",
+				Id:         navtree.NavIDFrontend,
+				SubTitle:   "Gain real user monitoring insights",
+				Icon:       "frontend-observability",
+				SortWeight: navtree.WeightFrontend,
+				Children:   []*navtree.NavLink{appLink},
+				Url:        s.cfg.AppSubURL + "/frontend",
+			})
 		case navtree.NavIDAlertsAndIncidents:
-			if alertingNode != nil {
-				treeRoot.AddSection(&navtree.NavLink{
-					Text:       "Alerts & incidents",
-					Id:         navtree.NavIDAlertsAndIncidents,
-					SubTitle:   "Alerting and incident management apps",
-					Icon:       "bell",
-					Section:    navtree.NavSectionCore,
-					SortWeight: navtree.WeightAlertsAndIncidents,
-					Children:   []*navtree.NavLink{alertingNode, appLink},
-					Url:        s.cfg.AppSubURL + "/alerts-and-incidents",
-				})
+			alertsAndIncidentsChildren := []*navtree.NavLink{}
+			for _, alertingNode := range alertingNodes {
+				alertsAndIncidentsChildren = append(alertsAndIncidentsChildren, alertingNode)
 				treeRoot.RemoveSection(alertingNode)
 			}
+			alertsAndIncidentsChildren = append(alertsAndIncidentsChildren, appLink)
+			treeRoot.AddSection(&navtree.NavLink{
+				Text:       "Alerts & IRM",
+				Id:         navtree.NavIDAlertsAndIncidents,
+				SubTitle:   "Alerting and incident management apps",
+				Icon:       "bell",
+				SortWeight: navtree.WeightAlertsAndIncidents,
+				Children:   alertsAndIncidentsChildren,
+				Url:        s.cfg.AppSubURL + "/alerts-and-incidents",
+			})
+		case navtree.NavIDTestingAndSynthetics:
+			treeRoot.AddSection(&navtree.NavLink{
+				Text:       "Testing & synthetics",
+				Id:         navtree.NavIDTestingAndSynthetics,
+				SubTitle:   "Optimize performance with k6 and Synthetic Monitoring insights",
+				Icon:       "k6",
+				SortWeight: navtree.WeightTestingAndSynthetics,
+				Children:   []*navtree.NavLink{appLink},
+				Url:        s.cfg.AppSubURL + "/testing-and-synthetics",
+			})
 		default:
 			s.log.Error("Plugin app nav id not found", "pluginId", plugin.ID, "navId", sectionID)
 		}
@@ -244,9 +275,8 @@ func (s *ServiceImpl) addPluginToSection(c *contextmodel.ReqContext, treeRoot *n
 func (s *ServiceImpl) hasAccessToInclude(c *contextmodel.ReqContext, pluginID string) func(include *plugins.Includes) bool {
 	hasAccess := ac.HasAccess(s.accessControl, c)
 	return func(include *plugins.Includes) bool {
-		useRBAC := s.features.IsEnabled(featuremgmt.FlagAccessControlOnCall) &&
-			!s.accessControl.IsDisabled() && include.RequiresRBACAction()
-		if useRBAC && !hasAccess(ac.ReqHasRole(include.Role), ac.EvalPermission(include.Action)) {
+		useRBAC := s.features.IsEnabledGlobally(featuremgmt.FlagAccessControlOnCall) && include.RequiresRBACAction()
+		if useRBAC && !hasAccess(ac.EvalPermission(include.Action)) {
 			s.log.Debug("plugin include is covered by RBAC, user doesn't have access",
 				"plugin", pluginID,
 				"include", include.Name)
@@ -260,14 +290,23 @@ func (s *ServiceImpl) hasAccessToInclude(c *contextmodel.ReqContext, pluginID st
 
 func (s *ServiceImpl) readNavigationSettings() {
 	s.navigationAppConfig = map[string]NavigationAppConfig{
-		"grafana-k8s-app":                  {SectionID: navtree.NavIDMonitoring, SortWeight: 1, Text: "Kubernetes"},
-		"grafana-synthetic-monitoring-app": {SectionID: navtree.NavIDMonitoring, SortWeight: 2, Text: "Synthetics"},
+		"grafana-k8s-app":                  {SectionID: navtree.NavIDInfrastructure, SortWeight: 1, Text: "Kubernetes"},
+		"grafana-aws-app":                  {SectionID: navtree.NavIDInfrastructure, SortWeight: 2},
+		"grafana-app-observability-app":    {SectionID: navtree.NavIDRoot, SortWeight: navtree.WeightApplication, Text: "Application", Icon: "graph-bar"},
+		"grafana-pyroscope-app":            {SectionID: navtree.NavIDExplore, SortWeight: 1, Text: "Profiles"},
+		"grafana-kowalski-app":             {SectionID: navtree.NavIDRoot, SortWeight: navtree.WeightFrontend, Text: "Frontend", Icon: "frontend-observability"},
+		"grafana-synthetic-monitoring-app": {SectionID: navtree.NavIDTestingAndSynthetics, SortWeight: 2, Text: "Synthetics"},
 		"grafana-oncall-app":               {SectionID: navtree.NavIDAlertsAndIncidents, SortWeight: 1, Text: "OnCall"},
-		"grafana-incident-app":             {SectionID: navtree.NavIDAlertsAndIncidents, SortWeight: 2, Text: "Incident"},
+		"grafana-incident-app":             {SectionID: navtree.NavIDAlertsAndIncidents, SortWeight: 2, Text: "Incidents"},
 		"grafana-ml-app":                   {SectionID: navtree.NavIDAlertsAndIncidents, SortWeight: 3, Text: "Machine Learning"},
+		"grafana-slo-app":                  {SectionID: navtree.NavIDAlertsAndIncidents, SortWeight: 4},
 		"grafana-cloud-link-app":           {SectionID: navtree.NavIDCfg},
+		"grafana-costmanagementui-app":     {SectionID: navtree.NavIDCfg, Text: "Cost management"},
+		"grafana-adaptive-metrics-app":     {SectionID: navtree.NavIDCfg, Text: "Adaptive Metrics"},
+		"grafana-logvolumeexplorer-app":    {SectionID: navtree.NavIDCfg, Text: "Log Volume Explorer"},
 		"grafana-easystart-app":            {SectionID: navtree.NavIDRoot, SortWeight: navtree.WeightApps + 1, Text: "Connections", Icon: "adjust-circle"},
-		"grafana-k6-app":                   {SectionID: navtree.NavIDRoot, SortWeight: navtree.WeightAlertsAndIncidents + 1, Text: "Performance testing", Icon: "k6"},
+		"k6-app":                           {SectionID: navtree.NavIDTestingAndSynthetics, SortWeight: 1, Text: "Performance"},
+		"grafana-asserts-app":              {SectionID: navtree.NavIDRoot, SortWeight: navtree.WeightAsserts, Icon: "asserts"},
 	}
 
 	s.navigationAppPathConfig = map[string]NavigationAppConfig{
@@ -289,7 +328,16 @@ func (s *ServiceImpl) readNavigationSettings() {
 			}
 		}
 
-		s.navigationAppConfig[pluginId] = *appCfg
+		// Only apply the new values, don't completely overwrite the entry if it exists
+		if entry, ok := s.navigationAppConfig[pluginId]; ok {
+			entry.SectionID = appCfg.SectionID
+			if appCfg.SortWeight != 0 {
+				entry.SortWeight = appCfg.SortWeight
+			}
+			s.navigationAppConfig[pluginId] = entry
+		} else {
+			s.navigationAppConfig[pluginId] = *appCfg
+		}
 	}
 
 	for _, key := range appStandalonePages.Keys() {

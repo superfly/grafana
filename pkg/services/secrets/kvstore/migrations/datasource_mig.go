@@ -44,7 +44,7 @@ func (s *DataSourceSecretMigrationService) Migrate(ctx context.Context) error {
 	}
 	logger.Debug(fmt.Sprint("secret migration status is ", migrationStatus))
 	// If this flag is true, delete secrets from the legacy secrets store as they are migrated
-	disableSecretsCompatibility := s.features.IsEnabled(featuremgmt.FlagDisableSecretsCompatibility)
+	disableSecretsCompatibility := s.features.IsEnabled(ctx, featuremgmt.FlagDisableSecretsCompatibility)
 	// If migration hasn't happened, migrate to unified secrets and keep copy in legacy
 	// If a complete migration happened and now backwards compatibility is enabled, copy secrets back to legacy
 	needCompatibility := migrationStatus != compatibleSecretMigrationValue && !disableSecretsCompatibility
@@ -55,12 +55,12 @@ func (s *DataSourceSecretMigrationService) Migrate(ctx context.Context) error {
 	if needCompatibility || needMigration {
 		logger.Debug("performing secret migration", "needs migration", needMigration, "needs compatibility", needCompatibility)
 		query := &datasources.GetAllDataSourcesQuery{}
-		err := s.dataSourcesService.GetAllDataSources(ctx, query)
+		dsList, err := s.dataSourcesService.GetAllDataSources(ctx, query)
 		if err != nil {
 			return err
 		}
 
-		for _, ds := range query.Result {
+		for _, ds := range dsList {
 			secureJsonData, err := s.dataSourcesService.DecryptedValues(ctx, ds)
 			if err != nil {
 				return err

@@ -21,31 +21,24 @@ func TestIntegrationCreateCorrelation(t *testing.T) {
 	}
 	ctx := NewTestEnv(t)
 
-	adminUser := User{
-		username: "admin",
-		password: "admin",
-	}
-	editorUser := User{
-		username: "editor",
-		password: "editor",
-	}
-
-	ctx.createUser(user.CreateUserCommand{
-		DefaultOrgRole: string(org.RoleEditor),
-		Password:       editorUser.password,
-		Login:          editorUser.username,
-	})
-	ctx.createUser(user.CreateUserCommand{
+	adminUser := ctx.createUser(user.CreateUserCommand{
 		DefaultOrgRole: string(org.RoleAdmin),
-		Password:       adminUser.password,
-		Login:          adminUser.username,
+		Password:       "admin",
+		Login:          "admin",
+	})
+
+	editorUser := ctx.createUser(user.CreateUserCommand{
+		DefaultOrgRole: string(org.RoleEditor),
+		Password:       "editor",
+		Login:          "editor",
+		OrgID:          adminUser.User.OrgID,
 	})
 
 	createDsCommand := &datasources.AddDataSourceCommand{
 		Name:     "read-only",
 		Type:     "loki",
 		ReadOnly: true,
-		OrgID:    1,
+		OrgID:    adminUser.User.OrgID,
 	}
 	dataSource := ctx.createDs(createDsCommand)
 	readOnlyDS := dataSource.UID
@@ -53,7 +46,7 @@ func TestIntegrationCreateCorrelation(t *testing.T) {
 	createDsCommand = &datasources.AddDataSourceCommand{
 		Name:  "writable",
 		Type:  "loki",
-		OrgID: 1,
+		OrgID: adminUser.User.OrgID,
 	}
 	dataSource = ctx.createDs(createDsCommand)
 	writableDs := dataSource.UID
@@ -140,7 +133,6 @@ func TestIntegrationCreateCorrelation(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Equal(t, "Data source not found", response.Message)
-		require.Equal(t, correlations.ErrSourceDataSourceDoesNotExists.Error(), response.Error)
 
 		require.NoError(t, res.Body.Close())
 	})
@@ -168,12 +160,11 @@ func TestIntegrationCreateCorrelation(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Equal(t, "Data source not found", response.Message)
-		require.Equal(t, correlations.ErrTargetDataSourceDoesNotExists.Error(), response.Error)
 
 		require.NoError(t, res.Body.Close())
 	})
 
-	t.Run("creating a correlation originating from a read-only data source should result in a 403", func(t *testing.T) {
+	t.Run("creating a correlation originating from a read-only data source should work", func(t *testing.T) {
 		res := ctx.Post(PostParams{
 			url: fmt.Sprintf("/api/datasources/uid/%s/correlations", readOnlyDS),
 			body: fmt.Sprintf(`{
@@ -186,17 +177,20 @@ func TestIntegrationCreateCorrelation(t *testing.T) {
 				}`, readOnlyDS),
 			user: adminUser,
 		})
-		require.Equal(t, http.StatusForbidden, res.StatusCode)
+		require.Equal(t, http.StatusOK, res.StatusCode)
 
 		responseBody, err := io.ReadAll(res.Body)
 		require.NoError(t, err)
 
-		var response errorResponseBody
+		var response correlations.CreateCorrelationResponseBody
 		err = json.Unmarshal(responseBody, &response)
 		require.NoError(t, err)
 
-		require.Equal(t, "Data source is read only", response.Message)
-		require.Equal(t, correlations.ErrSourceDataSourceReadOnly.Error(), response.Error)
+		require.Equal(t, "Correlation created", response.Message)
+		require.Equal(t, readOnlyDS, response.Result.SourceUID)
+		require.Equal(t, readOnlyDS, *response.Result.TargetUID)
+		require.Equal(t, "", response.Result.Description)
+		require.Equal(t, "", response.Result.Label)
 
 		require.NoError(t, res.Body.Close())
 	})
@@ -237,6 +231,8 @@ func TestIntegrationCreateCorrelation(t *testing.T) {
 		label := "a label"
 		fieldName := "fieldName"
 		configType := correlations.ConfigTypeQuery
+		transformation := correlations.Transformation{Type: "logfmt"}
+		transformation2 := correlations.Transformation{Type: "regex", Expression: "testExpression", MapValue: "testVar"}
 		res := ctx.Post(PostParams{
 			url: fmt.Sprintf("/api/datasources/uid/%s/correlations", writableDs),
 			body: fmt.Sprintf(`{
@@ -246,7 +242,11 @@ func TestIntegrationCreateCorrelation(t *testing.T) {
 					"config": {
 						"type": "%s",
 						"field": "%s",
-						"target": { "expr": "foo" }
+						"target": { "expr": "foo" },
+						"transformations": [
+							{"type": "logfmt"},
+							{"type": "regex", "expression": "testExpression", "mapValue": "testVar"}
+						]
 					}
 				}`, writableDs, description, label, configType, fieldName),
 			user: adminUser,
@@ -267,7 +267,9 @@ func TestIntegrationCreateCorrelation(t *testing.T) {
 		require.Equal(t, label, response.Result.Label)
 		require.Equal(t, configType, response.Result.Config.Type)
 		require.Equal(t, fieldName, response.Result.Config.Field)
-		require.Equal(t, map[string]interface{}{"expr": "foo"}, response.Result.Config.Target)
+		require.Equal(t, map[string]any{"expr": "foo"}, response.Result.Config.Target)
+		require.Equal(t, transformation, response.Result.Config.Transformations[0])
+		require.Equal(t, transformation2, response.Result.Config.Transformations[1])
 
 		require.NoError(t, res.Body.Close())
 	})
@@ -353,8 +355,6 @@ func TestIntegrationCreateCorrelation(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Contains(t, response.Message, "bad request data")
-		require.Contains(t, response.Error, correlations.ErrInvalidConfigType.Error())
-		require.Contains(t, response.Error, configType)
 
 		require.NoError(t, res.Body.Close())
 	})

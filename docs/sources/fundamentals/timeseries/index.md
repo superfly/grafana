@@ -1,6 +1,7 @@
 ---
 aliases:
   - ../basics/timeseries/
+  - /docs/grafana-cloud/introduction/timeseries/
 description: Introduction to time series
 keywords:
   - grafana
@@ -8,7 +9,12 @@ keywords:
   - guide
   - concepts
   - timeseries
-title: Intro to time series
+labels:
+  products:
+    - cloud
+    - enterprise
+    - oss
+title: Introduction to time series
 weight: 400
 ---
 

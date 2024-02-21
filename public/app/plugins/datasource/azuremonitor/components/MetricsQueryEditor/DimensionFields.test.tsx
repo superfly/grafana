@@ -2,11 +2,11 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import React from 'react';
 import { openMenu } from 'react-select-event';
-import { selectOptionInTest } from 'test/helpers/selectOptionInTest';
 
 import createMockDatasource from '../../__mocks__/datasource';
 import createMockPanelData from '../../__mocks__/panelData';
 import createMockQuery from '../../__mocks__/query';
+import { selectOptionInTest } from '../../utils/testUtils';
 
 import DimensionFields from './DimensionFields';
 import { appendDimensionFilter, setDimensionFilterValue } from './setQueryValue';
@@ -140,7 +140,7 @@ describe(`Azure Monitor QueryEditor`, () => {
           {
             ...mockPanelData.series[0].fields[0],
             name: 'Test Dimension 1',
-            labels: { testdimension1: 'testlabel' },
+            labels: { Testdimension1: 'testlabel' },
           },
         ],
       },
@@ -201,8 +201,8 @@ describe(`Azure Monitor QueryEditor`, () => {
       />
     );
     await screen.findByText('testlabel');
-    const labelClear = await screen.findByLabelText('Remove testlabel');
-    await user.click(labelClear);
+    const labelClear = await screen.findAllByLabelText('Remove');
+    await user.click(labelClear[0]);
     mockQuery = setDimensionFilterValue(mockQuery, 0, 'filters', []);
     expect(onQueryChange).toHaveBeenCalledWith({
       ...mockQuery,

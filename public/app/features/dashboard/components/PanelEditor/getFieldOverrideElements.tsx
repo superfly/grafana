@@ -10,6 +10,9 @@ import {
   DynamicConfigValue,
   ConfigOverrideRule,
   GrafanaTheme2,
+  fieldMatchers,
+  FieldConfigSource,
+  DataFrame,
 } from '@grafana/data';
 import { fieldMatchersUI, useStyles2, ValuePicker } from '@grafana/ui';
 import { getDataLinksVariableSuggestions } from 'app/features/panel/panellinks/link_srv';
@@ -18,41 +21,47 @@ import { DynamicConfigValueEditor } from './DynamicConfigValueEditor';
 import { OptionsPaneCategoryDescriptor } from './OptionsPaneCategoryDescriptor';
 import { OptionsPaneItemDescriptor } from './OptionsPaneItemDescriptor';
 import { OverrideCategoryTitle } from './OverrideCategoryTitle';
-import { OptionPaneRenderProps } from './types';
 
 export function getFieldOverrideCategories(
-  props: OptionPaneRenderProps,
-  searchQuery: string
+  fieldConfig: FieldConfigSource,
+  registry: FieldConfigOptionsRegistry,
+  data: DataFrame[],
+  searchQuery: string,
+  onFieldConfigsChange: (config: FieldConfigSource) => void
 ): OptionsPaneCategoryDescriptor[] {
   const categories: OptionsPaneCategoryDescriptor[] = [];
-  const currentFieldConfig = props.panel.fieldConfig;
-  const registry = props.plugin.fieldConfigRegistry;
-  const data = props.data?.series ?? [];
+  const currentFieldConfig = fieldConfig;
 
-  if (registry.isEmpty()) {
+  if (!registry || registry.isEmpty()) {
     return [];
   }
 
   const onOverrideChange = (index: number, override: ConfigOverrideRule) => {
     let overrides = cloneDeep(currentFieldConfig.overrides);
     overrides[index] = override;
-    props.onFieldConfigsChange({ ...currentFieldConfig, overrides });
+    onFieldConfigsChange({ ...currentFieldConfig, overrides });
   };
 
   const onOverrideRemove = (overrideIndex: number) => {
     let overrides = cloneDeep(currentFieldConfig.overrides);
     overrides.splice(overrideIndex, 1);
-    props.onFieldConfigsChange({ ...currentFieldConfig, overrides });
+    onFieldConfigsChange({ ...currentFieldConfig, overrides });
   };
 
   const onOverrideAdd = (value: SelectableValue<string>) => {
-    props.onFieldConfigsChange({
+    const info = fieldMatchers.get(value.value!);
+    if (!info) {
+      return;
+    }
+
+    onFieldConfigsChange({
       ...currentFieldConfig,
       overrides: [
         ...currentFieldConfig.overrides,
         {
           matcher: {
-            id: value.value!,
+            id: info.id,
+            options: info.defaultOptions,
           },
           properties: [],
         },
@@ -128,7 +137,7 @@ export function getFieldOverrideCategories(
             <matcherUi.component
               id={`${matcherUi.matcher.id}-${idx}`}
               matcher={matcherUi.matcher}
-              data={props.data?.series ?? []}
+              data={data ?? []}
               options={override.matcher.options}
               onChange={onMatcherConfigChange}
             />
@@ -148,7 +157,7 @@ export function getFieldOverrideCategories(
         continue;
       }
 
-      const onPropertyChange = (value: any) => {
+      const onPropertyChange = (value: DynamicConfigValue) => {
         override.properties[propIdx].value = value;
         onOverrideChange(idx, override);
       };

@@ -1,9 +1,7 @@
 import { cx } from '@emotion/css';
 import React, { useCallback, useEffect } from 'react';
 
-import { Checkbox, IconButton, useStyles2, useTheme2 } from '@grafana/ui';
-
-import { Space } from '../Space';
+import { Checkbox, IconButton, useStyles2, useTheme2, Space } from '@grafana/ui';
 
 import { EntryIcon } from './EntryIcon';
 import getStyles from './styles';
@@ -21,7 +19,7 @@ interface NestedEntryProps {
   onSelectedChange: (row: ResourceRow, selected: boolean) => void;
 }
 
-export const NestedEntry: React.FC<NestedEntryProps> = ({
+export const NestedEntry = ({
   entry,
   isSelected,
   isDisabled,
@@ -31,7 +29,7 @@ export const NestedEntry: React.FC<NestedEntryProps> = ({
   scrollIntoView,
   onToggleCollapse,
   onSelectedChange,
-}) => {
+}: NestedEntryProps) => {
   const theme = useTheme2();
   const styles = useStyles2(getStyles);
   const hasChildren = !!entry.children;

@@ -7,12 +7,16 @@ import { DataSourceInstanceSettings, MetricFindValue } from '@grafana/data/src';
 import { PrometheusDatasource } from '../../datasource';
 import { PromOptions } from '../../types';
 
-import { MetricSelect } from './MetricSelect';
+import {
+  formatPrometheusLabelFilters,
+  formatPrometheusLabelFiltersToString,
+  MetricSelect,
+  Props,
+} from './MetricSelect';
 
 const instanceSettings = {
   url: 'proxied',
   id: 1,
-  directUrl: 'direct',
   user: 'test',
   password: 'mupp',
   jsonData: { httpMethod: 'GET' },
@@ -44,7 +48,7 @@ dataSourceMock.metricFindQuery = jest.fn((query: string) => {
   );
 });
 
-const props = {
+const props: Props = {
   labelsFilters: [],
   datasource: dataSourceMock,
   query: {
@@ -54,6 +58,7 @@ const props = {
   },
   onChange: jest.fn(),
   onGetMetrics: jest.fn().mockResolvedValue(mockValues),
+  metricLookupDisabled: false,
 };
 
 describe('MetricSelect', () => {
@@ -64,6 +69,18 @@ describe('MetricSelect', () => {
     await waitFor(() => expect(screen.getByText('unique_metric')).toBeInTheDocument());
     await waitFor(() => expect(screen.getByText('more_unique_metric')).toBeInTheDocument());
     await waitFor(() => expect(screen.getAllByLabelText('Select option')).toHaveLength(3));
+  });
+
+  it('truncates list of metrics to 1000', async () => {
+    const manyMockValues = [...Array(1001).keys()].map((idx: number) => {
+      return { label: 'random_metric' + idx };
+    });
+
+    props.onGetMetrics = jest.fn().mockResolvedValue(manyMockValues);
+
+    render(<MetricSelect {...props} />);
+    await openMetricSelect();
+    await waitFor(() => expect(screen.getAllByLabelText('Select option')).toHaveLength(1000));
   });
 
   it('shows option to set custom value when typing', async () => {
@@ -128,6 +145,43 @@ describe('MetricSelect', () => {
     const input = screen.getByRole('combobox');
     await userEvent.type(input, 'new');
     await waitFor(() => expect(document.querySelector('mark')).not.toBeInTheDocument());
+  });
+
+  it('label filters properly join', () => {
+    const query = formatPrometheusLabelFilters([
+      {
+        value: 'value',
+        label: 'label',
+        op: '=',
+      },
+      {
+        value: 'value2',
+        label: 'label2',
+        op: '=',
+      },
+    ]);
+    query.forEach((label) => {
+      expect(label.includes(',', 0));
+    });
+  });
+  it('label filter creation', () => {
+    const labels = [
+      {
+        value: 'value',
+        label: 'label',
+        op: '=',
+      },
+      {
+        value: 'value2',
+        label: 'label2',
+        op: '=',
+      },
+    ];
+
+    const queryString = formatPrometheusLabelFiltersToString('query', labels);
+    queryString.split(',').forEach((queryChunk) => {
+      expect(queryChunk.length).toBeGreaterThan(1); // must be longer then ','
+    });
   });
 });
 

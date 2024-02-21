@@ -6,14 +6,16 @@ load(
     "scripts/drone/steps/lib.star",
     "slack_step",
 )
-load("scripts/drone/vault.star", "pull_secret")
+load(
+    "scripts/drone/vault.star",
+    "gar_pull_secret",
+    "gcr_pull_secret",
+)
 
 failure_template = "Build {{build.number}} failed for commit: <https://github.com/{{repo.owner}}/{{repo.name}}/commit/{{build.commit}}|{{ truncate build.commit 8 }}>: {{build.link}}\nBranch: <https://github.com/{{ repo.owner }}/{{ repo.name }}/commits/{{ build.branch }}|{{ build.branch }}>\nAuthor: {{build.author}}"
-drone_change_template = "`.drone.yml` and `starlark` files have been changed on the OSS repo, by: {{build.author}}. \nBranch: <https://github.com/{{ repo.owner }}/{{ repo.name }}/commits/{{ build.branch }}|{{ build.branch }}>\nCommit hash: <https://github.com/{{repo.owner}}/{{repo.name}}/commit/{{build.commit}}|{{ truncate build.commit 8 }}>"
 
 def pipeline(
         name,
-        edition,
         trigger,
         steps,
         services = [],
@@ -30,10 +32,9 @@ def pipeline(
 
     Args:
       name: controls the pipeline name.
-      edition: used to differentiate the pipeline for enterprise builds.
       trigger: a Drone trigger for the pipeline.
       steps: the Drone steps for the pipeline.
-      services: auxilliary services used during the pipeline.
+      services: auxiliary services used during the pipeline.
         Defaults to [].
       platform: abstracts platform specific configuration primarily for different Drone behavior on Windows.
         Defaults to 'linux'.
@@ -63,6 +64,10 @@ def pipeline(
             },
         }
 
+    docker_mount_path = "/var/run/docker.sock"
+    if platform == "windows":
+        docker_mount_path = "//./pipe/docker_engine/"
+
     pipeline = {
         "kind": "pipeline",
         "type": "docker",
@@ -77,12 +82,12 @@ def pipeline(
             {
                 "name": "docker",
                 "host": {
-                    "path": "/var/run/docker.sock",
+                    "path": docker_mount_path,
                 },
             },
         ],
         "depends_on": depends_on,
-        "image_pull_secrets": [pull_secret],
+        "image_pull_secrets": [gcr_pull_secret, gar_pull_secret],
     }
     if environment:
         pipeline.update(
@@ -93,12 +98,6 @@ def pipeline(
 
     pipeline["volumes"].extend(volumes)
     pipeline.update(platform_conf)
-
-    if edition in ("enterprise", "enterprise2"):
-        # We have a custom clone step for enterprise
-        pipeline["clone"] = {
-            "disable": True,
-        }
 
     return pipeline
 
@@ -133,4 +132,9 @@ def notify_pipeline(
 def with_deps(steps, deps = []):
     for step in steps:
         step["depends_on"] = deps
+    return steps
+
+def ignore_failure(steps):
+    for step in steps:
+        step["failure"] = "ignore"
     return steps

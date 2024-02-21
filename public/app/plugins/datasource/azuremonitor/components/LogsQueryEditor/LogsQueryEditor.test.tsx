@@ -2,6 +2,8 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import React from 'react';
 
+import { dateTime, LoadingState } from '@grafana/data';
+
 import createMockDatasource from '../../__mocks__/datasource';
 import createMockQuery from '../../__mocks__/query';
 import { createMockResourcePickerData } from '../MetricsQueryEditor/MetricsQueryEditor.test';
@@ -9,7 +11,7 @@ import { createMockResourcePickerData } from '../MetricsQueryEditor/MetricsQuery
 import LogsQueryEditor from './LogsQueryEditor';
 
 jest.mock('@grafana/runtime', () => ({
-  ...(jest.requireActual('@grafana/runtime') as unknown as object),
+  ...jest.requireActual('@grafana/runtime'),
   getTemplateSrv: () => ({
     replace: (val: string) => {
       return val;
@@ -22,7 +24,7 @@ const variableOptionGroup = {
   options: [],
 };
 
-describe('LogsQueryEdiutor', () => {
+describe('LogsQueryEditor', () => {
   const originalScrollIntoView = window.HTMLElement.prototype.scrollIntoView;
 
   beforeEach(() => {
@@ -50,13 +52,13 @@ describe('LogsQueryEdiutor', () => {
     );
 
     const resourcePickerButton = await screen.findByRole('button', { name: 'Select a resource' });
-    resourcePickerButton.click();
+    await userEvent.click(resourcePickerButton);
 
     const subscriptionButton = await screen.findByRole('button', { name: 'Expand Primary Subscription' });
-    subscriptionButton.click();
+    await userEvent.click(subscriptionButton);
 
     const resourceGroupButton = await screen.findByRole('button', { name: 'Expand A Great Resource Group' });
-    resourceGroupButton.click();
+    await userEvent.click(resourceGroupButton);
 
     const checkbox = await screen.findByLabelText('web-server');
     await userEvent.click(checkbox);
@@ -98,13 +100,13 @@ describe('LogsQueryEdiutor', () => {
     );
 
     const resourcePickerButton = await screen.findByRole('button', { name: 'Select a resource' });
-    resourcePickerButton.click();
+    await userEvent.click(resourcePickerButton);
 
     const subscriptionButton = await screen.findByRole('button', { name: 'Expand Primary Subscription' });
-    subscriptionButton.click();
+    await userEvent.click(subscriptionButton);
 
     const resourceGroupButton = await screen.findByRole('button', { name: 'Expand A Great Resource Group' });
-    resourceGroupButton.click();
+    await userEvent.click(resourceGroupButton);
 
     const checkbox = await screen.findByLabelText('web-server');
     await userEvent.click(checkbox);
@@ -131,13 +133,13 @@ describe('LogsQueryEdiutor', () => {
     );
 
     const resourcePickerButton = await screen.findByRole('button', { name: 'Select a resource' });
-    resourcePickerButton.click();
+    await userEvent.click(resourcePickerButton);
 
     const subscriptionButton = await screen.findByRole('button', { name: 'Expand Primary Subscription' });
-    subscriptionButton.click();
+    await userEvent.click(subscriptionButton);
 
     const resourceGroupButton = await screen.findByRole('button', { name: 'Expand A Great Resource Group' });
-    resourceGroupButton.click();
+    await userEvent.click(resourceGroupButton);
 
     const checkbox = await screen.findByLabelText('web-server');
     await userEvent.click(checkbox);
@@ -164,17 +166,17 @@ describe('LogsQueryEdiutor', () => {
     );
 
     const resourcePickerButton = await screen.findByRole('button', { name: 'Select a resource' });
-    resourcePickerButton.click();
+    await userEvent.click(resourcePickerButton);
 
     const advancedSection = screen.getByText('Advanced');
-    advancedSection.click();
+    await userEvent.click(advancedSection);
 
     const advancedInput = await screen.findByTestId('input-advanced-resource-picker-1');
-    // const advancedInput = await screen.findByLabelText('Resource URI(s)');
+
     await userEvent.type(advancedInput, '/subscriptions/def-123');
 
     const applyButton = screen.getByRole('button', { name: 'Apply' });
-    applyButton.click();
+    await userEvent.click(applyButton);
 
     expect(onChange).toBeCalledWith(
       expect.objectContaining({
@@ -183,5 +185,65 @@ describe('LogsQueryEdiutor', () => {
         }),
       })
     );
+  });
+
+  it('should update the dashboardTime prop', async () => {
+    const mockDatasource = createMockDatasource({ resourcePickerData: createMockResourcePickerData() });
+    const query = createMockQuery();
+    const onChange = jest.fn();
+
+    render(
+      <LogsQueryEditor
+        query={query}
+        datasource={mockDatasource}
+        variableOptionGroup={variableOptionGroup}
+        onChange={onChange}
+        setError={() => {}}
+      />
+    );
+
+    const dashboardTimeOption = await screen.findByLabelText('Dashboard');
+    await userEvent.click(dashboardTimeOption);
+
+    expect(onChange).toBeCalledWith(
+      expect.objectContaining({
+        azureLogAnalytics: expect.objectContaining({
+          dashboardTime: true,
+        }),
+      })
+    );
+  });
+
+  describe('azure portal link', () => {
+    it('should show the link button', async () => {
+      const mockDatasource = createMockDatasource({ resourcePickerData: createMockResourcePickerData() });
+      const query = createMockQuery();
+      const onChange = jest.fn();
+
+      const date = dateTime(new Date());
+      render(
+        <LogsQueryEditor
+          query={query}
+          datasource={mockDatasource}
+          variableOptionGroup={variableOptionGroup}
+          onChange={onChange}
+          setError={() => {}}
+          data={{
+            state: LoadingState.Done,
+            timeRange: {
+              from: date,
+              to: date,
+              raw: {
+                from: date,
+                to: date,
+              },
+            },
+            series: [{ refId: query.refId, length: 0, meta: { custom: { azurePortalLink: 'test' } }, fields: [] }],
+          }}
+        />
+      );
+
+      expect(await screen.findByText('View query in Azure Portal')).toBeInTheDocument();
+    });
   });
 });

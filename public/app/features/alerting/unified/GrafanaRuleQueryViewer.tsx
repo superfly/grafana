@@ -4,9 +4,8 @@ import { keyBy, startCase } from 'lodash';
 import React from 'react';
 
 import { DataSourceInstanceSettings, GrafanaTheme2, PanelData, RelativeTimeRange } from '@grafana/data';
-import { Stack } from '@grafana/experimental';
 import { config } from '@grafana/runtime';
-import { Badge, useStyles2 } from '@grafana/ui';
+import { Badge, Stack, useStyles2 } from '@grafana/ui';
 import { mapRelativeTimeRangeToOption } from '@grafana/ui/src/components/DateTimePickers/RelativeTimeRangePicker/utils';
 
 import { AlertQuery } from '../../../types/unified-alerting-dto';
@@ -15,8 +14,8 @@ import {
   downsamplingTypes,
   ExpressionQuery,
   ExpressionQueryType,
-  reducerModes,
   ReducerMode,
+  reducerModes,
   reducerTypes,
   thresholdFunctions,
   upsamplingTypes,
@@ -24,6 +23,7 @@ import {
 import alertDef, { EvalFunction } from '../state/alertDef';
 
 import { ExpressionResult } from './components/expressions/Expression';
+import { getThresholdsForQueries, ThresholdDefinition } from './components/rule-editor/util';
 import { RuleViewerVisualization } from './components/rule-viewer/RuleViewerVisualization';
 
 interface GrafanaRuleViewerProps {
@@ -44,47 +44,54 @@ export function GrafanaRuleQueryViewer({
   const dsByUid = keyBy(Object.values(config.datasources), (ds) => ds.uid);
   const dataQueries = queries.filter((q) => !isExpressionQuery(q.model));
   const expressions = queries.filter((q) => isExpressionQuery(q.model));
+  const styles = useStyles2(getExpressionViewerStyles);
+
+  const thresholds = getThresholdsForQueries(queries, condition);
 
   return (
     <Stack gap={2} direction="column">
-      <Stack gap={2}>
-        {dataQueries.map(({ model, relativeTimeRange, refId, datasourceUid }, index) => {
-          const dataSource = dsByUid[datasourceUid];
+      <div className={styles.maxWidthContainer}>
+        <Stack gap={2} wrap="wrap" data-testid="queries-container">
+          {dataQueries.map(({ model, relativeTimeRange, refId, datasourceUid }, index) => {
+            const dataSource = dsByUid[datasourceUid];
 
-          return (
-            <QueryPreview
-              key={index}
-              refId={refId}
-              isAlertCondition={condition === refId}
-              model={model}
-              relativeTimeRange={relativeTimeRange}
-              evalTimeRange={evalTimeRanges[refId]}
-              dataSource={dataSource}
-              queryData={evalDataByQuery[refId]}
-              onEvalTimeRangeChange={(timeRange) => onTimeRangeChange(refId, timeRange)}
-            />
-          );
-        })}
-      </Stack>
-
-      <Stack gap={1}>
-        {expressions.map(({ model, relativeTimeRange, refId, datasourceUid }, index) => {
-          const dataSource = dsByUid[datasourceUid];
-
-          return (
-            isExpressionQuery(model) && (
-              <ExpressionPreview
+            return (
+              <QueryPreview
                 key={index}
                 refId={refId}
                 isAlertCondition={condition === refId}
                 model={model}
+                relativeTimeRange={relativeTimeRange}
+                evalTimeRange={evalTimeRanges[refId]}
                 dataSource={dataSource}
-                evalData={evalDataByQuery[refId]}
+                thresholds={thresholds[refId]}
+                queryData={evalDataByQuery[refId]}
+                onEvalTimeRangeChange={(timeRange) => onTimeRangeChange(refId, timeRange)}
               />
-            )
-          );
-        })}
-      </Stack>
+            );
+          })}
+        </Stack>
+      </div>
+      <div className={styles.maxWidthContainer}>
+        <Stack gap={1} wrap="wrap" data-testid="expressions-container">
+          {expressions.map(({ model, refId, datasourceUid }, index) => {
+            const dataSource = dsByUid[datasourceUid];
+
+            return (
+              isExpressionQuery(model) && (
+                <ExpressionPreview
+                  key={index}
+                  refId={refId}
+                  isAlertCondition={condition === refId}
+                  model={model}
+                  dataSource={dataSource}
+                  evalData={evalDataByQuery[refId]}
+                />
+              )
+            );
+          })}
+        </Stack>
+      </div>
     </Stack>
   );
 }
@@ -93,6 +100,7 @@ interface QueryPreviewProps extends Pick<AlertQuery, 'refId' | 'relativeTimeRang
   isAlertCondition: boolean;
   dataSource?: DataSourceInstanceSettings;
   queryData?: PanelData;
+  thresholds?: ThresholdDefinition;
   evalTimeRange?: RelativeTimeRange;
   onEvalTimeRangeChange: (timeRange: RelativeTimeRange) => void;
 }
@@ -100,6 +108,7 @@ interface QueryPreviewProps extends Pick<AlertQuery, 'refId' | 'relativeTimeRang
 export function QueryPreview({
   refId,
   relativeTimeRange,
+  thresholds,
   model,
   dataSource,
   queryData,
@@ -123,9 +132,10 @@ export function QueryPreview({
       {dataSource && (
         <RuleViewerVisualization
           refId={refId}
-          datasourceUid={dataSource.uid}
+          dsSettings={dataSource}
           model={model}
           data={queryData}
+          thresholds={thresholds}
           relativeTimeRange={evalTimeRange}
           onTimeRangeChange={onEvalTimeRangeChange}
           className={styles.visualization}
@@ -140,7 +150,7 @@ const getQueryPreviewStyles = (theme: GrafanaTheme2) => ({
     margin: ${theme.spacing(1)};
   `,
   contentBox: css`
-    flex: 1 0 100%; // RuleViewerVisualization uses AutoSizer which doesn't expand the box
+    flex: 1 0 100%;
   `,
   visualization: css`
     padding: ${theme.spacing(1)};
@@ -367,20 +377,44 @@ function ThresholdExpressionViewer({ model }: { model: ExpressionQuery }) {
 
   const isRange = evaluator ? isRangeEvaluator(evaluator) : false;
 
-  return (
-    <div className={styles.container}>
-      <div className={styles.label}>Input</div>
-      <div className={styles.value}>{expression}</div>
+  const unloadEvaluator = conditions && conditions[0]?.unloadEvaluator;
+  const unloadThresholdFunction = thresholdFunctions.find((tf) => tf.value === unloadEvaluator?.type);
 
-      {evaluator && (
-        <>
-          <div className={styles.blue}>{thresholdFunction?.label}</div>
-          <div className={styles.bold}>
-            {isRange ? `(${evaluator.params[0]}; ${evaluator.params[1]})` : evaluator.params[0]}
-          </div>
-        </>
-      )}
-    </div>
+  const unloadIsRange = unloadEvaluator ? isRangeEvaluator(unloadEvaluator) : false;
+
+  return (
+    <>
+      <div className={styles.container}>
+        <div className={styles.label}>Input</div>
+        <div className={styles.value}>{expression}</div>
+
+        {evaluator && (
+          <>
+            <div className={styles.blue}>{thresholdFunction?.label}</div>
+            <div className={styles.bold}>
+              {isRange ? `(${evaluator.params[0]}; ${evaluator.params[1]})` : evaluator.params[0]}
+            </div>
+          </>
+        )}
+      </div>
+      <div className={styles.container}>
+        {unloadEvaluator && (
+          <>
+            <div className={styles.label}>Stop alerting when </div>
+            <div className={styles.value}>{expression}</div>
+
+            <>
+              <div className={styles.blue}>{unloadThresholdFunction?.label}</div>
+              <div className={styles.bold}>
+                {unloadIsRange
+                  ? `(${unloadEvaluator.params[0]}; ${unloadEvaluator.params[1]})`
+                  : unloadEvaluator.params[0]}
+              </div>
+            </>
+          </>
+        )}
+      </div>
+    </>
   );
 }
 
@@ -389,6 +423,9 @@ const getExpressionViewerStyles = (theme: GrafanaTheme2) => {
 
   return {
     ...common,
+    maxWidthContainer: css`
+      max-width: 100%;
+    `,
     container: css`
       padding: ${theme.spacing(1)};
       display: flex;

@@ -14,6 +14,7 @@ import (
 	"github.com/grafana/grafana/pkg/infra/localcache"
 	"github.com/grafana/grafana/pkg/infra/tracing"
 	"github.com/grafana/grafana/pkg/infra/usagestats"
+	"github.com/grafana/grafana/pkg/infra/usagestats/validator"
 	"github.com/grafana/grafana/pkg/services/annotations/annotationstest"
 	datasources "github.com/grafana/grafana/pkg/services/datasources/fakes"
 	encryptionprovider "github.com/grafana/grafana/pkg/services/encryption/provider"
@@ -27,27 +28,26 @@ func TestIntegrationEngineTimeouts(t *testing.T) {
 	}
 
 	usMock := &usagestats.UsageStatsMock{T: t}
+	usValidatorMock := &validator.FakeUsageStatsValidator{}
 
 	encProvider := encryptionprovider.ProvideEncryptionProvider()
-	cfg := setting.NewCfg()
-	settings := &setting.OSSImpl{Cfg: cfg}
-
-	encService, err := encryptionservice.ProvideEncryptionService(encProvider, usMock, settings)
+	encService, err := encryptionservice.ProvideEncryptionService(encProvider, usMock, setting.NewCfg())
 	require.NoError(t, err)
 
 	tracer := tracing.InitializeTracerForTest()
 	dsMock := &datasources.FakeDataSourceService{}
 	annotationsRepo := annotationstest.NewFakeAnnotationsRepo()
-	engine := ProvideAlertEngine(nil, nil, nil, usMock, encService, nil, tracer, nil, setting.NewCfg(), nil, nil, localcache.New(time.Minute, time.Minute), dsMock, annotationsRepo)
-	setting.AlertingNotificationTimeout = 30 * time.Second
-	setting.AlertingMaxAttempts = 3
+	cfg := setting.NewCfg()
+	engine := ProvideAlertEngine(nil, nil, nil, usMock, usValidatorMock, encService, nil, tracer, nil, cfg, nil, nil, localcache.New(time.Minute, time.Minute), dsMock, annotationsRepo)
+	cfg.AlertingNotificationTimeout = 30 * time.Second
+	cfg.AlertingMaxAttempts = 3
 	engine.resultHandler = &FakeResultHandler{}
 	job := &Job{running: true, Rule: &Rule{}}
 
 	t.Run("Should trigger as many retries as needed", func(t *testing.T) {
 		t.Run("pended alert for datasource -> result handler should be worked", func(t *testing.T) {
 			// reduce alert timeout to test quickly
-			setting.AlertingEvaluationTimeout = 30 * time.Second
+			cfg.AlertingEvaluationTimeout = 30 * time.Second
 			transportTimeoutInterval := 2 * time.Second
 			serverBusySleepDuration := 1 * time.Second
 
@@ -63,7 +63,7 @@ func TestIntegrationEngineTimeouts(t *testing.T) {
 			require.Equal(t, true, resultHandler.ResultHandleSucceed)
 
 			// initialize for other tests.
-			setting.AlertingEvaluationTimeout = 2 * time.Second
+			cfg.AlertingEvaluationTimeout = 2 * time.Second
 			engine.resultHandler = &FakeResultHandler{}
 		})
 	})

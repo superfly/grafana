@@ -28,15 +28,25 @@ type EmailSender interface {
 	SendEmailCommandHandlerSync(ctx context.Context, cmd *SendEmailCommandSync) error
 	SendEmailCommandHandler(ctx context.Context, cmd *SendEmailCommand) error
 }
+type PasswordResetMailer interface {
+	SendResetPasswordEmail(ctx context.Context, cmd *SendResetPasswordEmailCommand) error
+	ValidateResetPasswordCode(ctx context.Context, query *ValidateResetPasswordCodeQuery, userByLogin GetUserByLoginFunc) (*user.User, error)
+}
+type EmailVerificationMailer interface {
+	SendVerificationEmail(ctx context.Context, cmd *SendVerifyEmailCommand) error
+}
 type Service interface {
 	WebhookSender
 	EmailSender
+	PasswordResetMailer
+	EmailVerificationMailer
 }
 
 var mailTemplates *template.Template
 var tmplResetPassword = "reset_password"
 var tmplSignUpStarted = "signup_started"
 var tmplWelcomeOnSignUp = "welcome_on_signup"
+var tmplVerifyEmail = "verify_email_update"
 
 func ProvideService(bus bus.Bus, cfg *setting.Cfg, mailer Mailer, store TempUserStore) (*NotificationService, error) {
 	ns := &NotificationService{
@@ -54,8 +64,9 @@ func ProvideService(bus bus.Bus, cfg *setting.Cfg, mailer Mailer, store TempUser
 
 	mailTemplates = template.New("name")
 	mailTemplates.Funcs(template.FuncMap{
-		"Subject":       subjectTemplateFunc,
-		"HiddenSubject": hiddenSubjectTemplateFunc,
+		"Subject":                 subjectTemplateFunc,
+		"HiddenSubject":           hiddenSubjectTemplateFunc,
+		"__dangerouslyInjectHTML": __dangerouslyInjectHTML,
 	})
 	mailTemplates.Funcs(sprig.FuncMap())
 
@@ -111,7 +122,7 @@ func (ns *NotificationService) Run(ctx context.Context) error {
 				ns.log.Error("Failed to send webrequest ", "error", err)
 			}
 		case msg := <-ns.mailQueue:
-			num, err := ns.Send(msg)
+			num, err := ns.Send(ctx, msg)
 			tos := strings.Join(msg.To, "; ")
 			info := ""
 			if err != nil {
@@ -147,14 +158,14 @@ func (ns *NotificationService) SendWebhookSync(ctx context.Context, cmd *SendWeb
 
 // hiddenSubjectTemplateFunc sets the subject template (value) on the map represented by `.Subject.` (obj) so that it can be compiled and executed later.
 // It returns a blank string, so there will be no resulting value left in place of the template.
-func hiddenSubjectTemplateFunc(obj map[string]interface{}, value string) string {
+func hiddenSubjectTemplateFunc(obj map[string]any, value string) string {
 	obj["value"] = value
 	return ""
 }
 
 // subjectTemplateFunc does the same thing has hiddenSubjectTemplateFunc, but in addition it executes and returns the subject template using the data represented in `.TemplateData` (data)
 // This results in the template being replaced by the subject string.
-func subjectTemplateFunc(obj map[string]interface{}, data map[string]interface{}, value string) string {
+func subjectTemplateFunc(obj map[string]any, data map[string]any, value string) string {
 	obj["value"] = value
 
 	titleTmpl, err := template.New("title").Parse(value)
@@ -174,6 +185,17 @@ func subjectTemplateFunc(obj map[string]interface{}, data map[string]interface{}
 	return subj
 }
 
+// __dangerouslyInjectHTML allows marking areas of am email template as HTML safe, this will _not_ sanitize the string and will allow HTML snippets to be rendered verbatim.
+// Use with absolute care as this _could_ allow for XSS attacks when used in an insecure context.
+//
+// It's safe to ignore gosec warning G203 when calling this function in an HTML template because we assume anyone who has write access
+// to the email templates folder is an administrator.
+//
+// nolint:gosec
+func __dangerouslyInjectHTML(s string) template.HTML {
+	return template.HTML(s)
+}
+
 func (ns *NotificationService) SendEmailCommandHandlerSync(ctx context.Context, cmd *SendEmailCommandSync) error {
 	message, err := ns.buildEmailMessage(&SendEmailCommand{
 		Data:          cmd.Data,
@@ -191,7 +213,7 @@ func (ns *NotificationService) SendEmailCommandHandlerSync(ctx context.Context, 
 		return err
 	}
 
-	_, err = ns.Send(message)
+	_, err = ns.Send(ctx, message)
 	return err
 }
 
@@ -214,7 +236,7 @@ func (ns *NotificationService) SendResetPasswordEmail(ctx context.Context, cmd *
 	return ns.SendEmailCommandHandler(ctx, &SendEmailCommand{
 		To:       []string{cmd.User.Email},
 		Template: tmplResetPassword,
-		Data: map[string]interface{}{
+		Data: map[string]any{
 			"Code": code,
 			"Name": cmd.User.NameOrFallback(),
 		},
@@ -223,31 +245,44 @@ func (ns *NotificationService) SendResetPasswordEmail(ctx context.Context, cmd *
 
 type GetUserByLoginFunc = func(c context.Context, login string) (*user.User, error)
 
-func (ns *NotificationService) ValidateResetPasswordCode(ctx context.Context, query *ValidateResetPasswordCodeQuery, userByLogin GetUserByLoginFunc) error {
+func (ns *NotificationService) ValidateResetPasswordCode(ctx context.Context, query *ValidateResetPasswordCodeQuery, userByLogin GetUserByLoginFunc) (*user.User, error) {
 	login := getLoginForEmailCode(query.Code)
 	if login == "" {
-		return ErrInvalidEmailCode
+		return nil, ErrInvalidEmailCode
 	}
 
 	user, err := userByLogin(ctx, login)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	validEmailCode, err := validateUserEmailCode(ns.Cfg, user, query.Code)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if !validEmailCode {
-		return ErrInvalidEmailCode
+		return nil, ErrInvalidEmailCode
 	}
 
-	query.Result = user
-	return nil
+	return user, nil
+}
+
+func (ns *NotificationService) SendVerificationEmail(ctx context.Context, cmd *SendVerifyEmailCommand) error {
+	return ns.SendEmailCommandHandlerSync(ctx, &SendEmailCommandSync{
+		SendEmailCommand: SendEmailCommand{
+			To:       []string{cmd.Email},
+			Template: tmplVerifyEmail,
+			Data: map[string]any{
+				"Code":                           url.QueryEscape(cmd.Code),
+				"Name":                           cmd.User.Name,
+				"VerificationEmailLifetimeHours": int(ns.Cfg.VerificationEmailMaxLifetime.Hours()),
+			},
+		},
+	})
 }
 
 func (ns *NotificationService) signUpStartedHandler(ctx context.Context, evt *events.SignUpStarted) error {
-	if !setting.VerifyEmailEnabled {
+	if !ns.Cfg.VerifyEmailEnabled {
 		return nil
 	}
 
@@ -260,7 +295,7 @@ func (ns *NotificationService) signUpStartedHandler(ctx context.Context, evt *ev
 	err := ns.SendEmailCommandHandler(ctx, &SendEmailCommand{
 		To:       []string{evt.Email},
 		Template: tmplSignUpStarted,
-		Data: map[string]interface{}{
+		Data: map[string]any{
 			"Email":     evt.Email,
 			"Code":      evt.Code,
 			"SignUpUrl": setting.ToAbsUrl(fmt.Sprintf("signup/?email=%s&code=%s", url.QueryEscape(evt.Email), url.QueryEscape(evt.Code))),
@@ -283,7 +318,7 @@ func (ns *NotificationService) signUpCompletedHandler(ctx context.Context, evt *
 	return ns.SendEmailCommandHandler(ctx, &SendEmailCommand{
 		To:       []string{evt.Email},
 		Template: tmplWelcomeOnSignUp,
-		Data: map[string]interface{}{
+		Data: map[string]any{
 			"Name": evt.Name,
 		},
 	})

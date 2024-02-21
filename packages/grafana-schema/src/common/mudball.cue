@@ -94,7 +94,8 @@ AxisConfig: {
 	axisSoftMax?:       number
 	axisGridShow?:      bool
 	scaleDistribution?: ScaleDistributionConfig
-	axisCenteredZero?:   bool
+	axisCenteredZero?:  bool
+	axisBorderShow?:    bool
 } @cuetsy(kind="interface")
 
 // TODO docs
@@ -121,11 +122,11 @@ HideableFieldConfig: {
 } @cuetsy(kind="interface")
 
 // TODO docs
-GraphTresholdsStyleMode: "off" | "line" | "dashed" | "area" | "line+area" | "dashed+area" | "series" @cuetsy(kind="enum",memberNames="Off|Line|Dashed|Area|LineAndArea|DashedAndArea|Series")
+GraphThresholdsStyleMode: "off" | "line" | "dashed" | "area" | "line+area" | "dashed+area" | "series" @cuetsy(kind="enum",memberNames="Off|Line|Dashed|Area|LineAndArea|DashedAndArea|Series")
 
 // TODO docs
 GraphThresholdsStyleConfig: {
-	mode: GraphTresholdsStyleMode
+	mode: GraphThresholdsStyleMode
 } @cuetsy(kind="interface")
 
 // TODO docs
@@ -178,7 +179,7 @@ OptionsWithTextFormatting: {
 } @cuetsy(kind="interface")
 
 // TODO docs
-BigValueColorMode: "value" | "background" | "none" @cuetsy(kind="enum")
+BigValueColorMode: "value" | "background" | "background_solid" | "none" @cuetsy(kind="enum", memberNames="Value|Background|BackgroundSolid|None")
 
 // TODO docs
 BigValueGraphMode: "none" | "line" | "area" @cuetsy(kind="enum")
@@ -242,12 +243,26 @@ VizLegendOptions: {
 // for the bar gauge component of Grafana UI
 BarGaugeDisplayMode: "basic" | "lcd" | "gradient" @cuetsy(kind="enum")
 
+// Allows for the table cell gauge display type to set the gauge mode.
+BarGaugeValueMode: "color" | "text" | "hidden" @cuetsy(kind="enum")
+
+// Allows for the bar gauge name to be placed explicitly
+BarGaugeNamePlacement: "auto" | "top" | "left" @cuetsy(kind="enum")
+
+// Allows for the bar gauge size to be set explicitly
+BarGaugeSizing: "auto" | "manual" @cuetsy(kind="enum")
+
 // TODO docs
 VizTooltipOptions: {
 	mode: TooltipDisplayMode
 	sort: SortOrder
+	maxWidth?: number
+	maxHeight?: number
 } @cuetsy(kind="interface")
 
 Labels: {
 	[string]: string
 } @cuetsy(kind="interface")
+
+// Compare two values
+ComparisonOperation: "eq" | "neq" | "lt" | "lte" | "gt" | "gte" @cuetsy(kind="enum",memberNames="EQ|NEQ|LT|LTE|GT|GTE")

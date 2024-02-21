@@ -10,10 +10,11 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/grafana/grafana/pkg/components/apikeygen"
-	apikeygenprefix "github.com/grafana/grafana/pkg/components/apikeygenprefixed"
+	"github.com/grafana/grafana/pkg/components/satokengen"
 	"github.com/grafana/grafana/pkg/services/apikey"
 	"github.com/grafana/grafana/pkg/services/apikey/apikeytest"
 	"github.com/grafana/grafana/pkg/services/authn"
+	"github.com/grafana/grafana/pkg/services/login"
 	"github.com/grafana/grafana/pkg/services/org"
 	"github.com/grafana/grafana/pkg/services/user"
 	"github.com/grafana/grafana/pkg/services/user/usertest"
@@ -52,6 +53,10 @@ func TestAPIKey_Authenticate(t *testing.T) {
 				ID:       "api-key:1",
 				OrgID:    1,
 				OrgRoles: map[int64]org.RoleType{1: org.RoleAdmin},
+				ClientParams: authn.ClientParams{
+					SyncPermissions: true,
+				},
+				AuthenticatedBy: login.APIKeyAuthModule,
 			},
 		},
 		{
@@ -71,17 +76,19 @@ func TestAPIKey_Authenticate(t *testing.T) {
 				UserID:           1,
 				OrgID:            1,
 				IsServiceAccount: true,
-				OrgCount:         1,
 				OrgRole:          org.RoleViewer,
 				Name:             "test",
 			},
 			expectedIdentity: &authn.Identity{
 				ID:             "service-account:1",
 				OrgID:          1,
-				OrgCount:       1,
 				Name:           "test",
 				OrgRoles:       map[int64]org.RoleType{1: org.RoleViewer},
 				IsGrafanaAdmin: boolPtr(false),
+				ClientParams: authn.ClientParams{
+					SyncPermissions: true,
+				},
+				AuthenticatedBy: login.APIKeyAuthModule,
 			},
 		},
 		{
@@ -102,6 +109,17 @@ func TestAPIKey_Authenticate(t *testing.T) {
 			},
 			expectedErr: errAPIKeyRevoked,
 		},
+		{
+			desc: "should fail for api key in another organization",
+			req:  &authn.Request{OrgID: 1, HTTPRequest: &http.Request{Header: map[string][]string{"Authorization": {"Bearer " + secret}}}},
+			expectedKey: &apikey.APIKey{
+				ID:               1,
+				OrgID:            2,
+				Key:              hash,
+				ServiceAccountId: intPtr(1),
+			},
+			expectedErr: errAPIKeyOrgMismatch,
+		},
 	}
 
 	for _, tt := range tests {
@@ -116,10 +134,12 @@ func TestAPIKey_Authenticate(t *testing.T) {
 			if tt.expectedErr != nil {
 				assert.Nil(t, identity)
 				assert.ErrorIs(t, err, tt.expectedErr)
-			} else {
-				assert.NoError(t, err)
-				assert.EqualValues(t, *tt.expectedIdentity, *identity)
+				return
 			}
+
+			assert.NoError(t, err)
+			assert.EqualValues(t, *tt.expectedIdentity, *identity)
+			assert.Equal(t, tt.req.OrgID, tt.expectedIdentity.OrgID, "the request organization should match the identity's one")
 		})
 	}
 }
@@ -181,6 +201,112 @@ func TestAPIKey_Test(t *testing.T) {
 	}
 }
 
+func TestAPIKey_GetAPIKeyIDFromIdentity(t *testing.T) {
+	type TestCase struct {
+		desc             string
+		expectedKey      *apikey.APIKey
+		expectedIdentity *authn.Identity
+		expectedError    error
+		expectedKeyID    int64
+		expectedExists   bool
+	}
+
+	tests := []TestCase{
+		{
+			desc: "should return API Key ID for valid token that is connected to service account",
+			expectedKey: &apikey.APIKey{
+				ID:               1,
+				OrgID:            1,
+				Key:              hash,
+				ServiceAccountId: intPtr(1),
+			},
+			expectedIdentity: &authn.Identity{
+				ID:              "service-account:1",
+				OrgID:           1,
+				Name:            "test",
+				AuthenticatedBy: login.APIKeyAuthModule,
+			},
+			expectedKeyID:  1,
+			expectedExists: true,
+		},
+		{
+			desc: "should return API Key ID for valid token for API key",
+			expectedKey: &apikey.APIKey{
+				ID:    2,
+				OrgID: 1,
+				Key:   hash,
+			},
+			expectedIdentity: &authn.Identity{
+				ID:              "api-key:2",
+				OrgID:           1,
+				Name:            "test",
+				AuthenticatedBy: login.APIKeyAuthModule,
+			},
+			expectedKeyID:  2,
+			expectedExists: true,
+		},
+		{
+			desc: "should not return any ID when the request is not made by API key or service account",
+			expectedKey: &apikey.APIKey{
+				ID:    2,
+				OrgID: 1,
+				Key:   hash,
+			},
+			expectedIdentity: &authn.Identity{
+				ID:              "user:2",
+				OrgID:           1,
+				Name:            "test",
+				AuthenticatedBy: login.APIKeyAuthModule,
+			},
+			expectedKeyID:  -1,
+			expectedExists: false,
+		},
+		{
+			desc: "should not return any ID when the can't fetch API Key",
+			expectedKey: &apikey.APIKey{
+				ID:    1,
+				OrgID: 1,
+				Key:   hash,
+			},
+			expectedIdentity: &authn.Identity{
+				ID:              "service-account:2",
+				OrgID:           1,
+				Name:            "test",
+				AuthenticatedBy: login.APIKeyAuthModule,
+			},
+			expectedError:  fmt.Errorf("invalid token"),
+			expectedKeyID:  -1,
+			expectedExists: false,
+		},
+	}
+
+	req := &authn.Request{HTTPRequest: &http.Request{
+		Header: map[string][]string{
+			"Authorization": {"Bearer " + secret},
+		},
+	}}
+
+	signedInUser := &user.SignedInUser{
+		UserID: 1,
+		OrgID:  1,
+		Name:   "test",
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			c := ProvideAPIKey(&apikeytest.Service{
+				ExpectedError:  tt.expectedError,
+				ExpectedAPIKey: tt.expectedKey,
+			}, &usertest.FakeUserService{
+				ExpectedSignedInUser: signedInUser,
+			})
+			id, exists := c.getAPIKeyID(context.Background(), tt.expectedIdentity, req)
+			assert.Equal(t, tt.expectedExists, exists)
+			assert.Equal(t, tt.expectedKeyID, id)
+		})
+	}
+}
+
 func intPtr(n int64) *int64 {
 	return &n
 }
@@ -194,7 +320,7 @@ func genApiKey(legacy bool) (string, string) {
 		res, _ := apikeygen.New(1, "test")
 		return res.ClientSecret, res.HashedKey
 	}
-	res, _ := apikeygenprefix.New("test")
+	res, _ := satokengen.New("test")
 	return res.ClientSecret, res.HashedKey
 }
 

@@ -1,4 +1,4 @@
-import React, { FunctionComponent, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 
 import { SelectableValue } from '@grafana/data';
 import { config } from '@grafana/runtime';
@@ -9,11 +9,11 @@ import { AzureDataSourceSettings, AzureCredentials } from '../types';
 import { AzureCredentialsForm } from './AzureCredentialsForm';
 import { DefaultSubscription } from './DefaultSubscription';
 
-const azureClouds = [
+const azureClouds: SelectableValue[] = [
   { value: 'azuremonitor', label: 'Azure' },
   { value: 'govazuremonitor', label: 'Azure US Government' },
   { value: 'chinaazuremonitor', label: 'Azure China' },
-] as SelectableValue[];
+];
 
 export interface Props {
   options: AzureDataSourceSettings;
@@ -21,7 +21,7 @@ export interface Props {
   getSubscriptions: () => Promise<Array<SelectableValue<string>>>;
 }
 
-export const MonitorConfig: FunctionComponent<Props> = (props: Props) => {
+export const MonitorConfig = (props: Props) => {
   const { updateOptions, getSubscriptions, options } = props;
   const [subscriptions, setSubscriptions] = useState<Array<SelectableValue<string>>>([]);
   const credentials = useMemo(() => getCredentials(props.options), [props.options]);
@@ -43,9 +43,9 @@ export const MonitorConfig: FunctionComponent<Props> = (props: Props) => {
 
   return (
     <>
-      <h3 className="page-heading">Authentication</h3>
       <AzureCredentialsForm
         managedIdentityEnabled={config.azure.managedIdentityEnabled}
+        workloadIdentityEnabled={config.azure.workloadIdentityEnabled}
         credentials={credentials}
         azureCloudOptions={azureClouds}
         onCredentialsChange={onCredentialsChange}

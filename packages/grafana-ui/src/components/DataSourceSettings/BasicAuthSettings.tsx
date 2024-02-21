@@ -1,12 +1,12 @@
 import React from 'react';
 
-import { InlineField } from '../..';
+import { InlineField } from '../../components/Forms/InlineField';
 import { FormField } from '../FormField/FormField';
 import { SecretFormField } from '../SecretFormField/SecretFormField';
 
 import { HttpSettingsProps } from './types';
 
-export const BasicAuthSettings: React.FC<HttpSettingsProps> = ({ dataSourceConfig, onChange }) => {
+export const BasicAuthSettings = ({ dataSourceConfig, onChange }: HttpSettingsProps) => {
   const password = dataSourceConfig.secureJsonData ? dataSourceConfig.secureJsonData.basicAuthPassword : '';
 
   const onPasswordReset = () => {

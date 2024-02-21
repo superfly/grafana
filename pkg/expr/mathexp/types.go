@@ -2,6 +2,7 @@ package mathexp
 
 import (
 	"fmt"
+	"github.com/grafana/dataplane/sdata/numeric"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
 	"sort"
 	"strings"
@@ -12,6 +13,12 @@ import (
 // Results is a container for Value interfaces.
 type Results struct {
 	Values Values
+	Error  error
+}
+
+// IsNoData checks whether the result contains NoData value
+func (r Results) IsNoData() bool {
+	return len(r.Values) == 0 || len(r.Values) == 1 && r.Values[0].Type() == parse.TypeNoData
 }
 
 // Values is a slice of Value interfaces
@@ -31,11 +38,11 @@ func (vals Values) AsDataFrames(refID string) []*data.Frame {
 // all Value implementations should be a *data.Frame
 type Value interface {
 	Type() parse.ReturnType
-	Value() interface{}
+	Value() any
 	GetLabels() data.Labels
 	SetLabels(data.Labels)
-	GetMeta() interface{}
-	SetMeta(interface{})
+	GetMeta() any
+	SetMeta(any)
 	AsDataFrame() *data.Frame
 	AddNotice(notice data.Notice)
 }
@@ -49,17 +56,17 @@ type Scalar struct{ Frame *data.Frame }
 func (s Scalar) Type() parse.ReturnType { return parse.TypeScalar }
 
 // Value returns the actual value allows it to fulfill the Value interface.
-func (s Scalar) Value() interface{} { return s }
+func (s Scalar) Value() any { return s }
 
 func (s Scalar) GetLabels() data.Labels { return nil }
 
 func (s Scalar) SetLabels(ls data.Labels) {}
 
-func (s Scalar) GetMeta() interface{} {
+func (s Scalar) GetMeta() any {
 	return s.Frame.Meta.Custom
 }
 
-func (s Scalar) SetMeta(v interface{}) {
+func (s Scalar) SetMeta(v any) {
 	m := s.Frame.Meta
 	if m == nil {
 		m = &data.FrameMeta{}
@@ -107,7 +114,7 @@ type Number struct{ Frame *data.Frame }
 func (n Number) Type() parse.ReturnType { return parse.TypeNumberSet }
 
 // Value returns the actual value allows it to fulfill the Value interface.
-func (n Number) Value() interface{} { return &n }
+func (n Number) Value() any { return &n }
 
 func (n Number) GetName() string { return getFieldDisplayName(n.Frame, n.Frame.Fields[0]) }
 
@@ -133,15 +140,36 @@ func NewNumber(name string, labels data.Labels) Number {
 	return Number{
 		data.NewFrame("",
 			data.NewField(name, labels, make([]*float64, 1)),
-		),
+		).SetMeta(&data.FrameMeta{
+			Type:        data.FrameTypeNumericMulti,
+			TypeVersion: data.FrameTypeVersion{0, 1},
+		}),
 	}
 }
 
-func (n Number) GetMeta() interface{} {
+// NewNumber returns a data that holds a float64Vector
+func NumberFromRef(refID string, nr numeric.MetricRef) (Number, error) {
+	f, _, err := nr.NullableFloat64Value()
+	if err != nil {
+		return Number{}, err
+	}
+
+	frame := data.NewFrame("",
+		data.NewField(nr.GetMetricName(), nr.GetLabels(), []*float64{f})).SetMeta(&data.FrameMeta{
+		Type:        data.FrameTypeNumericMulti,
+		TypeVersion: data.FrameTypeVersion{0, 1},
+	})
+
+	frame.Fields[0].Config = nr.ValueField.Config
+
+	return Number{frame}, nil
+}
+
+func (n Number) GetMeta() any {
 	return n.Frame.Meta.Custom
 }
 
-func (n Number) SetMeta(v interface{}) {
+func (n Number) SetMeta(v any) {
 	m := n.Frame.Meta
 	if m == nil {
 		m = &data.FrameMeta{}
@@ -186,17 +214,17 @@ type NoData struct{ Frame *data.Frame }
 func (s NoData) Type() parse.ReturnType { return parse.TypeNoData }
 
 // Value returns the actual value allows it to fulfill the Value interface.
-func (s NoData) Value() interface{} { return s }
+func (s NoData) Value() any { return s }
 
 func (s NoData) GetLabels() data.Labels { return nil }
 
 func (s NoData) SetLabels(ls data.Labels) {}
 
-func (s NoData) GetMeta() interface{} {
+func (s NoData) GetMeta() any {
 	return s.Frame.Meta.Custom
 }
 
-func (s NoData) SetMeta(v interface{}) {
+func (s NoData) SetMeta(v any) {
 	m := s.Frame.Meta
 	if m == nil {
 		m = &data.FrameMeta{}

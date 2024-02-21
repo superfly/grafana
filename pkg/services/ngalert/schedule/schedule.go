@@ -8,10 +8,9 @@ import (
 	"time"
 
 	"github.com/benbjohnson/clock"
-	alertingModels "github.com/grafana/alerting/models"
-	"github.com/hashicorp/go-multierror"
-	prometheusModel "github.com/prometheus/common/model"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/grafana/grafana/pkg/infra/log"
@@ -29,23 +28,20 @@ import (
 
 // ScheduleService is an interface for a service that schedules the evaluation
 // of alert rules.
-//
-//go:generate mockery --name ScheduleService --structname FakeScheduleService --inpackage --filename schedule_mock.go --unroll-variadic=False
 type ScheduleService interface {
 	// Run the scheduler until the context is canceled or the scheduler returns
 	// an error. The scheduler is terminated when this function returns.
 	Run(context.Context) error
-	// UpdateAlertRule notifies scheduler that a rule has been changed
-	UpdateAlertRule(key ngmodels.AlertRuleKey, lastVersion int64, isPaused bool)
-	// DeleteAlertRule notifies scheduler that rules have been deleted
-	DeleteAlertRule(keys ...ngmodels.AlertRuleKey)
 }
+
+// retryDelay represents how long to wait between each failed rule evaluation.
+const retryDelay = 1 * time.Second
 
 // AlertsSender is an interface for a service that is responsible for sending notifications to the end-user.
 //
 //go:generate mockery --name AlertsSender --structname AlertsSenderMock --inpackage --filename alerts_sender_mock.go --with-expecter
 type AlertsSender interface {
-	Send(key ngmodels.AlertRuleKey, alerts definitions.PostableAlerts)
+	Send(ctx context.Context, key ngmodels.AlertRuleKey, alerts definitions.PostableAlerts)
 }
 
 // RulesStore is a store that provides alert rules for scheduling
@@ -85,6 +81,7 @@ type schedule struct {
 
 	appURL               *url.URL
 	disableGrafanaFolder bool
+	jitterEvaluations    JitterStrategy
 
 	metrics *metrics.Scheduler
 
@@ -108,26 +105,35 @@ type SchedulerCfg struct {
 	MinRuleInterval      time.Duration
 	DisableGrafanaFolder bool
 	AppURL               *url.URL
+	JitterEvaluations    JitterStrategy
 	EvaluatorFactory     eval.EvaluatorFactory
 	RuleStore            RulesStore
 	Metrics              *metrics.Scheduler
 	AlertSender          AlertsSender
 	Tracer               tracing.Tracer
+	Log                  log.Logger
 }
 
 // NewScheduler returns a new schedule.
 func NewScheduler(cfg SchedulerCfg, stateManager *state.Manager) *schedule {
+	const minMaxAttempts = int64(1)
+	if cfg.MaxAttempts < minMaxAttempts {
+		cfg.Log.Warn("Invalid scheduler maxAttempts, using a safe minimum", "configured", cfg.MaxAttempts, "actual", minMaxAttempts)
+		cfg.MaxAttempts = minMaxAttempts
+	}
+
 	sch := schedule{
 		registry:              alertRuleInfoRegistry{alertRuleInfo: make(map[ngmodels.AlertRuleKey]*alertRuleInfo)},
 		maxAttempts:           cfg.MaxAttempts,
 		clock:                 cfg.C,
 		baseInterval:          cfg.BaseInterval,
-		log:                   log.New("ngalert.scheduler"),
+		log:                   cfg.Log,
 		evaluatorFactory:      cfg.EvaluatorFactory,
 		ruleStore:             cfg.RuleStore,
 		metrics:               cfg.Metrics,
 		appURL:                cfg.AppURL,
 		disableGrafanaFolder:  cfg.DisableGrafanaFolder,
+		jitterEvaluations:     cfg.JitterEvaluations,
 		stateManager:          stateManager,
 		minRuleInterval:       cfg.MinRuleInterval,
 		schedulableAlertRules: alertRulesRegistry{rules: make(map[ngmodels.AlertRuleKey]*ngmodels.AlertRule)},
@@ -139,6 +145,7 @@ func NewScheduler(cfg SchedulerCfg, stateManager *state.Manager) *schedule {
 }
 
 func (sch *schedule) Run(ctx context.Context) error {
+	sch.log.Info("Starting scheduler", "tickInterval", sch.baseInterval, "maxAttempts", sch.maxAttempts)
 	t := ticker.New(sch.clock, sch.baseInterval, sch.metrics.Ticker)
 	defer t.Stop()
 
@@ -148,17 +155,15 @@ func (sch *schedule) Run(ctx context.Context) error {
 	return nil
 }
 
-// UpdateAlertRule looks for the active rule evaluation and commands it to update the rule
-func (sch *schedule) UpdateAlertRule(key ngmodels.AlertRuleKey, lastVersion int64, isPaused bool) {
-	ruleInfo, err := sch.registry.get(key)
-	if err != nil {
-		return
-	}
-	ruleInfo.update(ruleVersionAndPauseStatus{ruleVersion(lastVersion), isPaused})
+// Rules fetches the entire set of rules considered for evaluation by the scheduler on the next tick.
+// Such rules are not guaranteed to have been evaluated by the scheduler.
+// Rules returns all supplementary metadata for the rules that is stored by the scheduler - namely, the set of folder titles.
+func (sch *schedule) Rules() ([]*ngmodels.AlertRule, map[ngmodels.FolderKey]string) {
+	return sch.schedulableAlertRules.all()
 }
 
-// DeleteAlertRule stops evaluation of the rule, deletes it from active rules, and cleans up state cache.
-func (sch *schedule) DeleteAlertRule(keys ...ngmodels.AlertRuleKey) {
+// deleteAlertRule stops evaluation of the rule, deletes it from active rules, and cleans up state cache.
+func (sch *schedule) deleteAlertRule(keys ...ngmodels.AlertRuleKey) {
 	for _, key := range keys {
 		// It can happen that the scheduler has deleted the alert rule before the
 		// Ruler API has called DeleteAlertRule. This can happen as requests to
@@ -208,27 +213,22 @@ type readyToRunItem struct {
 	evaluation
 }
 
-func (sch *schedule) updateRulesMetrics(alertRules []*ngmodels.AlertRule) {
-	orgs := make(map[int64]int64)
-	for _, rule := range alertRules {
-		orgs[rule.OrgID]++
-	}
-	for org, numRules := range orgs {
-		sch.metrics.GroupRules.WithLabelValues(fmt.Sprint(org)).Set(float64(numRules))
-	}
-
-	// While these are the rules that we iterate over, at the moment there's no 100% guarantee that they'll be
-	// scheduled as rules could be removed before we get a chance to evaluate them.
-	sch.metrics.SchedulableAlertRules.Set(float64(len(alertRules)))
-	sch.metrics.SchedulableAlertRulesHash.Set(float64(hashUIDs(alertRules)))
-}
-
-func (sch *schedule) processTick(ctx context.Context, dispatcherGroup *errgroup.Group, tick time.Time) ([]readyToRunItem, map[ngmodels.AlertRuleKey]struct{}) {
+// TODO refactor to accept a callback for tests that will be called with things that are returned currently, and return nothing.
+// Returns a slice of rules that were scheduled for evaluation, map of stopped rules, and a slice of updated rules
+func (sch *schedule) processTick(ctx context.Context, dispatcherGroup *errgroup.Group, tick time.Time) ([]readyToRunItem, map[ngmodels.AlertRuleKey]struct{}, []ngmodels.AlertRuleKeyWithVersion) {
 	tickNum := tick.Unix() / int64(sch.baseInterval.Seconds())
 
-	if err := sch.updateSchedulableAlertRules(ctx); err != nil {
+	// update the local registry. If there was a difference between the previous state and the current new state, rulesDiff will contains keys of rules that were updated.
+	rulesDiff, err := sch.updateSchedulableAlertRules(ctx)
+	updated := rulesDiff.updated
+	if updated == nil { // make sure map is not nil
+		updated = map[ngmodels.AlertRuleKey]struct{}{}
+	}
+	if err != nil {
 		sch.log.Error("Failed to update alert rules", "error", err)
 	}
+
+	// this is the new current state. rulesDiff contains the previously existing rules that were different between this state and the previous state.
 	alertRules, folderTitles := sch.schedulableAlertRules.all()
 
 	// registeredDefinitions is a map used for finding deleted alert rules
@@ -240,6 +240,7 @@ func (sch *schedule) processTick(ctx context.Context, dispatcherGroup *errgroup.
 	sch.updateRulesMetrics(alertRules)
 
 	readyToRun := make([]readyToRunItem, 0)
+	updatedRules := make([]ngmodels.AlertRuleKeyWithVersion, 0, len(updated)) // this is needed for tests only
 	missingFolder := make(map[string][]string)
 	for _, item := range alertRules {
 		key := item.GetKey()
@@ -267,21 +268,40 @@ func (sch *schedule) processTick(ctx context.Context, dispatcherGroup *errgroup.
 		}
 
 		itemFrequency := item.IntervalSeconds / int64(sch.baseInterval.Seconds())
-		if item.IntervalSeconds != 0 && tickNum%itemFrequency == 0 {
-			var folderTitle string
-			if !sch.disableGrafanaFolder {
-				title, ok := folderTitles[item.NamespaceUID]
-				if ok {
-					folderTitle = title
-				} else {
-					missingFolder[item.NamespaceUID] = append(missingFolder[item.NamespaceUID], item.UID)
-				}
+		offset := jitterOffsetInTicks(item, sch.baseInterval, sch.jitterEvaluations)
+		isReadyToRun := item.IntervalSeconds != 0 && (tickNum%itemFrequency)-offset == 0
+
+		var folderTitle string
+		if !sch.disableGrafanaFolder {
+			title, ok := folderTitles[item.GetFolderKey()]
+			if ok {
+				folderTitle = title
+			} else {
+				missingFolder[item.NamespaceUID] = append(missingFolder[item.NamespaceUID], item.UID)
 			}
+		}
+
+		if isReadyToRun {
+			sch.log.Debug("Rule is ready to run on the current tick", "uid", item.UID, "tick", tickNum, "frequency", itemFrequency, "offset", offset)
 			readyToRun = append(readyToRun, readyToRunItem{ruleInfo: ruleInfo, evaluation: evaluation{
 				scheduledAt: tick,
 				rule:        item,
 				folderTitle: folderTitle,
 			}})
+		}
+		if _, isUpdated := updated[key]; isUpdated && !isReadyToRun {
+			// if we do not need to eval the rule, check the whether rule was just updated and if it was, notify evaluation routine about that
+			sch.log.Debug("Rule has been updated. Notifying evaluation routine", key.LogContext()...)
+			go func(ri *alertRuleInfo, rule *ngmodels.AlertRule) {
+				ri.update(ruleVersionAndPauseStatus{
+					Fingerprint: ruleWithFolder{rule: rule, folderTitle: folderTitle}.Fingerprint(),
+					IsPaused:    rule.IsPaused,
+				})
+			}(ruleInfo, item)
+			updatedRules = append(updatedRules, ngmodels.AlertRuleKeyWithVersion{
+				Version:      item.Version,
+				AlertRuleKey: item.GetKey(),
+			})
 		}
 
 		// remove the alert rule from the registered alert rules
@@ -320,10 +340,11 @@ func (sch *schedule) processTick(ctx context.Context, dispatcherGroup *errgroup.
 	for key := range registeredDefinitions {
 		toDelete = append(toDelete, key)
 	}
-	sch.DeleteAlertRule(toDelete...)
-	return readyToRun, registeredDefinitions
+	sch.deleteAlertRule(toDelete...)
+	return readyToRun, registeredDefinitions, updatedRules
 }
 
+//nolint:gocyclo
 func (sch *schedule) ruleRoutine(grafanaCtx context.Context, key ngmodels.AlertRuleKey, evalCh <-chan *evaluation, updateCh <-chan ruleVersionAndPauseStatus) error {
 	grafanaCtx = ngmodels.WithRuleKey(grafanaCtx, key)
 	logger := sch.log.FromContext(grafanaCtx)
@@ -333,11 +354,13 @@ func (sch *schedule) ruleRoutine(grafanaCtx context.Context, key ngmodels.AlertR
 	evalTotal := sch.metrics.EvalTotal.WithLabelValues(orgID)
 	evalDuration := sch.metrics.EvalDuration.WithLabelValues(orgID)
 	evalTotalFailures := sch.metrics.EvalFailures.WithLabelValues(orgID)
+	processDuration := sch.metrics.ProcessDuration.WithLabelValues(orgID)
+	sendDuration := sch.metrics.SendDuration.WithLabelValues(orgID)
 
 	notify := func(states []state.StateTransition) {
-		expiredAlerts := FromAlertsStateToStoppedAlert(states, sch.appURL, sch.clock)
+		expiredAlerts := state.FromAlertsStateToStoppedAlert(states, sch.appURL, sch.clock)
 		if len(expiredAlerts.PostableAlerts) > 0 {
-			sch.alertsSender.Send(key, expiredAlerts)
+			sch.alertsSender.Send(grafanaCtx, key, expiredAlerts)
 		}
 	}
 
@@ -351,118 +374,116 @@ func (sch *schedule) ruleRoutine(grafanaCtx context.Context, key ngmodels.AlertR
 		notify(states)
 	}
 
-	evaluate := func(ctx context.Context, attempt int64, e *evaluation, span tracing.Span) {
-		logger := logger.New("version", e.rule.Version, "attempt", attempt, "now", e.scheduledAt)
+	evaluate := func(ctx context.Context, f fingerprint, attempt int64, e *evaluation, span trace.Span, retry bool) error {
+		logger := logger.New("version", e.rule.Version, "fingerprint", f, "attempt", attempt, "now", e.scheduledAt).FromContext(ctx)
 		start := sch.clock.Now()
 
-		schedulerUser := &user.SignedInUser{
-			UserID:           -1,
-			IsServiceAccount: true,
-			Login:            "grafana_scheduler",
-			OrgID:            e.rule.OrgID,
-			OrgRole:          org.RoleAdmin,
-			Permissions: map[int64]map[string][]string{
-				e.rule.OrgID: {
-					datasources.ActionQuery: []string{
-						datasources.ScopeAll,
-					},
-				},
-			},
+		evalCtx := eval.NewContextWithPreviousResults(ctx, SchedulerUserFor(e.rule.OrgID), sch.newLoadedMetricsReader(e.rule))
+		if sch.evaluatorFactory == nil {
+			panic("evalfactory nil")
 		}
-		evalCtx := eval.Context(ctx, schedulerUser)
 		ruleEval, err := sch.evaluatorFactory.Create(evalCtx, e.rule.GetEvalCondition())
 		var results eval.Results
 		var dur time.Duration
-		if err == nil {
+		if err != nil {
+			dur = sch.clock.Now().Sub(start)
+			logger.Error("Failed to build rule evaluator", "error", err)
+		} else {
 			results, err = ruleEval.Evaluate(ctx, e.scheduledAt)
+			dur = sch.clock.Now().Sub(start)
 			if err != nil {
 				logger.Error("Failed to evaluate rule", "error", err, "duration", dur)
 			}
-		} else {
-			logger.Error("Failed to build rule evaluator", "error", err)
 		}
-		dur = sch.clock.Now().Sub(start)
 
 		evalTotal.Inc()
 		evalDuration.Observe(dur.Seconds())
 
+		if ctx.Err() != nil { // check if the context is not cancelled. The evaluation can be a long-running task.
+			span.SetStatus(codes.Error, "rule evaluation cancelled")
+			logger.Debug("Skip updating the state because the context has been cancelled")
+			return nil
+		}
+
 		if err != nil || results.HasErrors() {
 			evalTotalFailures.Inc()
+
+			// Only retry (return errors) if this isn't the last attempt, otherwise skip these return operations.
+			if retry {
+				// The only thing that can return non-nil `err` from ruleEval.Evaluate is the server side expression pipeline.
+				// This includes transport errors such as transient network errors.
+				if err != nil {
+					span.SetStatus(codes.Error, "rule evaluation failed")
+					span.RecordError(err)
+					return fmt.Errorf("server side expressions pipeline returned an error: %w", err)
+				}
+
+				// If the pipeline executed successfully but have other types of errors that can be retryable, we should do so.
+				if !results.HasNonRetryableErrors() {
+					span.SetStatus(codes.Error, "rule evaluation failed")
+					span.RecordError(err)
+					return fmt.Errorf("the result-set has errors that can be retried: %w", results.Error())
+				}
+			}
+
+			// If results is nil, we assume that the error must be from the SSE pipeline (ruleEval.Evaluate) which is the only code that can actually return an `err`.
 			if results == nil {
 				results = append(results, eval.NewResultFromError(err, e.scheduledAt, dur))
 			}
+
+			// If err is nil, we assume that the SSS pipeline succeeded and that the error must be embedded in the results.
 			if err == nil {
-				for _, result := range results {
-					if result.Error != nil {
-						err = multierror.Append(err, result.Error)
-					}
-				}
+				err = results.Error()
 			}
+
+			span.SetStatus(codes.Error, "rule evaluation failed")
 			span.RecordError(err)
-			span.AddEvents(
-				[]string{"error", "message"},
-				[]tracing.EventValue{
-					{Str: fmt.Sprintf("%v", err)},
-					{Str: "rule evaluation failed"},
-				})
 		} else {
 			logger.Debug("Alert rule evaluated", "results", results, "duration", dur)
-			span.AddEvents(
-				[]string{"message", "results"},
-				[]tracing.EventValue{
-					{Str: "rule evaluated"},
-					{Num: int64(len(results))},
-				})
+			span.AddEvent("rule evaluated", trace.WithAttributes(
+				attribute.Int64("results", int64(len(results))),
+			))
 		}
-		if ctx.Err() != nil { // check if the context is not cancelled. The evaluation can be a long-running task.
-			logger.Debug("Skip updating the state because the context has been cancelled")
-			return
-		}
-		processedStates := sch.stateManager.ProcessEvalResults(ctx, e.scheduledAt, e.rule, results, sch.getRuleExtraLabels(e))
-		alerts := FromStateTransitionToPostableAlerts(processedStates, sch.stateManager, sch.appURL)
-		span.AddEvents(
-			[]string{"message", "state_transitions", "alerts_to_send"},
-			[]tracing.EventValue{
-				{Str: "results processed"},
-				{Num: int64(len(processedStates))},
-				{Num: int64(len(alerts.PostableAlerts))},
-			})
-		if len(alerts.PostableAlerts) > 0 {
-			sch.alertsSender.Send(key, alerts)
-		}
-	}
+		start = sch.clock.Now()
+		processedStates := sch.stateManager.ProcessEvalResults(
+			ctx,
+			e.scheduledAt,
+			e.rule,
+			results,
+			state.GetRuleExtraLabels(logger, e.rule, e.folderTitle, !sch.disableGrafanaFolder),
+		)
+		processDuration.Observe(sch.clock.Now().Sub(start).Seconds())
 
-	retryIfError := func(f func(attempt int64) error) error {
-		var attempt int64
-		var err error
-		for attempt = 0; attempt < sch.maxAttempts; attempt++ {
-			err = f(attempt)
-			if err == nil {
-				return nil
-			}
+		start = sch.clock.Now()
+		alerts := state.FromStateTransitionToPostableAlerts(processedStates, sch.stateManager, sch.appURL)
+		span.AddEvent("results processed", trace.WithAttributes(
+			attribute.Int64("state_transitions", int64(len(processedStates))),
+			attribute.Int64("alerts_to_send", int64(len(alerts.PostableAlerts))),
+		))
+		if len(alerts.PostableAlerts) > 0 {
+			sch.alertsSender.Send(ctx, key, alerts)
 		}
-		return err
+		sendDuration.Observe(sch.clock.Now().Sub(start).Seconds())
+
+		return nil
 	}
 
 	evalRunning := false
-	var currentRuleVersion int64 = 0
+	var currentFingerprint fingerprint
 	defer sch.stopApplied(key)
 	for {
 		select {
 		// used by external services (API) to notify that rule is updated.
 		case ctx := <-updateCh:
-			// sometimes it can happen when, for example, the rule evaluation took so long,
-			// and there were two concurrent messages in updateCh and evalCh, and the eval's one got processed first.
-			// therefore, at the time when message from updateCh is processed the current rule will have
-			// at least the same version (or greater) and the state created for the new version of the rule.
-			if currentRuleVersion >= int64(ctx.Version) {
-				logger.Info("Skip updating rule because its current version is actual", "version", currentRuleVersion, "newVersion", ctx.Version)
+			if currentFingerprint == ctx.Fingerprint {
+				logger.Info("Rule's fingerprint has not changed. Skip resetting the state", "currentFingerprint", currentFingerprint)
 				continue
 			}
 
-			logger.Info("Clearing the state of the rule because it was updated", "version", currentRuleVersion, "newVersion", ctx.Version, "isPaused", ctx.IsPaused)
+			logger.Info("Clearing the state of the rule because it was updated", "isPaused", ctx.IsPaused, "fingerprint", ctx.Fingerprint)
 			// clear the state. So the next evaluation will start from the scratch.
 			resetState(grafanaCtx, ctx.IsPaused)
+			currentFingerprint = ctx.Fingerprint
 		// evalCh - used by the scheduler to signal that evaluation is needed.
 		case ctx, ok := <-evalCh:
 			if !ok {
@@ -480,40 +501,66 @@ func (sch *schedule) ruleRoutine(grafanaCtx context.Context, key ngmodels.AlertR
 					sch.evalApplied(key, ctx.scheduledAt)
 				}()
 
-				err := retryIfError(func(attempt int64) error {
-					newVersion := ctx.rule.Version
+				for attempt := int64(1); attempt <= sch.maxAttempts; attempt++ {
 					isPaused := ctx.rule.IsPaused
-					// fetch latest alert rule version
-					if currentRuleVersion != newVersion {
-						// Do not clean up state if the eval loop has just started.
-						// We need to reset state if the loop has started and the alert is already paused. It can happen,
-						// if we have an alert with state and we do file provision with stateful Grafana, that state
-						// lingers in DB and won't be cleaned up until next alert rule update.
-						if currentRuleVersion > 0 || isPaused {
-							logger.Debug("Got a new version of alert rule. Clear up the state and refresh extra labels", "version", currentRuleVersion, "newVersion", newVersion)
-							resetState(grafanaCtx, isPaused)
-						}
-						currentRuleVersion = newVersion
+					f := ruleWithFolder{ctx.rule, ctx.folderTitle}.Fingerprint()
+					// Do not clean up state if the eval loop has just started.
+					var needReset bool
+					if currentFingerprint != 0 && currentFingerprint != f {
+						logger.Debug("Got a new version of alert rule. Clear up the state", "fingerprint", f)
+						needReset = true
 					}
+					// We need to reset state if the loop has started and the alert is already paused. It can happen,
+					// if we have an alert with state and we do file provision with stateful Grafana, that state
+					// lingers in DB and won't be cleaned up until next alert rule update.
+					needReset = needReset || (currentFingerprint == 0 && isPaused)
+					if needReset {
+						resetState(grafanaCtx, isPaused)
+					}
+					currentFingerprint = f
 					if isPaused {
-						return nil
+						logger.Debug("Skip rule evaluation because it is paused")
+						return
 					}
-					tracingCtx, span := sch.tracer.Start(grafanaCtx, "alert rule execution")
-					defer span.End()
 
-					span.SetAttributes("rule_uid", ctx.rule.UID, attribute.String("rule_uid", ctx.rule.UID))
-					span.SetAttributes("org_id", ctx.rule.OrgID, attribute.Int64("org_id", ctx.rule.OrgID))
-					span.SetAttributes("rule_version", ctx.rule.Version, attribute.Int64("rule_version", ctx.rule.Version))
+					fpStr := currentFingerprint.String()
 					utcTick := ctx.scheduledAt.UTC().Format(time.RFC3339Nano)
-					span.SetAttributes("tick", utcTick, attribute.String("tick", utcTick))
+					tracingCtx, span := sch.tracer.Start(grafanaCtx, "alert rule execution", trace.WithAttributes(
+						attribute.String("rule_uid", ctx.rule.UID),
+						attribute.Int64("org_id", ctx.rule.OrgID),
+						attribute.Int64("rule_version", ctx.rule.Version),
+						attribute.String("rule_fingerprint", fpStr),
+						attribute.String("tick", utcTick),
+					))
 
-					evaluate(tracingCtx, attempt, ctx, span)
-					return nil
-				})
-				if err != nil {
-					logger.Error("Evaluation failed after all retries", "error", err)
+					// Check before any execution if the context was cancelled so that we don't do any evaluations.
+					if tracingCtx.Err() != nil {
+						span.SetStatus(codes.Error, "rule evaluation cancelled")
+						span.End()
+						logger.Error("Skip evaluation and updating the state because the context has been cancelled", "version", ctx.rule.Version, "fingerprint", f, "attempt", attempt, "now", ctx.scheduledAt)
+						return
+					}
+
+					retry := attempt < sch.maxAttempts
+					err := evaluate(tracingCtx, f, attempt, ctx, span, retry)
+					// This is extremely confusing - when we exhaust all retry attempts, or we have no retryable errors
+					// we return nil - so technically, this is meaningless to know whether the evaluation has errors or not.
+					span.End()
+					if err == nil {
+						return
+					}
+
+					logger.Error("Failed to evaluate rule", "version", ctx.rule.Version, "fingerprint", f, "attempt", attempt, "now", ctx.scheduledAt, "error", err)
+					select {
+					case <-tracingCtx.Done():
+						logger.Error("Context has been cancelled while backing off", "version", ctx.rule.Version, "fingerprint", f, "attempt", attempt, "now", ctx.scheduledAt)
+						return
+					case <-time.After(retryDelay):
+						continue
+					}
 				}
 			}()
+
 		case <-grafanaCtx.Done():
 			// clean up the state only if the reason for stopping the evaluation loop is that the rule was deleted
 			if errors.Is(grafanaCtx.Err(), errRuleDeleted) {
@@ -549,15 +596,19 @@ func (sch *schedule) stopApplied(alertDefKey ngmodels.AlertRuleKey) {
 	sch.stopAppliedFunc(alertDefKey)
 }
 
-func (sch *schedule) getRuleExtraLabels(evalCtx *evaluation) map[string]string {
-	extraLabels := make(map[string]string, 4)
-
-	extraLabels[alertingModels.NamespaceUIDLabel] = evalCtx.rule.NamespaceUID
-	extraLabels[prometheusModel.AlertNameLabel] = evalCtx.rule.Title
-	extraLabels[alertingModels.RuleUIDLabel] = evalCtx.rule.UID
-
-	if !sch.disableGrafanaFolder {
-		extraLabels[ngmodels.FolderTitleLabel] = evalCtx.folderTitle
+func SchedulerUserFor(orgID int64) *user.SignedInUser {
+	return &user.SignedInUser{
+		UserID:           -1,
+		IsServiceAccount: true,
+		Login:            "grafana_scheduler",
+		OrgID:            orgID,
+		OrgRole:          org.RoleAdmin,
+		Permissions: map[int64]map[string][]string{
+			orgID: {
+				datasources.ActionQuery: []string{
+					datasources.ScopeAll,
+				},
+			},
+		},
 	}
-	return extraLabels
 }

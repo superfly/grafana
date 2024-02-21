@@ -1,14 +1,22 @@
 ---
-title: Run Grafana behind a reverse proxy
-summary: Learn how to run Grafana behind a reverse proxy
+Feedback Link: https://github.com/grafana/tutorials/issues/new
+aliases:
+  - /docs/grafana/latest/installation/behind_proxy/
+authors:
+  - grafana_labs
+categories:
+  - administration
 description: Learn how to run Grafana behind a reverse proxy
 id: run-grafana-behind-a-proxy
-categories: ['administration']
-tags: ['advanced']
+labels:
+  products:
+    - enterprise
+    - oss
 status: Published
-authors: ['grafana_labs']
-Feedback Link: https://github.com/grafana/tutorials/issues/new
-aliases: ['/docs/grafana/latest/installation/behind_proxy/']
+summary: Learn how to run Grafana behind a reverse proxy
+tags:
+  - advanced
+title: Run Grafana behind a reverse proxy
 ---
 
 ## Introduction
@@ -26,23 +34,9 @@ domain = example.com
 
 - Restart Grafana for the new changes to take effect.
 
-You can also serve Grafana behind a _sub path_, such as `http://example.com/grafana`.
+## Configure reverse proxy
 
-To serve Grafana behind a sub path:
-
-- Include the sub path at the end of the `root_url`.
-- Set `serve_from_sub_path` to `true`.
-
-```bash
-[server]
-domain = example.com
-root_url = %(protocol)s://%(domain)s:%(http_port)s/grafana/
-serve_from_sub_path = true
-```
-
-Next, you need to configure your reverse proxy.
-
-## Configure NGINX
+### Configure NGINX
 
 [NGINX](https://www.nginx.com) is a high performance load balancer, web server, and reverse proxy.
 
@@ -69,7 +63,7 @@ server {
     proxy_pass http://grafana;
   }
 
-  # Proxy Grafana Live WebSocket connections.
+# Proxy Grafana Live WebSocket connections.
   location /api/live/ {
     proxy_http_version 1.1;
     proxy_set_header Upgrade $http_upgrade;
@@ -106,14 +100,12 @@ server {
   index index.html index.htm;
 
   location /grafana/ {
-    rewrite  ^/grafana/(.*)  /$1 break;
     proxy_set_header Host $http_host;
     proxy_pass http://grafana;
   }
 
   # Proxy Grafana Live WebSocket connections.
   location /grafana/api/live/ {
-    rewrite  ^/grafana/(.*)  /$1 break;
     proxy_http_version 1.1;
     proxy_set_header Upgrade $http_upgrade;
     proxy_set_header Connection $connection_upgrade;
@@ -123,7 +115,17 @@ server {
 }
 ```
 
-## Configure HAProxy
+Add a rewrite rule to each location block:
+
+```
+ rewrite  ^/grafana/(.*)  /$1 break;
+```
+
+{{% admonition type="note" %}}
+If Grafana is being served from behind a NGINX proxy with TLS termination enabled, then the `root_url` should be set accordingly. For example, if Grafana is being served from `https://example.com/grafana` then the `root_url` should be set to `https://example.com/grafana/` or `https://%(domain)s/grafana/` (and the corresponding `domain` should be set to `example.com`) in the `server` section of the Grafana configuration file. The `protocol` setting should be set to `http`, because the TLS handshake is being handled by NGINX.
+{{% /admonition %}}
+
+### Configure HAProxy
 
 To configure HAProxy to serve Grafana under a _sub path_:
 
@@ -133,16 +135,16 @@ frontend http-in
   use_backend grafana_backend if { path /grafana } or { path_beg /grafana/ }
 
 backend grafana_backend
+  server grafana localhost:3000
   # Requires haproxy >= 1.6
   http-request set-path %[path,regsub(^/grafana/?,/)]
-
   # Works for haproxy < 1.6
   # reqrep ^([^\ ]*\ /)grafana[/]?(.*) \1\2
 
   server grafana localhost:3000
 ```
 
-## Configure IIS
+### Configure IIS
 
 > IIS requires that the URL Rewrite module is installed.
 
@@ -169,7 +171,7 @@ This is the rewrite rule that is generated in the `web.config`:
 
 See the [tutorial on IIS URL Rewrites](/tutorials/iis/) for more in-depth instructions.
 
-## Configure Traefik
+### Configure Traefik
 
 [Traefik](https://traefik.io/traefik/) Cloud Native Reverse Proxy / Load Balancer / Edge Router
 
@@ -217,6 +219,18 @@ http:
           - url: http://192.168.30.10:3000
 ```
 
-## Summary
+## Alternative for serving Grafana under a sub path
 
-In this tutorial you learned how to run Grafana behind a reverse proxy.
+**Warning:** You only need this, if you do not handle the sub path serving via your reverse proxy configuration.
+
+If you don't want or can't use the reverse proxy to handle serving Grafana from a _sub path_, you can set the config variable `server_from_sub_path` to `true`.
+
+1. Include the sub path at the end of the `root_url`.
+2. Set `serve_from_sub_path` to `true`:
+
+```bash
+[server]
+domain = example.com
+root_url = %(protocol)s://%(domain)s:%(http_port)s/grafana/
+serve_from_sub_path = true
+```

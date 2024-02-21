@@ -6,10 +6,7 @@ import { Button, useStyles2 } from '@grafana/ui';
 import { useQueryParams } from 'app/core/hooks/useQueryParams';
 import { AlertmanagerGroup, AlertState } from 'app/plugins/datasource/alertmanager/types';
 
-import { useAlertManagerSourceName } from '../../hooks/useAlertManagerSourceName';
-import { useAlertManagersByPermission } from '../../hooks/useAlertManagerSources';
 import { getFiltersFromUrlParams } from '../../utils/misc';
-import { AlertManagerPicker } from '../AlertManagerPicker';
 
 import { AlertStateFilter } from './AlertStateFilter';
 import { GroupBy } from './GroupBy';
@@ -25,8 +22,6 @@ export const AlertGroupFilter = ({ groups }: Props) => {
   const { groupBy = [], queryString, alertState } = getFiltersFromUrlParams(queryParams);
   const matcherFilterKey = `matcher-${filterKey}`;
 
-  const alertManagers = useAlertManagersByPermission('instance');
-  const [alertManagerSourceName, setAlertManagerSourceName] = useAlertManagerSourceName(alertManagers);
   const styles = useStyles2(getStyles);
 
   const clearFilters = () => {
@@ -42,20 +37,13 @@ export const AlertGroupFilter = ({ groups }: Props) => {
 
   return (
     <div className={styles.wrapper}>
-      <AlertManagerPicker
-        current={alertManagerSourceName}
-        onChange={setAlertManagerSourceName}
-        dataSources={alertManagers}
-      />
       <div className={styles.filterSection}>
         <MatcherFilter
-          className={styles.filterInput}
           key={matcherFilterKey}
           defaultQueryString={queryString}
           onFilterChange={(value) => setQueryParams({ queryString: value ? value : null })}
         />
         <GroupBy
-          className={styles.filterInput}
           groups={groups}
           groupBy={groupBy}
           onGroupingChange={(keys) => setQueryParams({ groupBy: keys.length ? keys.join(',') : null })}
@@ -83,12 +71,7 @@ const getStyles = (theme: GrafanaTheme2) => ({
     display: flex;
     flex-direction: row;
     margin-bottom: ${theme.spacing(3)};
-  `,
-  filterInput: css`
-    width: 340px;
-    & + & {
-      margin-left: ${theme.spacing(1)};
-    }
+    gap: ${theme.spacing(1)};
   `,
   clearButton: css`
     margin-left: ${theme.spacing(1)};

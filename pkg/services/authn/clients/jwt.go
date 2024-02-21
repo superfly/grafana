@@ -2,32 +2,30 @@ package clients
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"net/http"
 	"strings"
 
-	"github.com/jmespath/go-jmespath"
-
 	"github.com/grafana/grafana/pkg/infra/log"
-	"github.com/grafana/grafana/pkg/models/roletype"
 	"github.com/grafana/grafana/pkg/services/auth"
 	authJWT "github.com/grafana/grafana/pkg/services/auth/jwt"
 	"github.com/grafana/grafana/pkg/services/authn"
 	"github.com/grafana/grafana/pkg/services/login"
 	"github.com/grafana/grafana/pkg/services/org"
 	"github.com/grafana/grafana/pkg/setting"
+	"github.com/grafana/grafana/pkg/util"
 	"github.com/grafana/grafana/pkg/util/errutil"
 )
+
+const authQueryParamName = "auth_token"
 
 var _ authn.ContextAwareClient = new(JWT)
 
 var (
-	ErrJWTInvalid = errutil.NewBase(errutil.StatusUnauthorized,
+	errJWTInvalid = errutil.Unauthorized(
 		"jwt.invalid", errutil.WithPublicMessage("Failed to verify JWT"))
-	ErrJWTMissingClaim = errutil.NewBase(errutil.StatusUnauthorized,
+	errJWTMissingClaim = errutil.Unauthorized(
 		"jwt.missing_claim", errutil.WithPublicMessage("Missing mandatory claim in JWT"))
-	ErrJWTInvalidRole = errutil.NewBase(errutil.StatusForbidden,
+	errJWTInvalidRole = errutil.Forbidden(
 		"jwt.invalid_role", errutil.WithPublicMessage("Invalid Role in claim"))
 )
 
@@ -51,34 +49,37 @@ func (s *JWT) Name() string {
 
 func (s *JWT) Authenticate(ctx context.Context, r *authn.Request) (*authn.Identity, error) {
 	jwtToken := s.retrieveToken(r.HTTPRequest)
+	s.stripSensitiveParam(r.HTTPRequest)
 
 	claims, err := s.jwtService.Verify(ctx, jwtToken)
 	if err != nil {
-		s.log.Debug("Failed to verify JWT", "error", err)
-		return nil, ErrJWTInvalid.Errorf("failed to verify JWT: %w", err)
+		s.log.FromContext(ctx).Debug("Failed to verify JWT", "error", err)
+		return nil, errJWTInvalid.Errorf("failed to verify JWT: %w", err)
 	}
 
 	sub, _ := claims["sub"].(string)
 	if sub == "" {
-		s.log.Warn("Got a JWT without the mandatory 'sub' claim", "error", err)
-		return nil, ErrJWTMissingClaim.Errorf("missing mandatory 'sub' claim in JWT")
+		return nil, errJWTMissingClaim.Errorf("missing mandatory 'sub' claim in JWT")
 	}
 
 	id := &authn.Identity{
-		AuthModule: login.JWTModule,
-		AuthID:     sub,
-		OrgRoles:   map[int64]org.RoleType{},
+		AuthenticatedBy: login.JWTModule,
+		AuthID:          sub,
+		OrgRoles:        map[int64]org.RoleType{},
 		ClientParams: authn.ClientParams{
 			SyncUser:        true,
 			FetchSyncedUser: true,
-			AllowSignUp:     s.cfg.JWTAuthAutoSignUp,
+			SyncPermissions: true,
+			SyncOrgRoles:    !s.cfg.JWTAuth.SkipOrgRoleSync,
+			AllowSignUp:     s.cfg.JWTAuth.AutoSignUp,
+			SyncTeams:       s.cfg.JWTAuth.GroupsAttributePath != "",
 		}}
 
-	if key := s.cfg.JWTAuthUsernameClaim; key != "" {
+	if key := s.cfg.JWTAuth.UsernameClaim; key != "" {
 		id.Login, _ = claims[key].(string)
 		id.ClientParams.LookUpParams.Login = &id.Login
 	}
-	if key := s.cfg.JWTAuthEmailClaim; key != "" {
+	if key := s.cfg.JWTAuth.EmailClaim; key != "" {
 		id.Email, _ = claims[key].(string)
 		id.ClientParams.LookUpParams.Email = &id.Email
 	}
@@ -87,50 +88,60 @@ func (s *JWT) Authenticate(ctx context.Context, r *authn.Request) (*authn.Identi
 		id.Name = name
 	}
 
-	var role roletype.RoleType
-	var grafanaAdmin bool
-	if !s.cfg.JWTAuthSkipOrgRoleSync {
-		role, grafanaAdmin = s.extractRoleAndAdmin(claims)
-		if s.cfg.JWTAuthRoleAttributeStrict && !role.IsValid() {
-			s.log.Warn("extracted Role is invalid", "role", role, "auth_id", id.AuthID)
-			return nil, ErrJWTInvalidRole.Errorf("invalid role claim in JWT: %s", role)
+	orgRoles, isGrafanaAdmin, err := getRoles(s.cfg, func() (org.RoleType, *bool, error) {
+		if s.cfg.JWTAuth.SkipOrgRoleSync {
+			return "", nil, nil
 		}
 
-		if role.IsValid() {
-			var orgID int64
-			// FIXME (jguer): GetIDForNewUser already has the auto assign information
-			// just needs the org role. Find a meaningful way to pass this default
-			// role to it (that doesn't involve id.OrgRoles[0] = role)
-			if s.cfg.AutoAssignOrg && s.cfg.AutoAssignOrgId > 0 {
-				orgID = int64(s.cfg.AutoAssignOrgId)
-				s.log.Debug("The user has a role assignment and organization membership is auto-assigned",
-					"role", role, "orgId", orgID)
-			} else {
-				orgID = int64(1)
-				s.log.Debug("The user has a role assignment and organization membership is not auto-assigned",
-					"role", role, "orgId", orgID)
-			}
-
-			id.OrgRoles[orgID] = role
-			if s.cfg.JWTAuthAllowAssignGrafanaAdmin {
-				id.IsGrafanaAdmin = &grafanaAdmin
-			}
+		role, grafanaAdmin := s.extractRoleAndAdmin(claims)
+		if s.cfg.JWTAuth.RoleAttributeStrict && !role.IsValid() {
+			return "", nil, errJWTInvalidRole.Errorf("invalid role claim in JWT: %s", role)
 		}
+
+		if !s.cfg.JWTAuth.AllowAssignGrafanaAdmin {
+			return role, nil, nil
+		}
+
+		return role, &grafanaAdmin, nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	id.OrgRoles = orgRoles
+	id.IsGrafanaAdmin = isGrafanaAdmin
+
+	id.Groups, err = s.extractGroups(claims)
+	if err != nil {
+		return nil, err
 	}
 
 	if id.Login == "" && id.Email == "" {
-		s.log.Debug("Failed to get an authentication claim from JWT",
+		s.log.FromContext(ctx).Debug("Failed to get an authentication claim from JWT",
 			"login", id.Login, "email", id.Email)
-		return nil, ErrJWTMissingClaim.Errorf("missing login and email claim in JWT")
+		return nil, errJWTMissingClaim.Errorf("missing login and email claim in JWT")
 	}
 
 	return id, nil
 }
 
+// remove sensitive query param
+// avoid JWT URL login passing auth_token in URL
+func (s *JWT) stripSensitiveParam(httpRequest *http.Request) {
+	if s.cfg.JWTAuth.URLLogin {
+		params := httpRequest.URL.Query()
+		if params.Has(authQueryParamName) {
+			params.Del(authQueryParamName)
+			httpRequest.URL.RawQuery = params.Encode()
+		}
+	}
+}
+
 // retrieveToken retrieves the JWT token from the request.
 func (s *JWT) retrieveToken(httpRequest *http.Request) string {
-	jwtToken := httpRequest.Header.Get(s.cfg.JWTAuthHeaderName)
-	if jwtToken == "" && s.cfg.JWTAuthURLLogin {
+	jwtToken := httpRequest.Header.Get(s.cfg.JWTAuth.HeaderName)
+	if jwtToken == "" && s.cfg.JWTAuth.URLLogin {
 		jwtToken = httpRequest.URL.Query().Get("auth_token")
 	}
 	// Strip the 'Bearer' prefix if it exists.
@@ -138,7 +149,7 @@ func (s *JWT) retrieveToken(httpRequest *http.Request) string {
 }
 
 func (s *JWT) Test(ctx context.Context, r *authn.Request) bool {
-	if !s.cfg.JWTAuthEnabled || s.cfg.JWTAuthHeaderName == "" {
+	if !s.cfg.JWTAuth.Enabled || s.cfg.JWTAuth.HeaderName == "" {
 		return false
 	}
 
@@ -162,12 +173,12 @@ func (s *JWT) Priority() uint {
 
 const roleGrafanaAdmin = "GrafanaAdmin"
 
-func (s *JWT) extractRoleAndAdmin(claims map[string]interface{}) (org.RoleType, bool) {
-	if s.cfg.JWTAuthRoleAttributePath == "" {
+func (s *JWT) extractRoleAndAdmin(claims map[string]any) (org.RoleType, bool) {
+	if s.cfg.JWTAuth.RoleAttributePath == "" {
 		return "", false
 	}
 
-	role, err := searchClaimsForStringAttr(s.cfg.JWTAuthRoleAttributePath, claims)
+	role, err := util.SearchJSONForStringAttr(s.cfg.JWTAuth.RoleAttributePath, claims)
 	if err != nil || role == "" {
 		return "", false
 	}
@@ -178,33 +189,10 @@ func (s *JWT) extractRoleAndAdmin(claims map[string]interface{}) (org.RoleType, 
 	return org.RoleType(role), false
 }
 
-func searchClaimsForStringAttr(attributePath string, claims map[string]interface{}) (string, error) {
-	val, err := searchClaimsForAttr(attributePath, claims)
-	if err != nil {
-		return "", err
+func (s *JWT) extractGroups(claims map[string]any) ([]string, error) {
+	if s.cfg.JWTAuth.GroupsAttributePath == "" {
+		return []string{}, nil
 	}
 
-	strVal, ok := val.(string)
-	if ok {
-		return strVal, nil
-	}
-
-	return "", nil
-}
-
-func searchClaimsForAttr(attributePath string, claims map[string]interface{}) (interface{}, error) {
-	if attributePath == "" {
-		return "", errors.New("no attribute path specified")
-	}
-
-	if len(claims) == 0 {
-		return "", errors.New("empty claims provided")
-	}
-
-	val, err := jmespath.Search(attributePath, claims)
-	if err != nil {
-		return "", fmt.Errorf("failed to search claims with provided path: %q: %w", attributePath, err)
-	}
-
-	return val, nil
+	return util.SearchJSONForStringSliceAttr(s.cfg.JWTAuth.GroupsAttributePath, claims)
 }

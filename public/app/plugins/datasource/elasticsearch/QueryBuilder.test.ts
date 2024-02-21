@@ -19,11 +19,11 @@ describe('ElasticQueryBuilder', () => {
   it('should clean settings from null values', () => {
     const query = builder.build({
       refId: 'A',
-      // The following `missing: null as any` is because previous versions of the DS where
+      // The following `missing: null as unknown as string` is because previous versions of the DS where
       // storing null in the query model when inputting an empty string,
       // which were then removed in the query builder.
       // The new version doesn't store empty strings at all. This tests ensures backward compatibility.
-      metrics: [{ type: 'avg', id: '0', settings: { missing: null as any, script: '1' } }],
+      metrics: [{ type: 'avg', id: '0', settings: { missing: null as unknown as string, script: '1' } }],
       timeField: '@timestamp',
       bucketAggs: [{ type: 'date_histogram', field: '@timestamp', id: '1' }],
     });
@@ -604,36 +604,6 @@ describe('ElasticQueryBuilder', () => {
     expect(firstLevel.nested.path).toBe('nested_field');
   });
 
-  // This test wasn't migrated, as adhoc variables are going to be interpolated before
-  // Or we need to add this to backend query builder (TBD)
-  it('with adhoc filters', () => {
-    const query = builder.build(
-      {
-        refId: 'A',
-        metrics: [{ type: 'count', id: '0' }],
-        timeField: '@timestamp',
-        bucketAggs: [{ type: 'date_histogram', field: '@timestamp', id: '3' }],
-      },
-      [
-        { key: 'key1', operator: '=', value: 'value1', condition: '' },
-        { key: 'key2', operator: '=', value: 'value2', condition: '' },
-        { key: 'key2', operator: '!=', value: 'value2', condition: '' },
-        { key: 'key3', operator: '<', value: 'value3', condition: '' },
-        { key: 'key4', operator: '>', value: 'value4', condition: '' },
-        { key: 'key5', operator: '=~', value: 'value5', condition: '' },
-        { key: 'key6', operator: '!~', value: 'value6', condition: '' },
-      ]
-    );
-
-    expect(query.query.bool.must[0].match_phrase['key1'].query).toBe('value1');
-    expect(query.query.bool.must[1].match_phrase['key2'].query).toBe('value2');
-    expect(query.query.bool.must_not[0].match_phrase['key2'].query).toBe('value2');
-    expect(query.query.bool.filter[1].range['key3'].lt).toBe('value3');
-    expect(query.query.bool.filter[2].range['key4'].gt).toBe('value4');
-    expect(query.query.bool.filter[3].regexp['key5']).toBe('value5');
-    expect(query.query.bool.filter[4].bool.must_not.regexp['key6']).toBe('value6');
-  });
-
   describe('getTermsQuery', () => {
     function testGetTermsQuery(queryDef: TermsQuery) {
       const query = builder.getTermsQuery(queryDef);
@@ -768,26 +738,6 @@ describe('ElasticQueryBuilder', () => {
           query.query.bool.filter.find((filter: object) => Object.keys(filter).includes('query_string'))
         ).toBeFalsy();
       });
-    });
-
-    it('with adhoc filters', () => {
-      // TODO: Types for AdHocFilters
-      const adhocFilters = [
-        { key: 'key1', operator: '=', value: 'value1', condition: '' },
-        { key: 'key2', operator: '!=', value: 'value2', condition: '' },
-        { key: 'key3', operator: '<', value: 'value3', condition: '' },
-        { key: 'key4', operator: '>', value: 'value4', condition: '' },
-        { key: 'key5', operator: '=~', value: 'value5', condition: '' },
-        { key: 'key6', operator: '!~', value: 'value6', condition: '' },
-      ];
-      const query = builder.getLogsQuery({ refId: 'A' }, 500, adhocFilters);
-
-      expect(query.query.bool.must[0].match_phrase['key1'].query).toBe('value1');
-      expect(query.query.bool.must_not[0].match_phrase['key2'].query).toBe('value2');
-      expect(query.query.bool.filter[1].range['key3'].lt).toBe('value3');
-      expect(query.query.bool.filter[2].range['key4'].gt).toBe('value4');
-      expect(query.query.bool.filter[3].regexp['key5']).toBe('value5');
-      expect(query.query.bool.filter[4].bool.must_not.regexp['key6']).toBe('value6');
     });
   });
 
@@ -948,6 +898,25 @@ describe('ElasticQueryBuilder', () => {
 
           expect(query.aggs['2'].date_histogram.interval).toBeUndefined();
           expect(query.aggs['2'].date_histogram.fixed_interval).toBe('1d');
+        });
+
+        it('should use calendar_interval', () => {
+          const query = builder.build({
+            refId: 'A',
+            metrics: [{ type: 'count', id: '1' }],
+            timeField: '@timestamp',
+            bucketAggs: [
+              {
+                type: 'date_histogram',
+                id: '2',
+                field: '@time',
+                settings: { min_doc_count: '1', interval: '1w' },
+              },
+            ],
+          });
+
+          expect(query.aggs['2'].date_histogram.interval).toBeUndefined();
+          expect(query.aggs['2'].date_histogram.calendar_interval).toBe('1w');
         });
       });
     });

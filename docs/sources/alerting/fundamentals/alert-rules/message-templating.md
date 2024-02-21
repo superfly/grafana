@@ -3,20 +3,28 @@ aliases:
   - ../../contact-points/message-templating/
   - ../../message-templating/
   - ../../unified-alerting/message-templating/
-description: Notification templating
+canonical: https://grafana.com/docs/grafana/latest/alerting/fundamentals/alert-rules/message-templating/
+description: Learn about notification templating
 keywords:
   - grafana
   - alerting
   - guide
   - contact point
   - templating
+labels:
+  products:
+    - cloud
+    - enterprise
+    - oss
 title: Notification templating
 weight: 415
 ---
 
 # Notification templating
 
-Notifications sent via contact points are built using notification templates. Grafana's default templates are based on the [Go templating system](https://golang.org/pkg/text/template) where some fields are evaluated as text, while others are evaluated as HTML (which can affect escaping). The default template, defined in [default_template.go](https://github.com/grafana/alerting/blob/main/templates/default_template.go), is a useful reference for custom templates.
+Notifications sent via contact points are built using notification templates. Grafana's default templates are based on the [Go templating system](https://golang.org/pkg/text/template) where some fields are evaluated as text, while others are evaluated as HTML (which can affect escaping).
+
+The default template [default_template.go](https://github.com/grafana/alerting/blob/main/templates/default_template.go) is a useful reference for custom templates.
 
 Since most of the contact point fields can be templated, you can create reusable custom templates and use them in multiple contact points.
 
@@ -51,11 +59,11 @@ Alert summary:
 
 You can use any of the following built-in template options to embed custom templates.
 
-| Name                    | Notes                                                         |
-| ----------------------- | ------------------------------------------------------------- |
-| `default.title`         | Displays high-level status information.                       |
-| `default.message`       | Provides a formatted summary of firing and resolved alerts.   |
-| `teams.default.message` | Similar to `default.messsage`, formatted for Microsoft Teams. |
+| Name                    | Notes                                                        |
+| ----------------------- | ------------------------------------------------------------ |
+| `default.title`         | Displays high-level status information.                      |
+| `default.message`       | Provides a formatted summary of firing and resolved alerts.  |
+| `teams.default.message` | Similar to `default.message`, formatted for Microsoft Teams. |
 
 ### HTML in notification templates
 

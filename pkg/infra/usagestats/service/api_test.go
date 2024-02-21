@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"path"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -15,7 +14,6 @@ import (
 	contextmodel "github.com/grafana/grafana/pkg/services/contexthandler/model"
 	"github.com/grafana/grafana/pkg/services/stats"
 	"github.com/grafana/grafana/pkg/services/user"
-	"github.com/grafana/grafana/pkg/setting"
 	"github.com/grafana/grafana/pkg/web"
 )
 
@@ -23,37 +21,37 @@ func TestApi_getUsageStats(t *testing.T) {
 	type getUsageStatsTestCase struct {
 		desc           string
 		expectedStatus int
-		IsGrafanaAdmin bool
+		permissions    map[string][]string
 		enabled        bool
 	}
 	tests := []getUsageStatsTestCase{
 		{
 			desc:           "expect usage stats",
 			enabled:        true,
-			IsGrafanaAdmin: true,
+			permissions:    map[string][]string{ActionRead: {}},
 			expectedStatus: 200,
 		},
 		{
 			desc:           "expect usage stat preview still there after disabling",
 			enabled:        false,
-			IsGrafanaAdmin: true,
+			permissions:    map[string][]string{ActionRead: {}},
 			expectedStatus: 200,
 		},
 		{
-			desc:           "expect http status 403 when not admin",
+			desc:           "expect http status 403 when does not have the right permissions",
 			enabled:        false,
-			IsGrafanaAdmin: false,
+			permissions:    map[string][]string{},
 			expectedStatus: 403,
 		},
 	}
 	sqlStore := dbtest.NewFakeDB()
-	uss := createService(t, setting.Cfg{}, sqlStore, false)
+	uss := createService(t, sqlStore, false)
 	uss.registerAPIEndpoints()
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
 			uss.Cfg.ReportingEnabled = tt.enabled
-			server := setupTestServer(t, &user.SignedInUser{OrgID: 1, IsGrafanaAdmin: tt.IsGrafanaAdmin}, uss)
+			server := setupTestServer(t, &user.SignedInUser{OrgID: 1, Permissions: map[int64]map[string][]string{1: tt.permissions}}, uss)
 
 			usageStats, recorder := getUsageStats(t, server)
 			require.Equal(t, tt.expectedStatus, recorder.Code)
@@ -80,7 +78,7 @@ func getUsageStats(t *testing.T, server *web.Mux) (*stats.SystemStats, *httptest
 
 func setupTestServer(t *testing.T, user *user.SignedInUser, service *UsageStats) *web.Mux {
 	server := web.New()
-	server.UseMiddleware(web.Renderer(path.Join(setting.StaticRootPath, "views"), "[[", "]]"))
+	server.UseMiddleware(web.Renderer("views", "[[", "]]"))
 	server.Use(contextProvider(&testContext{user}))
 	service.RouteRegister.Register(server)
 	return server
@@ -97,7 +95,7 @@ func contextProvider(tc *testContext) web.Handler {
 			Context:      c,
 			SignedInUser: tc.user,
 			IsSignedIn:   signedIn,
-			SkipCache:    true,
+			SkipDSCache:  true,
 			Logger:       log.New("test"),
 		}
 		c.Req = c.Req.WithContext(ctxkey.Set(c.Req.Context(), reqCtx))

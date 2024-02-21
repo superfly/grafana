@@ -14,6 +14,7 @@ export { Tooltip } from './Tooltip/Tooltip';
 export type { PopoverContent } from './Tooltip/types';
 export { PopoverController } from './Tooltip/PopoverController';
 export { Popover } from './Tooltip/Popover';
+export { Toggletip } from './Toggletip/Toggletip';
 export { Portal, getPortalContainer, PortalContainer } from './Portal/Portal';
 export { CustomScrollbar, type ScrollbarPosition } from './CustomScrollbar/CustomScrollbar';
 export { TabbedContainer, type TabConfig } from './TabbedContainer/TabbedContainer';
@@ -34,6 +35,7 @@ export { StatsPicker } from './StatsPicker/StatsPicker';
 export { RefreshPicker, defaultIntervals } from './RefreshPicker/RefreshPicker';
 export { TimeRangePicker, type TimeRangePickerProps } from './DateTimePickers/TimeRangePicker';
 export { TimePickerTooltip } from './DateTimePickers/TimeRangePicker';
+export { TimeRangeLabel } from './DateTimePickers/TimeRangePicker/TimeRangeLabel';
 export { TimeOfDayPicker } from './DateTimePickers/TimeOfDayPicker';
 export { TimeZonePicker } from './DateTimePickers/TimeZonePicker';
 export { WeekStartPicker } from './DateTimePickers/WeekStartPicker';
@@ -44,8 +46,9 @@ export {
 } from './DateTimePickers/DatePickerWithInput/DatePickerWithInput';
 export { DateTimePicker } from './DateTimePickers/DateTimePicker/DateTimePicker';
 export { List } from './List/List';
-export { InteractiveTable } from './InteractiveTable/InteractiveTable';
+export { InteractiveTable, type FetchDataArgs, type FetchDataFunc } from './InteractiveTable/InteractiveTable';
 export { TagsInput } from './TagsInput/TagsInput';
+export { AutoSaveField } from './AutoSaveField/AutoSaveField';
 export { Pagination } from './Pagination/Pagination';
 export { Tag, type OnTagClick } from './Tags/Tag';
 export { TagList } from './Tags/TagList';
@@ -81,14 +84,23 @@ export { SetInterval } from './SetInterval/SetInterval';
 
 export { Table } from './Table/Table';
 export {
-  TableCellDisplayMode,
+  type TableCustomCellOptions,
+  type CustomCellRendererProps,
+  type TableFieldOptions,
   type TableSortByFieldState,
   type TableFooterCalc,
   type AdHocFilterItem,
+  type TableAutoCellOptions,
+  type TableSparklineCellOptions,
+  type TableBarGaugeCellOptions,
+  type TableColoredBackgroundCellOptions,
+  type TableColorTextCellOptions,
+  type TableImageCellOptions,
+  type TableJsonViewCellOptions,
 } from './Table/types';
 export { TableInputCSV } from './TableInputCSV/TableInputCSV';
 export { TabsBar } from './Tabs/TabsBar';
-export { Tab } from './Tabs/Tab';
+export { Tab, type TabProps } from './Tabs/Tab';
 export { VerticalTab } from './Tabs/VerticalTab';
 export { TabContent } from './Tabs/TabContent';
 export { Counter } from './Tabs/Counter';
@@ -105,9 +117,6 @@ export {
 export { Sparkline } from './Sparkline/Sparkline';
 
 export { Gauge } from './Gauge/Gauge';
-export { Graph } from './Graph/Graph';
-export { GraphWithLegend } from './Graph/GraphWithLegend';
-export { GraphContextMenu, GraphContextMenuHeader } from './Graph/GraphContextMenu';
 export { BarGauge } from './BarGauge/BarGauge';
 export {
   VizTooltip,
@@ -118,7 +127,6 @@ export {
   type SeriesTableRowProps,
 } from './VizTooltip';
 export { VizRepeater, type VizRepeaterRenderValueProps } from './VizRepeater/VizRepeater';
-export { graphTimeFormat, graphTickFormatter } from './Graph/utils';
 export {
   PanelChrome,
   type PanelChromeProps,
@@ -126,8 +134,6 @@ export {
   type PanelChromeType,
   PanelChromeLoadingIndicator,
   type PanelChromeLoadingIndicatorProps,
-  PanelChromeErrorIndicator,
-  type PanelChromeErrorIndicatorProps,
   PanelContextProvider,
   type PanelContext,
   PanelContextRoot,
@@ -144,13 +150,9 @@ export { VizLegend } from './VizLegend/VizLegend';
 export { VizLegendListItem } from './VizLegend/VizLegendListItem';
 
 export { Alert, type AlertVariant } from './Alert/Alert';
-export { GraphSeriesToggler, type GraphSeriesTogglerAPI } from './Graph/GraphSeriesToggler';
+export { GraphSeriesToggler, type GraphSeriesTogglerAPI } from '../graveyard/Graph/GraphSeriesToggler';
 export { Collapse, ControlledCollapse } from './Collapse/Collapse';
 export { CollapsableSection } from './Collapse/CollapsableSection';
-export { LogLabels } from './Logs/LogLabels';
-export { LogMessageAnsi } from './Logs/LogMessageAnsi';
-export { LogRows } from './Logs/LogRows';
-export { getLogRowStyles } from './Logs/getLogRowStyles';
 export { DataLinkButton } from './DataLinks/DataLinkButton';
 export { FieldLinkList } from './DataLinks/FieldLinkList';
 // Panel editors
@@ -206,6 +208,12 @@ export { ToolbarButton, ToolbarButtonRow } from './ToolbarButton';
 export { ValuePicker } from './ValuePicker/ValuePicker';
 export { fieldMatchersUI } from './MatchersUI/fieldMatchersUI';
 export { Link } from './Link/Link';
+export { TextLink } from './Link/TextLink';
+export { Text } from './Text/Text';
+export { Box } from './Layout/Box/Box';
+export { Stack } from './Layout/Stack/Stack';
+export { Grid } from './Layout/Grid/Grid';
+export { Space } from './Layout/Space';
 
 export { Label } from './Forms/Label';
 export { Field, type FieldProps } from './Forms/Field';
@@ -221,7 +229,6 @@ export { FieldArray } from './Forms/FieldArray';
 // Select
 export { default as resetSelectStyles } from './Select/resetSelectStyles';
 export * from './Select/Select';
-export { DropdownIndicator } from './Select/DropdownIndicator';
 export { getSelectStyles } from './Select/getSelectStyles';
 export * from './Select/types';
 
@@ -251,10 +258,18 @@ export { FormattedValueDisplay } from './FormattedValueDisplay/FormattedValueDis
 export { ButtonSelect } from './Dropdown/ButtonSelect';
 export { Dropdown } from './Dropdown/Dropdown';
 export { PluginSignatureBadge, type PluginSignatureBadgeProps } from './PluginSignatureBadge/PluginSignatureBadge';
-
+export { UserIcon, type UserIconProps } from './UsersIndicator/UserIcon';
+export { type UserView } from './UsersIndicator/types';
+export { Avatar } from './UsersIndicator/Avatar';
 // Export this until we've figured out a good approach to inline form styles.
 export { InlineFormLabel } from './FormLabel/FormLabel';
+export { Divider } from './Divider/Divider';
+export { getDragStyles, type DragHandlePosition } from './DragHandle/DragHandle';
+export { useSplitter } from './Splitter/useSplitter';
 
+export { LayoutItemContext, type LayoutItemContextProps } from './Layout/LayoutItemContext';
+
+/** @deprecated Please use non-legacy versions of these components */
 const LegacyForms = {
   SecretFormField,
   FormField,
@@ -276,13 +291,24 @@ export { UPlotChart } from './uPlot/Plot';
 export { PlotLegend } from './uPlot/PlotLegend';
 export * from './uPlot/geometries';
 export * from './uPlot/plugins';
-export { type PlotTooltipInterpolator, type PlotSelection } from './uPlot/types';
+export { type PlotTooltipInterpolator, type PlotSelection, FIXED_UNIT } from './uPlot/types';
 export { type UPlotConfigPrepFn } from './uPlot/config/UPlotConfigBuilder';
-export { GraphNG, type GraphNGProps, FIXED_UNIT } from './GraphNG/GraphNG';
-export { TimeSeries } from './TimeSeries/TimeSeries';
-export { useGraphNGContext } from './GraphNG/hooks';
-export { preparePlotFrame, buildScaleKey } from './GraphNG/utils';
-export { type GraphNGLegendEvent } from './GraphNG/types';
 export * from './PanelChrome/types';
 export { Label as BrowserLabel } from './BrowserLabel/Label';
 export { PanelContainer } from './PanelContainer/PanelContainer';
+
+// -----------------------------------------------------
+// Graveyard: exported, but no longer used internally
+// These will be removed in the future
+// -----------------------------------------------------
+
+export { Graph } from '../graveyard/Graph/Graph';
+export { GraphWithLegend } from '../graveyard/Graph/GraphWithLegend';
+export { GraphContextMenu, GraphContextMenuHeader } from '../graveyard/Graph/GraphContextMenu';
+export { graphTimeFormat, graphTickFormatter } from '../graveyard/Graph/utils';
+
+export { GraphNG, type GraphNGProps } from '../graveyard/GraphNG/GraphNG';
+export { TimeSeries } from '../graveyard/TimeSeries/TimeSeries';
+export { useGraphNGContext } from '../graveyard/GraphNG/hooks';
+export { preparePlotFrame, buildScaleKey } from '../graveyard/GraphNG/utils';
+export { type GraphNGLegendEvent } from '../graveyard/GraphNG/types';

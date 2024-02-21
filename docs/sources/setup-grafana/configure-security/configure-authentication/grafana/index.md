@@ -2,8 +2,13 @@
 aliases:
   - ../../../auth/grafana/
 description: Grafana OAuthentication Guide
+labels:
+  products:
+    - enterprise
+    - oss
+menuTitle: Basic auth
 title: Configure Grafana authentication
-weight: 1000
+weight: 200
 ---
 
 ## Configure Grafana authentication
@@ -16,7 +21,7 @@ provider (listed above). There is also options for allowing self sign up.
 
 > The following applies when using Grafana's built in user authentication, LDAP (without Auth proxy) or OAuth integration.
 
-Grafana are using short-lived tokens as a mechanism for verifying authenticated users.
+Grafana uses short-lived tokens as a mechanism for verifying authenticated users.
 These short-lived tokens are rotated each `token_rotation_interval_minutes` for an active authenticated user.
 
 An active authenticated user that gets it token rotated will extend the `login_maximum_inactive_lifetime_duration` time from "now" that Grafana will remember the user.
@@ -53,7 +58,7 @@ api_key_max_seconds_to_live = -1
 
 ### Anonymous authentication
 
-You can make Grafana accessible without any login required by enabling anonymous access in the configuration file. For more information, refer to [Implications of allowing anonymous access to dashboards]({{< relref "../#implications-of-enabling-anonymous-access-to-dashboards" >}}).
+You can make Grafana accessible without any login required by enabling anonymous access in the configuration file. For more information, refer to [Anonymous authentication]({{< relref "../../configure-authentication#anonymous-authentication" >}}).
 
 Example:
 
@@ -69,9 +74,23 @@ org_role = Viewer
 
 # Hide the Grafana version text from the footer and help tooltip for unauthenticated users (default: false)
 hide_version = true
+
+# Setting this limits the number of anonymous devices in your instance. Any new anonymous devices added after the limit has been reached will be denied access.
+device_limit =
 ```
 
 If you change your organization name in the Grafana UI this setting needs to be updated to match the new name.
+
+#### Anonymous devices
+
+The anonymous devices feature enhances the management and monitoring of anonymous access within your Grafana instance. This feature is part of ongoing efforts to provide more control and transparency over anonymous usage.
+
+Users can now view anonymous usage statistics, including the count of devices and users over the last 30 days.
+
+- Go to **Administration -> Users** to access the anonymous devices tab.
+- A new stat for the usage stats page -> Usage & Stats page shows the active anonymous devices last 30 days.
+
+The number of anonymous devices is not limited by default. The configuration option `device_limit` allows you to enforce a limit on the number of anonymous devices. This enables you to have greater control over the usage within your Grafana instance and keep the usage within the limits of your environment. Once the limit is reached, any new devices that try to access Grafana will be denied access.
 
 ### Basic authentication
 
@@ -116,16 +135,21 @@ disable_signout_menu = true
 
 ### URL redirect after signing out
 
-URL to redirect the user to after signing out from Grafana. This can for example be used to enable signout from oauth provider.
+The URL to redirect the user to after signing out from Grafana can be configured under `[auth]` or under a specific OAuth provider section (for example, `[auth.generic_oauth]`). The URL configured under a specific OAuth provider section takes precedence over the URL configured in `[auth]` section. This can, for example, enable signout from the OAuth provider.
 
 ```bash
+[auth.generic_oauth]
+signout_redirect_url =
+
 [auth]
 signout_redirect_url =
 ```
 
 ### Protected roles
 
-> **Note:** Available in [Grafana Enterprise]({{< relref "../../../../introduction/grafana-enterprise" >}}) and [Grafana Cloud Advanced]({{< relref "../../../../introduction/grafana-cloud" >}}).
+{{% admonition type="note" %}}
+Available in [Grafana Enterprise]({{< relref "../../../../introduction/grafana-enterprise" >}}) and [Grafana Cloud]({{< relref "../../../../introduction/grafana-cloud" >}}).
+{{% /admonition %}}
 
 By default, after you configure an authorization provider, Grafana will adopt existing users into the new authentication scheme. For example, if you have created a user with basic authentication having the login `jsmith@example.com`, then set up SAML authentication where `jsmith@example.com` is an account, the user's authentication type will be changed to SAML if they perform a SAML sign-in.
 

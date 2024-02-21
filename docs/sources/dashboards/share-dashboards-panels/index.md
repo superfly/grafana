@@ -24,8 +24,14 @@ keywords:
   - reporting
   - export
   - pdf
+labels:
+  products:
+    - cloud
+    - enterprise
+    - oss
 menuTitle: Sharing
 title: Share dashboards and panels
+description: Share Grafana dashboards and panels within your organization and publicly
 weight: 85
 ---
 
@@ -42,7 +48,9 @@ You must have an authorized viewer permission to see an image rendered by a dire
 
 The same permission is also required to view embedded links unless you have anonymous access permission enabled for your Grafana instance.
 
-> **Note:** As of Grafana 8.0, anonymous access permission is not available in Grafana Cloud.
+{{% admonition type="note" %}}
+As of Grafana 8.0, anonymous access permission is not available in Grafana Cloud.
+{{% /admonition %}}
 
 When you share a panel or dashboard as a snapshot, a snapshot (which is a panel or dashboard at the moment you take the snapshot) is publicly available on the web. Anyone with a link to it can access it. Because snapshots do not require any authorization to view, Grafana removes information related to the account it came from, as well as any sensitive data from the snapshot.
 
@@ -50,12 +58,15 @@ When you share a panel or dashboard as a snapshot, a snapshot (which is a panel 
 
 You can share a dashboard as a direct link or as a snapshot. You can also export a dashboard.
 
-> **Note:** If you change a dashboard, ensure that you save the changes before sharing.
+{{% admonition type="note" %}}
+If you change a dashboard, ensure that you save the changes before sharing.
+{{% /admonition %}}
 
-1. Navigate to the home page of your Grafana instance.
-1. Click on the share icon in the top navigation.
+1. Click **Dashboards** in the left-side menu.
+1. Click the dashboard you want to share.
+1. Click the **Share** button at the top right of the screen.
 
-   The share dialog opens and shows the **Link** tab.
+   The share dialog opens and shows the Link tab.
 
 ### Share a direct link
 
@@ -73,7 +84,8 @@ A dashboard snapshot shares an interactive dashboard publicly. Grafana strips se
 
 You can publish snapshots to your local instance or to [snapshots.raintank.io](http://snapshots.raintank.io). The latter is a free service provided by Grafana Labs that enables you to publish dashboard snapshots to an external Grafana instance. Anyone with the link can view it. You can set an expiration time if you want the snapshot removed after a certain time period.
 
-1. Click **Local Snapshot** or **Publish to snapshots.raintank.io**.
+1. Click the **Snapshot** tab.
+1. Click **Publish to snapshots.raintank.io** or **Local Snapshot**.
 
    Grafana generates a link of the snapshot.
 
@@ -83,15 +95,17 @@ If you created a snapshot by mistake, click **Delete snapshot** to remove the sn
 
 ### Dashboard export
 
-Grafana dashboards can easily be exported and imported. For more information, refer to [Export and import dashboards]({{< relref "./manage-dashboards/#export-and-import-dashboards" >}}).
+Grafana dashboards can easily be exported and imported. For more information, refer to [Export and import dashboards][].
 
 ## Export dashboard as PDF
 
 You can generate and save PDF files of any dashboard.
 
-> **Note:** Available in [Grafana Enterprise]({{< relref "../../introduction/grafana-enterprise/" >}}).
+> **Note:** Available in [Grafana Enterprise][] and [Grafana Cloud](/docs/grafana-cloud/).
 
-1. In the upper-right corner of the dashboard that you want to export as PDF, click the **Share dashboard** icon.
+1. Click **Dashboards** in the left-side menu.
+1. Click the dashboard you want to share.
+1. Click the **Share** button at the top right of the screen.
 1. On the PDF tab, select a layout option for the exported dashboard: **Portrait** or **Landscape**.
 1. Click **Save as PDF** to render the dashboard as a PDF file.
 
@@ -101,8 +115,8 @@ You can generate and save PDF files of any dashboard.
 
 You can share a panel as a direct link, as a snapshot, or as an embedded link. You can also create library panels using the **Share** option on any panel.
 
-1. Click a panel title to open the panel menu.
-1. Click **Share**.
+1. Hover over any part of the panel to display the actions menu on the top right corner.
+1. Click the menu and select **Share**.
 
    The share dialog opens and shows the **Link** tab.
 
@@ -117,7 +131,7 @@ The **Link** tab shows the current time range, template variables, and the defau
 1. Send the copied URL to a Grafana user with authorization to view the link.
 1. You also optionally click **Direct link rendered image** to share an image of the panel.
 
-For more information, refer to [Image rendering]({{< relref "../../setup-grafana/image-rendering/" >}}).
+For more information, refer to [Image rendering][].
 
 The following example shows a link to a server-side rendered PNG:
 
@@ -139,8 +153,8 @@ A panel snapshot shares an interactive panel publicly. Grafana strips sensitive 
 
 You can publish snapshots to your local instance or to [snapshots.raintank.io](http://snapshots.raintank.io). The latter is a free service provided by [Grafana Labs](https://grafana.com), that enables you to publish dashboard snapshots to an external Grafana instance. You can optionally set an expiration time if you want the snapshot to be removed after a certain time period.
 
-1. In the **Share Panel** dialog, click **Snapshot** to open the tab.
-1. Click **Local Snapshot** or **Publish to snapshots.raintank.io**.
+1. In the **Share Panel** dialog, click **Snapshot** to go to the tab.
+1. Click **Publish to snapshots.raintank.io** or **Local Snapshot**.
 
    Grafana generates the link of the snapshot.
 
@@ -173,6 +187,17 @@ To create a library panel from the **Share Panel** dialog:
 
 1. Click **Library panel**.
 1. In **Library panel name**, enter the name.
-1. In **Save in folder**, select the folder in which to save the library panel. By default, the General folder is selected.
+1. In **Save in folder**, select the folder in which to save the library panel. By default, the root level is selected.
 1. Click **Create library panel** to save your changes.
 1. Save the dashboard.
+
+{{% docs/reference %}}
+[Export and import dashboards]: "/docs/grafana/ -> /docs/grafana/<GRAFANA VERSION>/dashboards/manage-dashboards#export-and-import-dashboards"
+[Export and import dashboards]: "/docs/grafana-cloud/ -> /docs/grafana/<GRAFANA VERSION>/dashboards/manage-dashboards#export-and-import-dashboards"
+
+[Grafana Enterprise]: "/docs/grafana/ -> /docs/grafana/<GRAFANA VERSION>/introduction/grafana-enterprise"
+[Grafana Enterprise]: "/docs/grafana-cloud/ -> /docs/grafana/<GRAFANA VERSION>/introduction/grafana-enterprise"
+
+[Image rendering]: "/docs/grafana/ -> /docs/grafana/<GRAFANA VERSION>/setup-grafana/image-rendering"
+[Image rendering]: "/docs/grafana-cloud/ -> /docs/grafana/<GRAFANA VERSION>/setup-grafana/image-rendering"
+{{% /docs/reference %}}

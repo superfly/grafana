@@ -1,5 +1,4 @@
-import { screen } from '@testing-library/dom';
-import { render } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import React from 'react';
 
@@ -14,7 +13,7 @@ describe('QueryEditor', () => {
   it('should render without error', async () => {
     setup();
 
-    expect(screen.findByText('process_cpu:cpu')).toBeDefined();
+    expect(await screen.findByText(/process_cpu - cpu/)).toBeDefined();
   });
 
   it('should render options', async () => {

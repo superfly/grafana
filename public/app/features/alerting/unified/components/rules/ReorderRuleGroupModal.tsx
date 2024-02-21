@@ -1,7 +1,7 @@
 import { css } from '@emotion/css';
 import cx from 'classnames';
 import { compact } from 'lodash';
-import React, { FC, useCallback, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   DragDropContext,
   Draggable,
@@ -27,12 +27,13 @@ interface ModalProps {
   namespace: CombinedRuleNamespace;
   group: CombinedRuleGroup;
   onClose: () => void;
+  folderUid?: string;
 }
 
 type CombinedRuleWithUID = { uid: string } & CombinedRule;
 
-export const ReorderCloudGroupModal: FC<ModalProps> = (props) => {
-  const { group, namespace, onClose } = props;
+export const ReorderCloudGroupModal = (props: ModalProps) => {
+  const { group, namespace, onClose, folderUid } = props;
   const [pending, setPending] = useState<boolean>(false);
   const [rulesList, setRulesList] = useState<CombinedRule[]>(group.rules);
 
@@ -63,6 +64,7 @@ export const ReorderCloudGroupModal: FC<ModalProps> = (props) => {
           groupName: group.name,
           rulesSourceName: rulesSourceName,
           newRules: rulerRules,
+          folderUid: folderUid || namespace.name,
         })
       )
         .unwrap()
@@ -70,7 +72,7 @@ export const ReorderCloudGroupModal: FC<ModalProps> = (props) => {
           setPending(false);
         });
     },
-    [group.name, namespace.name, namespace.rulesSource, rulesList]
+    [group.name, namespace.name, namespace.rulesSource, rulesList, folderUid]
   );
 
   // assign unique but stable identifiers to each (alerting / recording) rule
@@ -145,7 +147,7 @@ interface ModalHeaderProps {
   group: CombinedRuleGroup;
 }
 
-const ModalHeader: FC<ModalHeaderProps> = ({ namespace, group }) => {
+const ModalHeader = ({ namespace, group }: ModalHeaderProps) => {
   const styles = useStyles2(getStyles);
 
   return (

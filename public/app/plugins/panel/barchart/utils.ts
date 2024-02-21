@@ -1,26 +1,27 @@
-import { orderBy } from 'lodash';
+import { cloneDeep } from 'lodash';
 import uPlot, { Padding } from 'uplot';
 
 import {
-  ArrayVector,
   DataFrame,
   Field,
   FieldType,
   formattedValueToString,
   getDisplayProcessor,
   getFieldColorModeForField,
+  cacheFieldDisplayNames,
   getFieldSeriesColor,
   GrafanaTheme2,
   outerJoinDataFrames,
-  reduceField,
   TimeZone,
   VizOrientation,
+  getFieldDisplayName,
 } from '@grafana/data';
 import { maybeSortFrame } from '@grafana/data/src/transformations/transformers/joinDataFrames';
 import {
+  AxisColorMode,
   AxisPlacement,
   GraphTransform,
-  GraphTresholdsStyleMode,
+  GraphThresholdsStyleMode,
   ScaleDirection,
   ScaleDistribution,
   ScaleOrientation,
@@ -28,11 +29,12 @@ import {
   VizLegendOptions,
 } from '@grafana/schema';
 import { FIXED_UNIT, measureText, UPlotConfigBuilder, UPlotConfigPrepFn, UPLOT_AXIS_FONT_SIZE } from '@grafana/ui';
+import { AxisProps } from '@grafana/ui/src/components/uPlot/config/UPlotAxisBuilder';
 import { getStackingGroups } from '@grafana/ui/src/components/uPlot/utils';
 import { findField } from 'app/features/dimensions';
 
 import { BarsOptions, getConfig } from './bars';
-import { PanelFieldConfig, PanelOptions, defaultPanelFieldConfig } from './panelcfg.gen';
+import { FieldConfig, Options, defaultFieldConfig } from './panelcfg.gen';
 import { BarChartDisplayValues, BarChartDisplayWarning } from './types';
 
 function getBarCharScaleOrientation(orientation: VizOrientation) {
@@ -53,7 +55,7 @@ function getBarCharScaleOrientation(orientation: VizOrientation) {
   };
 }
 
-export interface BarChartOptionsEX extends PanelOptions {
+export interface BarChartOptionsEX extends Options {
   rawValue: (seriesIdx: number, valueIdx: number) => number | null;
   getColor?: (seriesIdx: number, valueIdx: number, value: unknown) => string | null;
   timeZone?: TimeZone;
@@ -186,7 +188,7 @@ export const preparePlotConfigBuilder: UPlotConfigPrepFn<BarChartOptionsEX> = ({
 
     seriesIndex++;
 
-    const customConfig: PanelFieldConfig = { ...defaultPanelFieldConfig, ...field.config.custom };
+    const customConfig: FieldConfig = { ...defaultFieldConfig, ...field.config.custom };
 
     const scaleKey = field.config.unit || FIXED_UNIT;
     const colorMode = getFieldColorModeForField(field);
@@ -207,8 +209,8 @@ export const preparePlotConfigBuilder: UPlotConfigPrepFn<BarChartOptionsEX> = ({
 
     // Render thresholds in graph
     if (customConfig.thresholdsStyle && field.config.thresholds) {
-      const thresholdDisplay = customConfig.thresholdsStyle.mode ?? GraphTresholdsStyleMode.Off;
-      if (thresholdDisplay !== GraphTresholdsStyleMode.Off) {
+      const thresholdDisplay = customConfig.thresholdsStyle.mode ?? GraphThresholdsStyleMode.Off;
+      if (thresholdDisplay !== GraphThresholdsStyleMode.Off) {
         builder.addThresholds({
           config: customConfig.thresholdsStyle,
           thresholds: field.config.thresholds,
@@ -236,8 +238,8 @@ export const preparePlotConfigBuilder: UPlotConfigPrepFn<BarChartOptionsEX> = ({
       thresholds: field.config.thresholds,
       hardMin: field.config.min,
       hardMax: field.config.max,
-      softMin,
-      softMax,
+      softMin: customConfig.axisSoftMin,
+      softMax: customConfig.axisSoftMax,
 
       // The following properties are not used in the uPlot config, but are utilized as transport for legend config
       // PlotLegend currently gets unfiltered DataFrame[], so index must be into that field array, not the prepped frame's which we're iterating here
@@ -258,6 +260,7 @@ export const preparePlotConfigBuilder: UPlotConfigPrepFn<BarChartOptionsEX> = ({
       max: field.config.max,
       softMin,
       softMax,
+      centeredZero: customConfig.axisCenteredZero,
       orientation: vizOrientation.yOri,
       direction: vizOrientation.yDir,
       distribution: customConfig.scaleDistribution?.type,
@@ -278,7 +281,7 @@ export const preparePlotConfigBuilder: UPlotConfigPrepFn<BarChartOptionsEX> = ({
         }
       }
 
-      builder.addAxis({
+      let axisOpts: AxisProps = {
         scaleKey,
         label: customConfig.axisLabel,
         size: customConfig.axisWidth,
@@ -288,7 +291,19 @@ export const preparePlotConfigBuilder: UPlotConfigPrepFn<BarChartOptionsEX> = ({
         tickLabelRotation: vizOrientation.xOri === 1 ? xTickLabelRotation * -1 : 0,
         theme,
         grid: { show: customConfig.axisGridShow },
-      });
+      };
+
+      if (customConfig.axisBorderShow) {
+        axisOpts.border = {
+          show: true,
+        };
+      }
+
+      if (customConfig.axisColorMode === AxisColorMode.Series) {
+        axisOpts.color = seriesColor;
+      }
+
+      builder.addAxis(axisOpts);
     }
   }
 
@@ -316,13 +331,13 @@ function getRotationPadding(
 ): Padding {
   const values = frame.fields[0].values;
   const fontSize = UPLOT_AXIS_FONT_SIZE;
-  const displayProcessor = frame.fields[0].display ?? ((v) => v);
+  const displayProcessor = frame.fields[0].display;
+  const getProcessedValue = (i: number) => {
+    return displayProcessor ? displayProcessor(values[i]) : values[i];
+  };
   let maxLength = 0;
   for (let i = 0; i < values.length; i++) {
-    let size = measureText(
-      shortenValue(formattedValueToString(displayProcessor(values.get(i))), valueMaxLength),
-      fontSize
-    );
+    let size = measureText(shortenValue(formattedValueToString(getProcessedValue(i)), valueMaxLength), fontSize);
     maxLength = size.width > maxLength ? size.width : maxLength;
   }
 
@@ -331,7 +346,7 @@ function getRotationPadding(
     rotateLabel > 0
       ? Math.cos((rotateLabel * Math.PI) / 180) *
         measureText(
-          shortenValue(formattedValueToString(displayProcessor(values.get(values.length - 1))), valueMaxLength),
+          shortenValue(formattedValueToString(getProcessedValue(values.length - 1)), valueMaxLength),
           fontSize
         ).width
       : 0;
@@ -340,8 +355,7 @@ function getRotationPadding(
   const paddingLeft =
     rotateLabel < 0
       ? Math.cos((rotateLabel * -1 * Math.PI) / 180) *
-        measureText(shortenValue(formattedValueToString(displayProcessor(values.get(0))), valueMaxLength), fontSize)
-          .width
+        measureText(shortenValue(formattedValueToString(getProcessedValue(0)), valueMaxLength), fontSize).width
       : 0;
 
   // Add padding to the bottom to avoid clipping the rotated labels.
@@ -360,11 +374,13 @@ function getRotationPadding(
 export function prepareBarChartDisplayValues(
   series: DataFrame[],
   theme: GrafanaTheme2,
-  options: PanelOptions
+  options: Options
 ): BarChartDisplayValues | BarChartDisplayWarning {
-  if (!series?.length) {
+  if (!series.length || series.every((fr) => fr.length === 0)) {
     return { warn: 'No data in response' };
   }
+
+  cacheFieldDisplayNames(series);
 
   // Bar chart requires a single frame
   const frame =
@@ -433,14 +449,12 @@ export function prepareBarChartDisplayValues(
               },
             },
           },
-          values: new ArrayVector(
-            field.values.toArray().map((v) => {
-              if (!(Number.isFinite(v) || v == null)) {
-                return null;
-              }
-              return v;
-            })
-          ),
+          values: field.values.map((v) => {
+            if (!(Number.isFinite(v) || v == null)) {
+              return null;
+            }
+            return v;
+          }),
         };
 
         if (options.stacking === StackingMode.Percent) {
@@ -478,49 +492,30 @@ export function prepareBarChartDisplayValues(
     }
   }
 
-  if (isLegendOrdered(options.legend)) {
-    const sortKey = options.legend.sortBy!.toLowerCase();
-    const reducers = options.legend.calcs ?? [sortKey];
-    fields = orderBy(
-      fields,
-      (field) => {
-        return reduceField({ field, reducers })[sortKey];
-      },
-      options.legend.sortDesc ? 'desc' : 'asc'
-    );
-  }
-
-  let legendFields: Field[] = fields;
+  // If stacking is percent, we need to correct the legend fields unit and display
+  let legendFields: Field[] = cloneDeep(fields);
   if (options.stacking === StackingMode.Percent) {
-    legendFields = fields.map((field) => {
-      const alignedFrameField = frame.fields.find((f) => f.name === field.name)!;
+    legendFields.map((field) => {
+      const alignedFrameField = frame.fields.find(
+        (f) => getFieldDisplayName(f, frame) === getFieldDisplayName(f, frame)
+      );
 
-      const copy = {
-        ...field,
-        config: {
-          ...alignedFrameField.config,
-        },
-        values: field.values,
-      };
-
-      copy.display = getDisplayProcessor({ field: copy, theme });
-
-      return copy;
+      field.config.unit = alignedFrameField?.config?.unit ?? undefined;
+      field.display = getDisplayProcessor({ field: field, theme });
     });
-
-    legendFields.unshift(firstField);
   }
 
-  // String field is first
+  // String field is first, make sure fields / legend fields indexes match
   fields.unshift(firstField);
+  legendFields.unshift(firstField);
 
   return {
     aligned: frame,
     colorByField,
     viz: [
       {
-        length: firstField.values.length,
         fields: fields, // ideally: fields.filter((f) => !Boolean(f.config.custom?.hideFrom?.viz)),
+        length: firstField.values.length,
       },
     ],
     legend: {

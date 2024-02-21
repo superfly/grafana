@@ -11,47 +11,53 @@ import (
 	"github.com/grafana/grafana-plugin-sdk-go/data/sqlutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/xorcare/pointer"
 
-	"github.com/grafana/grafana/pkg/infra/log"
+	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
+	"github.com/grafana/grafana/pkg/tsdb/sqleng/util"
 )
 
 func TestSQLEngine(t *testing.T) {
 	dt := time.Date(2018, 3, 14, 21, 20, 6, int(527345*time.Microsecond), time.UTC)
 
+	t.Run("Handle interpolating $__interval and $__interval_ms", func(t *testing.T) {
+		from := time.Date(2018, 4, 12, 18, 0, 0, 0, time.UTC)
+		to := from.Add(5 * time.Minute)
+		timeRange := backend.TimeRange{From: from, To: to}
+
+		text := "$__interval $__timeGroupAlias(time,$__interval) $__interval_ms"
+
+		t.Run("interpolate 10 minutes $__interval", func(t *testing.T) {
+			query := backend.DataQuery{JSON: []byte("{}"), MaxDataPoints: 1500, Interval: time.Minute * 10}
+			sql := Interpolate(query, timeRange, "", text)
+			require.Equal(t, "10m $__timeGroupAlias(time,10m) 600000", sql)
+		})
+
+		t.Run("interpolate 4seconds $__interval", func(t *testing.T) {
+			query := backend.DataQuery{JSON: []byte("{}"), MaxDataPoints: 1500, Interval: time.Second * 4}
+			sql := Interpolate(query, timeRange, "", text)
+			require.Equal(t, "4s $__timeGroupAlias(time,4s) 4000", sql)
+		})
+
+		t.Run("interpolate 200 milliseconds $__interval", func(t *testing.T) {
+			query := backend.DataQuery{JSON: []byte("{}"), MaxDataPoints: 1500, Interval: time.Millisecond * 200}
+			sql := Interpolate(query, timeRange, "", text)
+			require.Equal(t, "200ms $__timeGroupAlias(time,200ms) 200", sql)
+		})
+	})
+
 	t.Run("Given a time range between 2018-04-12 00:00 and 2018-04-12 00:05", func(t *testing.T) {
 		from := time.Date(2018, 4, 12, 18, 0, 0, 0, time.UTC)
 		to := from.Add(5 * time.Minute)
 		timeRange := backend.TimeRange{From: from, To: to}
-		query := backend.DataQuery{JSON: []byte("{}")}
-
-		t.Run("interpolate $__interval", func(t *testing.T) {
-			sql, err := Interpolate(query, timeRange, "", "select $__interval ")
-			require.NoError(t, err)
-			require.Equal(t, "select 1m ", sql)
-		})
-
-		t.Run("interpolate $__interval in $__timeGroup", func(t *testing.T) {
-			sql, err := Interpolate(query, timeRange, "", "select $__timeGroupAlias(time,$__interval)")
-			require.NoError(t, err)
-			require.Equal(t, "select $__timeGroupAlias(time,1m)", sql)
-		})
-
-		t.Run("interpolate $__interval_ms", func(t *testing.T) {
-			sql, err := Interpolate(query, timeRange, "", "select $__interval_ms ")
-			require.NoError(t, err)
-			require.Equal(t, "select 60000 ", sql)
-		})
+		query := backend.DataQuery{JSON: []byte("{}"), MaxDataPoints: 1500, Interval: time.Second * 60}
 
 		t.Run("interpolate __unixEpochFrom function", func(t *testing.T) {
-			sql, err := Interpolate(query, timeRange, "", "select $__unixEpochFrom()")
-			require.NoError(t, err)
+			sql := Interpolate(query, timeRange, "", "select $__unixEpochFrom()")
 			require.Equal(t, fmt.Sprintf("select %d", from.Unix()), sql)
 		})
 
 		t.Run("interpolate __unixEpochTo function", func(t *testing.T) {
-			sql, err := Interpolate(query, timeRange, "", "select $__unixEpochTo()")
-			require.NoError(t, err)
+			sql := Interpolate(query, timeRange, "", "select $__unixEpochTo()")
 			require.Equal(t, fmt.Sprintf("select %d", to.Unix()), sql)
 		})
 	})
@@ -67,19 +73,19 @@ func TestSQLEngine(t *testing.T) {
 				tSeconds,
 			}),
 			data.NewField("time2", nil, []*int64{
-				pointer.Int64(tSeconds),
+				util.Pointer(tSeconds),
 			}),
 			data.NewField("time3", nil, []int64{
 				tMilliseconds,
 			}),
 			data.NewField("time4", nil, []*int64{
-				pointer.Int64(tMilliseconds),
+				util.Pointer(tMilliseconds),
 			}),
 			data.NewField("time5", nil, []int64{
 				tNanoSeconds,
 			}),
 			data.NewField("time6", nil, []*int64{
-				pointer.Int64(tNanoSeconds),
+				util.Pointer(tNanoSeconds),
 			}),
 			data.NewField("time7", nil, []*int64{
 				nilPointer,
@@ -111,19 +117,19 @@ func TestSQLEngine(t *testing.T) {
 				tSeconds,
 			}),
 			data.NewField("time2", nil, []*uint64{
-				pointer.Uint64(tSeconds),
+				util.Pointer(tSeconds),
 			}),
 			data.NewField("time3", nil, []uint64{
 				tMilliseconds,
 			}),
 			data.NewField("time4", nil, []*uint64{
-				pointer.Uint64(tMilliseconds),
+				util.Pointer(tMilliseconds),
 			}),
 			data.NewField("time5", nil, []uint64{
 				tNanoSeconds,
 			}),
 			data.NewField("time6", nil, []*uint64{
-				pointer.Uint64(tNanoSeconds),
+				util.Pointer(tNanoSeconds),
 			}),
 			data.NewField("time7", nil, []*uint64{
 				nilPointer,
@@ -153,7 +159,7 @@ func TestSQLEngine(t *testing.T) {
 				tSeconds,
 			}),
 			data.NewField("time2", nil, []*int32{
-				pointer.Int32(tSeconds),
+				util.Pointer(tSeconds),
 			}),
 			data.NewField("time7", nil, []*int32{
 				nilInt,
@@ -178,7 +184,7 @@ func TestSQLEngine(t *testing.T) {
 				tSeconds,
 			}),
 			data.NewField("time2", nil, []*uint32{
-				pointer.Uint32(tSeconds),
+				util.Pointer(tSeconds),
 			}),
 			data.NewField("time7", nil, []*uint32{
 				nilInt,
@@ -204,19 +210,19 @@ func TestSQLEngine(t *testing.T) {
 				tSeconds,
 			}),
 			data.NewField("time2", nil, []*float64{
-				pointer.Float64(tSeconds),
+				util.Pointer(tSeconds),
 			}),
 			data.NewField("time3", nil, []float64{
 				tMilliseconds,
 			}),
 			data.NewField("time4", nil, []*float64{
-				pointer.Float64(tMilliseconds),
+				util.Pointer(tMilliseconds),
 			}),
 			data.NewField("time5", nil, []float64{
 				tNanoSeconds,
 			}),
 			data.NewField("time6", nil, []*float64{
-				pointer.Float64(tNanoSeconds),
+				util.Pointer(tNanoSeconds),
 			}),
 			data.NewField("time7", nil, []*float64{
 				nilPointer,
@@ -246,7 +252,7 @@ func TestSQLEngine(t *testing.T) {
 				tSeconds,
 			}),
 			data.NewField("time2", nil, []*float32{
-				pointer.Float32(tSeconds),
+				util.Pointer(tSeconds),
 			}),
 			data.NewField("time7", nil, []*float32{
 				nilInt,
@@ -267,61 +273,61 @@ func TestSQLEngine(t *testing.T) {
 				int64(1),
 			}),
 			data.NewField("value2", nil, []*int64{
-				pointer.Int64(1),
+				util.Pointer(int64(1)),
 			}),
 			data.NewField("value3", nil, []int32{
 				int32(1),
 			}),
 			data.NewField("value4", nil, []*int32{
-				pointer.Int32(1),
+				util.Pointer(int32(1)),
 			}),
 			data.NewField("value5", nil, []int16{
 				int16(1),
 			}),
 			data.NewField("value6", nil, []*int16{
-				pointer.Int16(1),
+				util.Pointer(int16(1)),
 			}),
 			data.NewField("value7", nil, []int8{
 				int8(1),
 			}),
 			data.NewField("value8", nil, []*int8{
-				pointer.Int8(1),
+				util.Pointer(int8(1)),
 			}),
 			data.NewField("value9", nil, []float64{
 				float64(1),
 			}),
 			data.NewField("value10", nil, []*float64{
-				pointer.Float64(1),
+				util.Pointer(1.0),
 			}),
 			data.NewField("value11", nil, []float32{
 				float32(1),
 			}),
 			data.NewField("value12", nil, []*float32{
-				pointer.Float32(1),
+				util.Pointer(float32(1)),
 			}),
 			data.NewField("value13", nil, []uint64{
 				uint64(1),
 			}),
 			data.NewField("value14", nil, []*uint64{
-				pointer.Uint64(1),
+				util.Pointer(uint64(1)),
 			}),
 			data.NewField("value15", nil, []uint32{
 				uint32(1),
 			}),
 			data.NewField("value16", nil, []*uint32{
-				pointer.Uint32(1),
+				util.Pointer(uint32(1)),
 			}),
 			data.NewField("value17", nil, []uint16{
 				uint16(1),
 			}),
 			data.NewField("value18", nil, []*uint16{
-				pointer.Uint16(1),
+				util.Pointer(uint16(1)),
 			}),
 			data.NewField("value19", nil, []uint8{
 				uint8(1),
 			}),
 			data.NewField("value20", nil, []*uint8{
-				pointer.Uint8(1),
+				util.Pointer(uint8(1)),
 			}),
 		)
 		for i := 0; i < len(originFrame.Fields); i++ {
@@ -389,28 +395,32 @@ func TestSQLEngine(t *testing.T) {
 		}
 	})
 
-	t.Run("Should handle connection errors", func(t *testing.T) {
-		randomErr := fmt.Errorf("random error")
-
-		tests := []struct {
-			err                                   error
-			expectedErr                           error
-			expectQueryResultTransformerWasCalled bool
-		}{
-			{err: &net.OpError{Op: "Dial"}, expectedErr: ErrConnectionFailed, expectQueryResultTransformerWasCalled: false},
-			{err: randomErr, expectedErr: randomErr, expectQueryResultTransformerWasCalled: true},
+	t.Run("Should not return raw connection errors", func(t *testing.T) {
+		err := net.OpError{Op: "Dial", Err: fmt.Errorf("inner-error")}
+		transformer := &testQueryResultTransformer{}
+		dp := DataSourceHandler{
+			log:                    backend.NewLoggerWith("logger", "test"),
+			queryResultTransformer: transformer,
 		}
+		resultErr := dp.TransformQueryError(dp.log, &err)
+		assert.False(t, transformer.transformQueryErrorWasCalled)
+		errorText := resultErr.Error()
+		assert.NotEqual(t, err, resultErr)
+		assert.NotContains(t, errorText, "inner-error")
+		assert.Contains(t, errorText, "failed to connect to server")
+	})
 
-		for _, tc := range tests {
-			transformer := &testQueryResultTransformer{}
-			dp := DataSourceHandler{
-				log:                    log.New("test"),
-				queryResultTransformer: transformer,
-			}
-			resultErr := dp.TransformQueryError(dp.log, tc.err)
-			assert.ErrorIs(t, resultErr, tc.expectedErr)
-			assert.Equal(t, tc.expectQueryResultTransformerWasCalled, transformer.transformQueryErrorWasCalled)
+	t.Run("Should return non-connection errors unmodified", func(t *testing.T) {
+		err := fmt.Errorf("normal error")
+		transformer := &testQueryResultTransformer{}
+		dp := DataSourceHandler{
+			log:                    backend.NewLoggerWith("logger", "test"),
+			queryResultTransformer: transformer,
 		}
+		resultErr := dp.TransformQueryError(dp.log, err)
+		assert.True(t, transformer.transformQueryErrorWasCalled)
+		assert.Equal(t, err, resultErr)
+		assert.ErrorIs(t, err, resultErr)
 	})
 }
 

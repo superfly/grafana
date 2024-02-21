@@ -5,15 +5,15 @@ import { histogramFieldsToFrame } from '@grafana/data/src/transformations/transf
 import { useTheme2 } from '@grafana/ui';
 
 import { Histogram, getBucketSize } from './Histogram';
-import { PanelOptions } from './panelcfg.gen';
+import { Options } from './panelcfg.gen';
 
-type Props = PanelProps<PanelOptions>;
+type Props = PanelProps<Options>;
 
 export const HistogramPanel = ({ data, options, width, height }: Props) => {
   const theme = useTheme2();
 
   const histogram = useMemo(() => {
-    if (!data?.series?.length) {
+    if (!data.series.length) {
       return undefined;
     }
 
@@ -65,6 +65,7 @@ export const HistogramPanel = ({ data, options, width, height }: Props) => {
       height={height}
       alignedFrame={histogram}
       bucketSize={bucketSize}
+      bucketCount={options.bucketCount}
     >
       {(config, alignedFrame) => {
         return null; // <TooltipPlugin data={alignedFrame} config={config} mode={options.tooltip.mode} timeZone={timeZone} />;

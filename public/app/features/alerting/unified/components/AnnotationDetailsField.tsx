@@ -1,8 +1,8 @@
 import { css } from '@emotion/css';
-import React, { FC } from 'react';
+import React from 'react';
 
 import { GrafanaTheme2 } from '@grafana/data';
-import { Tooltip, useStyles2 } from '@grafana/ui';
+import { TextLink, Tooltip, useStyles2 } from '@grafana/ui';
 
 import { Annotation, annotationLabels } from '../utils/constants';
 
@@ -15,9 +15,10 @@ const wellableAnnotationKeys = ['message', 'description'];
 interface Props {
   annotationKey: string;
   value: string;
+  valueLink?: string;
 }
 
-export const AnnotationDetailsField: FC<Props> = ({ annotationKey, value }) => {
+export const AnnotationDetailsField = ({ annotationKey, value, valueLink }: Props) => {
   const label = annotationLabels[annotationKey as Annotation] ? (
     <Tooltip content={annotationKey} placement="top" theme="info">
       <span>{annotationLabels[annotationKey as Annotation]}</span>
@@ -28,28 +29,36 @@ export const AnnotationDetailsField: FC<Props> = ({ annotationKey, value }) => {
 
   return (
     <DetailsField label={label} horizontal={true}>
-      <AnnotationValue annotationKey={annotationKey} value={value} />
+      <AnnotationValue annotationKey={annotationKey} value={value} valueLink={valueLink} />
     </DetailsField>
   );
 };
 
-const AnnotationValue: FC<Props> = ({ annotationKey, value }) => {
+const AnnotationValue = ({ annotationKey, value, valueLink }: Props) => {
   const styles = useStyles2(getStyles);
 
   const needsWell = wellableAnnotationKeys.includes(annotationKey);
-  const needsLink = value && value.startsWith('http');
+  const needsExternalLink = value && value.startsWith('http');
 
   const tokenizeValue = <Tokenize input={value} delimiter={['{{', '}}']} />;
+
+  if (valueLink) {
+    return (
+      <TextLink href={valueLink} external>
+        {value}
+      </TextLink>
+    );
+  }
 
   if (needsWell) {
     return <Well className={styles.well}>{tokenizeValue}</Well>;
   }
 
-  if (needsLink) {
+  if (needsExternalLink) {
     return (
-      <a href={value} target="__blank" className={styles.link}>
+      <TextLink href={value} external>
         {value}
-      </a>
+      </TextLink>
     );
   }
 
@@ -59,9 +68,5 @@ const AnnotationValue: FC<Props> = ({ annotationKey, value }) => {
 export const getStyles = (theme: GrafanaTheme2) => ({
   well: css`
     word-break: break-word;
-  `,
-  link: css`
-    word-break: break-all;
-    color: ${theme.colors.primary.text};
   `,
 });

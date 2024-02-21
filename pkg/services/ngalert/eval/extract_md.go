@@ -2,6 +2,7 @@ package eval
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/grafana/grafana-plugin-sdk-go/data"
@@ -39,24 +40,27 @@ func extractEvalString(frame *data.Frame) (s string) {
 		return sb.String()
 	}
 
-	if caps, ok := frame.Meta.Custom.([]NumberValueCapture); ok {
+	if captures, ok := frame.Meta.Custom.([]NumberValueCapture); ok {
+		// Sort captures in ascending order of "Var" so we can assert in tests
+		sort.Slice(captures, func(i, j int) bool {
+			return captures[i].Var < captures[j].Var
+		})
 		sb := strings.Builder{}
-		for _, c := range caps {
-			if c.Var == frame.RefID {
+		for _, capture := range captures {
+			if capture.Var == frame.RefID {
 				valString := "null"
-				if c.Value != nil {
-					if *c.Value == float64(int64(*c.Value)) {
-						valString = fmt.Sprintf("%d", int64(*c.Value))
+				if capture.Value != nil {
+					if *capture.Value == float64(int64(*capture.Value)) {
+						valString = fmt.Sprintf("%d", int64(*capture.Value))
 					} else {
-						valString = fmt.Sprintf("%.3f", *c.Value)
+						valString = fmt.Sprintf("%.3f", *capture.Value)
 					}
 				}
-				sb.WriteString(fmt.Sprintf("%s=%s", c.Metric, valString))
+				sb.WriteString(fmt.Sprintf("%s=%s", capture.Metric, valString))
 			}
 		}
 		return sb.String()
 	}
-
 	return ""
 }
 
@@ -93,11 +97,11 @@ func extractValues(frame *data.Frame) map[string]NumberValueCapture {
 		return v
 	}
 
-	if caps, ok := frame.Meta.Custom.([]NumberValueCapture); ok {
-		v := make(map[string]NumberValueCapture, len(caps))
-		for _, c := range caps {
-			if c.Var == frame.RefID {
-				v[c.Metric] = c
+	if captures, ok := frame.Meta.Custom.([]NumberValueCapture); ok {
+		v := make(map[string]NumberValueCapture, len(captures))
+		for _, capture := range captures {
+			if capture.Var == frame.RefID {
+				v[capture.Metric] = capture
 			}
 		}
 		return v

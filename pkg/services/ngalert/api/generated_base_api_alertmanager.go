@@ -12,6 +12,7 @@ import (
 	"github.com/grafana/grafana/pkg/api/response"
 	"github.com/grafana/grafana/pkg/api/routing"
 	"github.com/grafana/grafana/pkg/middleware"
+	"github.com/grafana/grafana/pkg/middleware/requestmeta"
 	contextmodel "github.com/grafana/grafana/pkg/services/contexthandler/model"
 	apimodels "github.com/grafana/grafana/pkg/services/ngalert/api/tooling/definitions"
 	"github.com/grafana/grafana/pkg/services/ngalert/metrics"
@@ -33,6 +34,7 @@ type AlertmanagerApi interface {
 	RouteGetGrafanaAMAlerts(*contextmodel.ReqContext) response.Response
 	RouteGetGrafanaAMStatus(*contextmodel.ReqContext) response.Response
 	RouteGetGrafanaAlertingConfig(*contextmodel.ReqContext) response.Response
+	RouteGetGrafanaAlertingConfigHistory(*contextmodel.ReqContext) response.Response
 	RouteGetGrafanaReceivers(*contextmodel.ReqContext) response.Response
 	RouteGetGrafanaSilence(*contextmodel.ReqContext) response.Response
 	RouteGetGrafanaSilences(*contextmodel.ReqContext) response.Response
@@ -41,7 +43,9 @@ type AlertmanagerApi interface {
 	RoutePostAMAlerts(*contextmodel.ReqContext) response.Response
 	RoutePostAlertingConfig(*contextmodel.ReqContext) response.Response
 	RoutePostGrafanaAlertingConfig(*contextmodel.ReqContext) response.Response
+	RoutePostGrafanaAlertingConfigHistoryActivate(*contextmodel.ReqContext) response.Response
 	RoutePostTestGrafanaReceivers(*contextmodel.ReqContext) response.Response
+	RoutePostTestGrafanaTemplates(*contextmodel.ReqContext) response.Response
 }
 
 func (f *AlertmanagerApiHandler) RouteCreateGrafanaSilence(ctx *contextmodel.ReqContext) response.Response {
@@ -113,6 +117,9 @@ func (f *AlertmanagerApiHandler) RouteGetGrafanaAMStatus(ctx *contextmodel.ReqCo
 func (f *AlertmanagerApiHandler) RouteGetGrafanaAlertingConfig(ctx *contextmodel.ReqContext) response.Response {
 	return f.handleRouteGetGrafanaAlertingConfig(ctx)
 }
+func (f *AlertmanagerApiHandler) RouteGetGrafanaAlertingConfigHistory(ctx *contextmodel.ReqContext) response.Response {
+	return f.handleRouteGetGrafanaAlertingConfigHistory(ctx)
+}
 func (f *AlertmanagerApiHandler) RouteGetGrafanaReceivers(ctx *contextmodel.ReqContext) response.Response {
 	return f.handleRouteGetGrafanaReceivers(ctx)
 }
@@ -163,6 +170,11 @@ func (f *AlertmanagerApiHandler) RoutePostGrafanaAlertingConfig(ctx *contextmode
 	}
 	return f.handleRoutePostGrafanaAlertingConfig(ctx, conf)
 }
+func (f *AlertmanagerApiHandler) RoutePostGrafanaAlertingConfigHistoryActivate(ctx *contextmodel.ReqContext) response.Response {
+	// Parse Path Parameters
+	idParam := web.Params(ctx.Req)[":id"]
+	return f.handleRoutePostGrafanaAlertingConfigHistoryActivate(ctx, idParam)
+}
 func (f *AlertmanagerApiHandler) RoutePostTestGrafanaReceivers(ctx *contextmodel.ReqContext) response.Response {
 	// Parse Request Body
 	conf := apimodels.TestReceiversConfigBodyParams{}
@@ -171,236 +183,326 @@ func (f *AlertmanagerApiHandler) RoutePostTestGrafanaReceivers(ctx *contextmodel
 	}
 	return f.handleRoutePostTestGrafanaReceivers(ctx, conf)
 }
+func (f *AlertmanagerApiHandler) RoutePostTestGrafanaTemplates(ctx *contextmodel.ReqContext) response.Response {
+	// Parse Request Body
+	conf := apimodels.TestTemplatesConfigBodyParams{}
+	if err := web.Bind(ctx.Req, &conf); err != nil {
+		return response.Error(http.StatusBadRequest, "bad request data", err)
+	}
+	return f.handleRoutePostTestGrafanaTemplates(ctx, conf)
+}
 
 func (api *API) RegisterAlertmanagerApiEndpoints(srv AlertmanagerApi, m *metrics.API) {
 	api.RouteRegister.Group("", func(group routing.RouteRegister) {
 		group.Post(
 			toMacaronPath("/api/alertmanager/grafana/api/v2/silences"),
+			requestmeta.SetOwner(requestmeta.TeamAlerting),
+			requestmeta.SetSLOGroup(requestmeta.SLOGroupHighSlow),
 			api.authorize(http.MethodPost, "/api/alertmanager/grafana/api/v2/silences"),
 			metrics.Instrument(
 				http.MethodPost,
 				"/api/alertmanager/grafana/api/v2/silences",
-				srv.RouteCreateGrafanaSilence,
+				api.Hooks.Wrap(srv.RouteCreateGrafanaSilence),
 				m,
 			),
 		)
 		group.Post(
 			toMacaronPath("/api/alertmanager/{DatasourceUID}/api/v2/silences"),
+			requestmeta.SetOwner(requestmeta.TeamAlerting),
+			requestmeta.SetSLOGroup(requestmeta.SLOGroupHighSlow),
 			api.authorize(http.MethodPost, "/api/alertmanager/{DatasourceUID}/api/v2/silences"),
 			metrics.Instrument(
 				http.MethodPost,
 				"/api/alertmanager/{DatasourceUID}/api/v2/silences",
-				srv.RouteCreateSilence,
+				api.Hooks.Wrap(srv.RouteCreateSilence),
 				m,
 			),
 		)
 		group.Delete(
 			toMacaronPath("/api/alertmanager/{DatasourceUID}/config/api/v1/alerts"),
+			requestmeta.SetOwner(requestmeta.TeamAlerting),
+			requestmeta.SetSLOGroup(requestmeta.SLOGroupHighSlow),
 			api.authorize(http.MethodDelete, "/api/alertmanager/{DatasourceUID}/config/api/v1/alerts"),
 			metrics.Instrument(
 				http.MethodDelete,
 				"/api/alertmanager/{DatasourceUID}/config/api/v1/alerts",
-				srv.RouteDeleteAlertingConfig,
+				api.Hooks.Wrap(srv.RouteDeleteAlertingConfig),
 				m,
 			),
 		)
 		group.Delete(
 			toMacaronPath("/api/alertmanager/grafana/config/api/v1/alerts"),
+			requestmeta.SetOwner(requestmeta.TeamAlerting),
+			requestmeta.SetSLOGroup(requestmeta.SLOGroupHighSlow),
 			api.authorize(http.MethodDelete, "/api/alertmanager/grafana/config/api/v1/alerts"),
 			metrics.Instrument(
 				http.MethodDelete,
 				"/api/alertmanager/grafana/config/api/v1/alerts",
-				srv.RouteDeleteGrafanaAlertingConfig,
+				api.Hooks.Wrap(srv.RouteDeleteGrafanaAlertingConfig),
 				m,
 			),
 		)
 		group.Delete(
 			toMacaronPath("/api/alertmanager/grafana/api/v2/silence/{SilenceId}"),
+			requestmeta.SetOwner(requestmeta.TeamAlerting),
+			requestmeta.SetSLOGroup(requestmeta.SLOGroupHighSlow),
 			api.authorize(http.MethodDelete, "/api/alertmanager/grafana/api/v2/silence/{SilenceId}"),
 			metrics.Instrument(
 				http.MethodDelete,
 				"/api/alertmanager/grafana/api/v2/silence/{SilenceId}",
-				srv.RouteDeleteGrafanaSilence,
+				api.Hooks.Wrap(srv.RouteDeleteGrafanaSilence),
 				m,
 			),
 		)
 		group.Delete(
 			toMacaronPath("/api/alertmanager/{DatasourceUID}/api/v2/silence/{SilenceId}"),
+			requestmeta.SetOwner(requestmeta.TeamAlerting),
+			requestmeta.SetSLOGroup(requestmeta.SLOGroupHighSlow),
 			api.authorize(http.MethodDelete, "/api/alertmanager/{DatasourceUID}/api/v2/silence/{SilenceId}"),
 			metrics.Instrument(
 				http.MethodDelete,
 				"/api/alertmanager/{DatasourceUID}/api/v2/silence/{SilenceId}",
-				srv.RouteDeleteSilence,
+				api.Hooks.Wrap(srv.RouteDeleteSilence),
 				m,
 			),
 		)
 		group.Get(
 			toMacaronPath("/api/alertmanager/{DatasourceUID}/api/v2/alerts/groups"),
+			requestmeta.SetOwner(requestmeta.TeamAlerting),
+			requestmeta.SetSLOGroup(requestmeta.SLOGroupHighSlow),
 			api.authorize(http.MethodGet, "/api/alertmanager/{DatasourceUID}/api/v2/alerts/groups"),
 			metrics.Instrument(
 				http.MethodGet,
 				"/api/alertmanager/{DatasourceUID}/api/v2/alerts/groups",
-				srv.RouteGetAMAlertGroups,
+				api.Hooks.Wrap(srv.RouteGetAMAlertGroups),
 				m,
 			),
 		)
 		group.Get(
 			toMacaronPath("/api/alertmanager/{DatasourceUID}/api/v2/alerts"),
+			requestmeta.SetOwner(requestmeta.TeamAlerting),
+			requestmeta.SetSLOGroup(requestmeta.SLOGroupHighSlow),
 			api.authorize(http.MethodGet, "/api/alertmanager/{DatasourceUID}/api/v2/alerts"),
 			metrics.Instrument(
 				http.MethodGet,
 				"/api/alertmanager/{DatasourceUID}/api/v2/alerts",
-				srv.RouteGetAMAlerts,
+				api.Hooks.Wrap(srv.RouteGetAMAlerts),
 				m,
 			),
 		)
 		group.Get(
 			toMacaronPath("/api/alertmanager/{DatasourceUID}/api/v2/status"),
+			requestmeta.SetOwner(requestmeta.TeamAlerting),
+			requestmeta.SetSLOGroup(requestmeta.SLOGroupHighSlow),
 			api.authorize(http.MethodGet, "/api/alertmanager/{DatasourceUID}/api/v2/status"),
 			metrics.Instrument(
 				http.MethodGet,
 				"/api/alertmanager/{DatasourceUID}/api/v2/status",
-				srv.RouteGetAMStatus,
+				api.Hooks.Wrap(srv.RouteGetAMStatus),
 				m,
 			),
 		)
 		group.Get(
 			toMacaronPath("/api/alertmanager/{DatasourceUID}/config/api/v1/alerts"),
+			requestmeta.SetOwner(requestmeta.TeamAlerting),
+			requestmeta.SetSLOGroup(requestmeta.SLOGroupHighSlow),
 			api.authorize(http.MethodGet, "/api/alertmanager/{DatasourceUID}/config/api/v1/alerts"),
 			metrics.Instrument(
 				http.MethodGet,
 				"/api/alertmanager/{DatasourceUID}/config/api/v1/alerts",
-				srv.RouteGetAlertingConfig,
+				api.Hooks.Wrap(srv.RouteGetAlertingConfig),
 				m,
 			),
 		)
 		group.Get(
 			toMacaronPath("/api/alertmanager/grafana/api/v2/alerts/groups"),
+			requestmeta.SetOwner(requestmeta.TeamAlerting),
+			requestmeta.SetSLOGroup(requestmeta.SLOGroupHighSlow),
 			api.authorize(http.MethodGet, "/api/alertmanager/grafana/api/v2/alerts/groups"),
 			metrics.Instrument(
 				http.MethodGet,
 				"/api/alertmanager/grafana/api/v2/alerts/groups",
-				srv.RouteGetGrafanaAMAlertGroups,
+				api.Hooks.Wrap(srv.RouteGetGrafanaAMAlertGroups),
 				m,
 			),
 		)
 		group.Get(
 			toMacaronPath("/api/alertmanager/grafana/api/v2/alerts"),
+			requestmeta.SetOwner(requestmeta.TeamAlerting),
+			requestmeta.SetSLOGroup(requestmeta.SLOGroupHighSlow),
 			api.authorize(http.MethodGet, "/api/alertmanager/grafana/api/v2/alerts"),
 			metrics.Instrument(
 				http.MethodGet,
 				"/api/alertmanager/grafana/api/v2/alerts",
-				srv.RouteGetGrafanaAMAlerts,
+				api.Hooks.Wrap(srv.RouteGetGrafanaAMAlerts),
 				m,
 			),
 		)
 		group.Get(
 			toMacaronPath("/api/alertmanager/grafana/api/v2/status"),
+			requestmeta.SetOwner(requestmeta.TeamAlerting),
+			requestmeta.SetSLOGroup(requestmeta.SLOGroupHighSlow),
 			api.authorize(http.MethodGet, "/api/alertmanager/grafana/api/v2/status"),
 			metrics.Instrument(
 				http.MethodGet,
 				"/api/alertmanager/grafana/api/v2/status",
-				srv.RouteGetGrafanaAMStatus,
+				api.Hooks.Wrap(srv.RouteGetGrafanaAMStatus),
 				m,
 			),
 		)
 		group.Get(
 			toMacaronPath("/api/alertmanager/grafana/config/api/v1/alerts"),
+			requestmeta.SetOwner(requestmeta.TeamAlerting),
+			requestmeta.SetSLOGroup(requestmeta.SLOGroupHighSlow),
 			api.authorize(http.MethodGet, "/api/alertmanager/grafana/config/api/v1/alerts"),
 			metrics.Instrument(
 				http.MethodGet,
 				"/api/alertmanager/grafana/config/api/v1/alerts",
-				srv.RouteGetGrafanaAlertingConfig,
+				api.Hooks.Wrap(srv.RouteGetGrafanaAlertingConfig),
+				m,
+			),
+		)
+		group.Get(
+			toMacaronPath("/api/alertmanager/grafana/config/history"),
+			requestmeta.SetOwner(requestmeta.TeamAlerting),
+			requestmeta.SetSLOGroup(requestmeta.SLOGroupHighSlow),
+			api.authorize(http.MethodGet, "/api/alertmanager/grafana/config/history"),
+			metrics.Instrument(
+				http.MethodGet,
+				"/api/alertmanager/grafana/config/history",
+				api.Hooks.Wrap(srv.RouteGetGrafanaAlertingConfigHistory),
 				m,
 			),
 		)
 		group.Get(
 			toMacaronPath("/api/alertmanager/grafana/config/api/v1/receivers"),
+			requestmeta.SetOwner(requestmeta.TeamAlerting),
+			requestmeta.SetSLOGroup(requestmeta.SLOGroupHighSlow),
 			api.authorize(http.MethodGet, "/api/alertmanager/grafana/config/api/v1/receivers"),
 			metrics.Instrument(
 				http.MethodGet,
 				"/api/alertmanager/grafana/config/api/v1/receivers",
-				srv.RouteGetGrafanaReceivers,
+				api.Hooks.Wrap(srv.RouteGetGrafanaReceivers),
 				m,
 			),
 		)
 		group.Get(
 			toMacaronPath("/api/alertmanager/grafana/api/v2/silence/{SilenceId}"),
+			requestmeta.SetOwner(requestmeta.TeamAlerting),
+			requestmeta.SetSLOGroup(requestmeta.SLOGroupHighSlow),
 			api.authorize(http.MethodGet, "/api/alertmanager/grafana/api/v2/silence/{SilenceId}"),
 			metrics.Instrument(
 				http.MethodGet,
 				"/api/alertmanager/grafana/api/v2/silence/{SilenceId}",
-				srv.RouteGetGrafanaSilence,
+				api.Hooks.Wrap(srv.RouteGetGrafanaSilence),
 				m,
 			),
 		)
 		group.Get(
 			toMacaronPath("/api/alertmanager/grafana/api/v2/silences"),
+			requestmeta.SetOwner(requestmeta.TeamAlerting),
+			requestmeta.SetSLOGroup(requestmeta.SLOGroupHighSlow),
 			api.authorize(http.MethodGet, "/api/alertmanager/grafana/api/v2/silences"),
 			metrics.Instrument(
 				http.MethodGet,
 				"/api/alertmanager/grafana/api/v2/silences",
-				srv.RouteGetGrafanaSilences,
+				api.Hooks.Wrap(srv.RouteGetGrafanaSilences),
 				m,
 			),
 		)
 		group.Get(
 			toMacaronPath("/api/alertmanager/{DatasourceUID}/api/v2/silence/{SilenceId}"),
+			requestmeta.SetOwner(requestmeta.TeamAlerting),
+			requestmeta.SetSLOGroup(requestmeta.SLOGroupHighSlow),
 			api.authorize(http.MethodGet, "/api/alertmanager/{DatasourceUID}/api/v2/silence/{SilenceId}"),
 			metrics.Instrument(
 				http.MethodGet,
 				"/api/alertmanager/{DatasourceUID}/api/v2/silence/{SilenceId}",
-				srv.RouteGetSilence,
+				api.Hooks.Wrap(srv.RouteGetSilence),
 				m,
 			),
 		)
 		group.Get(
 			toMacaronPath("/api/alertmanager/{DatasourceUID}/api/v2/silences"),
+			requestmeta.SetOwner(requestmeta.TeamAlerting),
+			requestmeta.SetSLOGroup(requestmeta.SLOGroupHighSlow),
 			api.authorize(http.MethodGet, "/api/alertmanager/{DatasourceUID}/api/v2/silences"),
 			metrics.Instrument(
 				http.MethodGet,
 				"/api/alertmanager/{DatasourceUID}/api/v2/silences",
-				srv.RouteGetSilences,
+				api.Hooks.Wrap(srv.RouteGetSilences),
 				m,
 			),
 		)
 		group.Post(
 			toMacaronPath("/api/alertmanager/{DatasourceUID}/api/v2/alerts"),
+			requestmeta.SetOwner(requestmeta.TeamAlerting),
+			requestmeta.SetSLOGroup(requestmeta.SLOGroupHighSlow),
 			api.authorize(http.MethodPost, "/api/alertmanager/{DatasourceUID}/api/v2/alerts"),
 			metrics.Instrument(
 				http.MethodPost,
 				"/api/alertmanager/{DatasourceUID}/api/v2/alerts",
-				srv.RoutePostAMAlerts,
+				api.Hooks.Wrap(srv.RoutePostAMAlerts),
 				m,
 			),
 		)
 		group.Post(
 			toMacaronPath("/api/alertmanager/{DatasourceUID}/config/api/v1/alerts"),
+			requestmeta.SetOwner(requestmeta.TeamAlerting),
+			requestmeta.SetSLOGroup(requestmeta.SLOGroupHighSlow),
 			api.authorize(http.MethodPost, "/api/alertmanager/{DatasourceUID}/config/api/v1/alerts"),
 			metrics.Instrument(
 				http.MethodPost,
 				"/api/alertmanager/{DatasourceUID}/config/api/v1/alerts",
-				srv.RoutePostAlertingConfig,
+				api.Hooks.Wrap(srv.RoutePostAlertingConfig),
 				m,
 			),
 		)
 		group.Post(
 			toMacaronPath("/api/alertmanager/grafana/config/api/v1/alerts"),
+			requestmeta.SetOwner(requestmeta.TeamAlerting),
+			requestmeta.SetSLOGroup(requestmeta.SLOGroupHighSlow),
 			api.authorize(http.MethodPost, "/api/alertmanager/grafana/config/api/v1/alerts"),
 			metrics.Instrument(
 				http.MethodPost,
 				"/api/alertmanager/grafana/config/api/v1/alerts",
-				srv.RoutePostGrafanaAlertingConfig,
+				api.Hooks.Wrap(srv.RoutePostGrafanaAlertingConfig),
+				m,
+			),
+		)
+		group.Post(
+			toMacaronPath("/api/alertmanager/grafana/config/history/{id}/_activate"),
+			requestmeta.SetOwner(requestmeta.TeamAlerting),
+			requestmeta.SetSLOGroup(requestmeta.SLOGroupHighSlow),
+			api.authorize(http.MethodPost, "/api/alertmanager/grafana/config/history/{id}/_activate"),
+			metrics.Instrument(
+				http.MethodPost,
+				"/api/alertmanager/grafana/config/history/{id}/_activate",
+				api.Hooks.Wrap(srv.RoutePostGrafanaAlertingConfigHistoryActivate),
 				m,
 			),
 		)
 		group.Post(
 			toMacaronPath("/api/alertmanager/grafana/config/api/v1/receivers/test"),
+			requestmeta.SetOwner(requestmeta.TeamAlerting),
+			requestmeta.SetSLOGroup(requestmeta.SLOGroupHighSlow),
 			api.authorize(http.MethodPost, "/api/alertmanager/grafana/config/api/v1/receivers/test"),
 			metrics.Instrument(
 				http.MethodPost,
 				"/api/alertmanager/grafana/config/api/v1/receivers/test",
-				srv.RoutePostTestGrafanaReceivers,
+				api.Hooks.Wrap(srv.RoutePostTestGrafanaReceivers),
+				m,
+			),
+		)
+		group.Post(
+			toMacaronPath("/api/alertmanager/grafana/config/api/v1/templates/test"),
+			requestmeta.SetOwner(requestmeta.TeamAlerting),
+			requestmeta.SetSLOGroup(requestmeta.SLOGroupHighSlow),
+			api.authorize(http.MethodPost, "/api/alertmanager/grafana/config/api/v1/templates/test"),
+			metrics.Instrument(
+				http.MethodPost,
+				"/api/alertmanager/grafana/config/api/v1/templates/test",
+				api.Hooks.Wrap(srv.RoutePostTestGrafanaTemplates),
 				m,
 			),
 		)

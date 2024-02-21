@@ -13,6 +13,7 @@ import (
 	"github.com/grafana/grafana/pkg/infra/localcache"
 	"github.com/grafana/grafana/pkg/infra/tracing"
 	"github.com/grafana/grafana/pkg/infra/usagestats"
+	"github.com/grafana/grafana/pkg/infra/usagestats/validator"
 	"github.com/grafana/grafana/pkg/services/alerting/models"
 	"github.com/grafana/grafana/pkg/services/annotations/annotationstest"
 	"github.com/grafana/grafana/pkg/services/dashboards"
@@ -118,12 +119,11 @@ func (a *AlertStoreMock) PauseAllAlerts(context.Context, *models.PauseAllAlertCo
 
 func TestEngineProcessJob(t *testing.T) {
 	usMock := &usagestats.UsageStatsMock{T: t}
+	usValidatorMock := &validator.FakeUsageStatsValidator{}
 
 	encProvider := encryptionprovider.ProvideEncryptionProvider()
 	cfg := setting.NewCfg()
-	settings := &setting.OSSImpl{Cfg: cfg}
-
-	encService, err := encryptionservice.ProvideEncryptionService(encProvider, usMock, settings)
+	encService, err := encryptionservice.ProvideEncryptionService(encProvider, usMock, cfg)
 	require.NoError(t, err)
 	tracer := tracing.InitializeTracerForTest()
 
@@ -131,10 +131,10 @@ func TestEngineProcessJob(t *testing.T) {
 	dsMock := &fd.FakeDataSourceService{
 		DataSources: []*datasources.DataSource{{ID: 1, Type: datasources.DS_PROMETHEUS}},
 	}
-	engine := ProvideAlertEngine(nil, nil, nil, usMock, encService, nil, tracer, store, setting.NewCfg(), nil, nil, localcache.New(time.Minute, time.Minute), dsMock, annotationstest.NewFakeAnnotationsRepo())
-	setting.AlertingEvaluationTimeout = 30 * time.Second
-	setting.AlertingNotificationTimeout = 30 * time.Second
-	setting.AlertingMaxAttempts = 3
+	engine := ProvideAlertEngine(nil, nil, nil, usMock, usValidatorMock, encService, nil, tracer, store, cfg, nil, nil, localcache.New(time.Minute, time.Minute), dsMock, annotationstest.NewFakeAnnotationsRepo())
+	cfg.AlertingEvaluationTimeout = 30 * time.Second
+	cfg.AlertingNotificationTimeout = 30 * time.Second
+	cfg.AlertingMaxAttempts = 3
 	engine.resultHandler = &FakeResultHandler{}
 	job := &Job{running: true, Rule: &Rule{}}
 
@@ -158,9 +158,9 @@ func TestEngineProcessJob(t *testing.T) {
 		t.Run("error + not last attempt -> retry", func(t *testing.T) {
 			engine.evalHandler = NewFakeEvalHandler(0)
 
-			for i := 1; i < setting.AlertingMaxAttempts; i++ {
+			for i := 1; i < cfg.AlertingMaxAttempts; i++ {
 				attemptChan := make(chan int, 1)
-				cancelChan := make(chan context.CancelFunc, setting.AlertingMaxAttempts)
+				cancelChan := make(chan context.CancelFunc, cfg.AlertingMaxAttempts)
 
 				engine.processJob(i, attemptChan, cancelChan, job)
 				nextAttemptID, more := <-attemptChan
@@ -174,9 +174,9 @@ func TestEngineProcessJob(t *testing.T) {
 		t.Run("error + last attempt -> no retry", func(t *testing.T) {
 			engine.evalHandler = NewFakeEvalHandler(0)
 			attemptChan := make(chan int, 1)
-			cancelChan := make(chan context.CancelFunc, setting.AlertingMaxAttempts)
+			cancelChan := make(chan context.CancelFunc, cfg.AlertingMaxAttempts)
 
-			engine.processJob(setting.AlertingMaxAttempts, attemptChan, cancelChan, job)
+			engine.processJob(cfg.AlertingMaxAttempts, attemptChan, cancelChan, job)
 			nextAttemptID, more := <-attemptChan
 
 			require.Equal(t, 0, nextAttemptID)
@@ -187,7 +187,7 @@ func TestEngineProcessJob(t *testing.T) {
 		t.Run("no error -> no retry", func(t *testing.T) {
 			engine.evalHandler = NewFakeEvalHandler(1)
 			attemptChan := make(chan int, 1)
-			cancelChan := make(chan context.CancelFunc, setting.AlertingMaxAttempts)
+			cancelChan := make(chan context.CancelFunc, cfg.AlertingMaxAttempts)
 
 			engine.processJob(1, attemptChan, cancelChan, job)
 			nextAttemptID, more := <-attemptChan
@@ -200,7 +200,7 @@ func TestEngineProcessJob(t *testing.T) {
 
 	t.Run("Should trigger as many retries as needed", func(t *testing.T) {
 		t.Run("never success -> max retries number", func(t *testing.T) {
-			expectedAttempts := setting.AlertingMaxAttempts
+			expectedAttempts := cfg.AlertingMaxAttempts
 			evalHandler := NewFakeEvalHandler(0)
 			engine.evalHandler = evalHandler
 
@@ -220,7 +220,7 @@ func TestEngineProcessJob(t *testing.T) {
 		})
 
 		t.Run("some errors before success -> some retries", func(t *testing.T) {
-			expectedAttempts := int(math.Ceil(float64(setting.AlertingMaxAttempts) / 2))
+			expectedAttempts := int(math.Ceil(float64(cfg.AlertingMaxAttempts) / 2))
 			evalHandler := NewFakeEvalHandler(expectedAttempts)
 			engine.evalHandler = evalHandler
 

@@ -11,13 +11,13 @@ import (
 	"github.com/grafana/grafana/pkg/infra/kvstore"
 	"github.com/grafana/grafana/pkg/infra/log"
 	"github.com/grafana/grafana/pkg/infra/usagestats"
-	"github.com/grafana/grafana/pkg/plugins"
 	ac "github.com/grafana/grafana/pkg/services/accesscontrol"
+	"github.com/grafana/grafana/pkg/services/auth/identity"
 	"github.com/grafana/grafana/pkg/services/featuremgmt"
-	"github.com/grafana/grafana/pkg/services/pluginsettings"
+	"github.com/grafana/grafana/pkg/services/pluginsintegration/pluginsettings"
+	"github.com/grafana/grafana/pkg/services/pluginsintegration/pluginstore"
 	"github.com/grafana/grafana/pkg/services/supportbundles"
 	"github.com/grafana/grafana/pkg/services/supportbundles/bundleregistry"
-	"github.com/grafana/grafana/pkg/services/user"
 	"github.com/grafana/grafana/pkg/setting"
 )
 
@@ -27,45 +27,48 @@ const (
 )
 
 type Service struct {
-	cfg            *setting.Cfg
-	store          bundleStore
-	pluginStore    plugins.Store
-	pluginSettings pluginsettings.Service
 	accessControl  ac.AccessControl
-	features       *featuremgmt.FeatureManager
 	bundleRegistry *bundleregistry.Service
+	cfg            *setting.Cfg
+	features       *featuremgmt.FeatureManager
+	pluginSettings pluginsettings.Service
+	pluginStore    pluginstore.Store
+	store          bundleStore
 
-	log log.Logger
+	log                  log.Logger
+	encryptionPublicKeys []string
 
 	enabled         bool
 	serverAdminOnly bool
 }
 
-func ProvideService(cfg *setting.Cfg,
-	bundleRegistry *bundleregistry.Service,
-	sql db.DB,
-	kvStore kvstore.KVStore,
+func ProvideService(
 	accessControl ac.AccessControl,
 	accesscontrolService ac.Service,
-	routeRegister routing.RouteRegister,
-	settings setting.Provider,
-	pluginStore plugins.Store,
-	pluginSettings pluginsettings.Service,
+	bundleRegistry *bundleregistry.Service,
+	cfg *setting.Cfg,
 	features *featuremgmt.FeatureManager,
 	httpServer *grafanaApi.HTTPServer,
+	kvStore kvstore.KVStore,
+	pluginSettings pluginsettings.Service,
+	pluginStore pluginstore.Store,
+	routeRegister routing.RouteRegister,
+	settings setting.Provider,
+	sql db.DB,
 	usageStats usagestats.Service) (*Service, error) {
 	section := cfg.SectionWithEnvOverrides("support_bundles")
 	s := &Service{
-		cfg:             cfg,
-		store:           newStore(kvStore),
-		pluginStore:     pluginStore,
-		pluginSettings:  pluginSettings,
-		accessControl:   accessControl,
-		features:        features,
-		bundleRegistry:  bundleRegistry,
-		log:             log.New("supportbundle.service"),
-		enabled:         section.Key("enabled").MustBool(true),
-		serverAdminOnly: section.Key("server_admin_only").MustBool(true),
+		accessControl:        accessControl,
+		bundleRegistry:       bundleRegistry,
+		cfg:                  cfg,
+		enabled:              section.Key("enabled").MustBool(true),
+		encryptionPublicKeys: section.Key("public_keys").Strings(" "),
+		features:             features,
+		log:                  log.New("supportbundle.service"),
+		pluginSettings:       pluginSettings,
+		pluginStore:          pluginStore,
+		serverAdminOnly:      section.Key("server_admin_only").MustBool(true),
+		store:                newStore(kvStore),
 	}
 
 	usageStats.RegisterMetricsFunc(s.getUsageStats)
@@ -74,10 +77,8 @@ func ProvideService(cfg *setting.Cfg,
 		return s, nil
 	}
 
-	if !accessControl.IsDisabled() {
-		if err := s.declareFixedRoles(accesscontrolService); err != nil {
-			return nil, err
-		}
+	if err := s.declareFixedRoles(accesscontrolService); err != nil {
+		return nil, err
 	}
 
 	s.registerAPIEndpoints(httpServer, routeRegister)
@@ -108,7 +109,7 @@ func (s *Service) Run(ctx context.Context) error {
 	return ctx.Err()
 }
 
-func (s *Service) create(ctx context.Context, collectors []string, usr *user.SignedInUser) (*supportbundles.Bundle, error) {
+func (s *Service) create(ctx context.Context, collectors []string, usr identity.Requester) (*supportbundles.Bundle, error) {
 	bundle, err := s.store.Create(ctx, usr)
 	if err != nil {
 		return nil, err
@@ -118,7 +119,7 @@ func (s *Service) create(ctx context.Context, collectors []string, usr *user.Sig
 		ctx, cancel := context.WithTimeout(context.Background(), bundleCreationTimeout)
 		defer func() {
 			if err := recover(); err != nil {
-				s.log.Error("support bundle collection panic", "err", err)
+				s.log.Error("Support bundle collection panic", "err", err)
 			}
 			cancel()
 		}()
@@ -156,14 +157,14 @@ func (s *Service) remove(ctx context.Context, uid string) error {
 func (s *Service) cleanup(ctx context.Context) {
 	bundles, err := s.list(ctx)
 	if err != nil {
-		s.log.Error("failed to list bundles to clean up", "error", err)
+		s.log.Error("Failed to list bundles to clean up", "error", err)
 	}
 
 	if err == nil {
 		for _, b := range bundles {
 			if time.Now().Unix() >= b.ExpiresAt {
 				if err := s.remove(ctx, b.UID); err != nil {
-					s.log.Error("failed to cleanup bundle", "error", err)
+					s.log.Error("Failed to cleanup bundle", "error", err)
 				}
 			}
 		}
@@ -175,7 +176,7 @@ func (s *Service) getUsageStats(ctx context.Context) (map[string]interface{}, er
 
 	count, err := s.store.StatsCount(ctx)
 	if err != nil {
-		s.log.Warn("unable to get support bundle counter", "error", err)
+		s.log.Warn("Unable to get support bundle counter", "error", err)
 	}
 
 	m["stats.bundles.count"] = count

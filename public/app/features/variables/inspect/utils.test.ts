@@ -1,4 +1,4 @@
-import { PanelModel } from 'app/features/dashboard/state';
+import { DashboardModel, PanelModel } from 'app/features/dashboard/state';
 
 import { variableAdapters } from '../adapters';
 import { createCustomVariableAdapter } from '../custom/adapter';
@@ -6,7 +6,13 @@ import { createDataSourceVariableAdapter } from '../datasource/adapter';
 import { createQueryVariableAdapter } from '../query/adapter';
 import { createGraph } from '../state/actions';
 
-import { flattenPanels, getAllAffectedPanelIdsForVariableChange, getPanelVars, getPropsWithVariable } from './utils';
+import {
+  flattenPanels,
+  getAllAffectedPanelIdsForVariableChange,
+  getPanelVars,
+  getPropsWithVariable,
+  getVariableName,
+} from './utils';
 
 describe('getPropsWithVariable', () => {
   it('when called it should return the correct graph', () => {
@@ -303,7 +309,21 @@ describe('flattenPanels', () => {
   });
 });
 
-const dashWithRepeatsAndRows: any = {
+describe('getVariableName', () => {
+  it('should return undefined if no match is found', () => {
+    expect(getVariableName('no variable here')).toBeUndefined();
+  });
+
+  it('should return undefined if variable matches inherited object prop names', () => {
+    expect(getVariableName('${toString}')).toBeUndefined();
+  });
+
+  it('should return the variable name if it exists and does not match inherited object prop names', () => {
+    expect(getVariableName('${myVariable}')).toBe('myVariable');
+  });
+});
+
+const dashWithRepeatsAndRows = {
   annotations: {
     list: [
       {
@@ -1163,9 +1183,9 @@ const dashWithRepeatsAndRows: any = {
   title: 'Variables update POC',
   uid: 'tISItwInz',
   version: 2,
-};
+} as unknown as DashboardModel;
 
-const dashWithTemplateDependenciesAndPanels: any = {
+const dashWithTemplateDependenciesAndPanels = {
   annotations: {
     list: [
       {
@@ -1662,9 +1682,9 @@ const dashWithTemplateDependenciesAndPanels: any = {
   title: 'Variables dependencies update POC',
   uid: 'n60iRMNnk',
   version: 6,
-};
+} as unknown as DashboardModel;
 
-const dashWithAllVariables: any = {
+const dashWithAllVariables = {
   annotations: {
     list: [
       {
@@ -1967,4 +1987,4 @@ const dashWithAllVariables: any = {
   uid: 'XkBHMzF7z',
   version: 6,
   weekStart: '',
-};
+} as unknown as DashboardModel;

@@ -4,6 +4,7 @@ import { AlertQuery } from 'app/types/unified-alerting-dto';
 
 import {
   checkForPathSeparator,
+  findRenamedDataQueryReferences,
   getThresholdsForQueries,
   queriesWithUpdatedReferences,
   updateMathExpressionRefs,
@@ -244,12 +245,12 @@ describe('checkForPathSeparator', () => {
 
 describe('getThresholdsForQueries', () => {
   it('should work for threshold condition', () => {
-    const queries = createThresholdExample('gt');
-    expect(getThresholdsForQueries(queries)).toMatchSnapshot();
+    const [queries, condition] = createThresholdExample('gt');
+    expect(getThresholdsForQueries(queries, condition)).toMatchSnapshot();
   });
 
   it('should work for classic_condition', () => {
-    const [dataQuery] = createThresholdExample('gt');
+    const [[dataQuery]] = createThresholdExample('gt');
 
     const classicCondition = {
       refId: 'B',
@@ -281,29 +282,81 @@ describe('getThresholdsForQueries', () => {
       },
     };
 
-    const thresholdsClassic = getThresholdsForQueries([dataQuery, classicCondition]);
+    const thresholdsClassic = getThresholdsForQueries([dataQuery, classicCondition], classicCondition.refId);
     expect(thresholdsClassic).toMatchSnapshot();
   });
 
+  it('should not throw if no refId exists', () => {
+    const dataQuery: AlertQuery = {
+      refId: 'A',
+      datasourceUid: 'abc123',
+      queryType: '',
+      relativeTimeRange: {
+        from: 600,
+        to: 0,
+      },
+      model: {
+        refId: 'A',
+      },
+    };
+
+    const classicCondition = {
+      refId: 'B',
+      datasourceUid: '__expr__',
+      queryType: '',
+      model: {
+        refId: 'B',
+        type: 'classic_conditions',
+        datasource: ExpressionDatasourceRef,
+        conditions: [
+          {
+            type: 'query',
+            evaluator: {
+              params: [0],
+              type: 'gt',
+            },
+            operator: {
+              type: 'and',
+            },
+            query: {
+              params: [''],
+            },
+            reducer: {
+              params: [],
+              type: 'last',
+            },
+          },
+        ],
+      },
+    };
+
+    expect(() => {
+      const thresholds = getThresholdsForQueries([dataQuery, classicCondition], classicCondition.refId);
+      expect(thresholds).toStrictEqual({});
+    }).not.toThrowError();
+  });
+
   it('should work for within_range', () => {
-    const queries = createThresholdExample('within_range');
-    const thresholds = getThresholdsForQueries(queries);
+    const [queries, condition] = createThresholdExample('within_range');
+    const thresholds = getThresholdsForQueries(queries, condition);
     expect(thresholds).toMatchSnapshot();
   });
 
   it('should work for lt and gt', () => {
-    expect(getThresholdsForQueries(createThresholdExample('gt'))).toMatchSnapshot();
-    expect(getThresholdsForQueries(createThresholdExample('lt'))).toMatchSnapshot();
+    const [gtQueries, qtCondition] = createThresholdExample('gt');
+    const [ltQueries, ltCondition] = createThresholdExample('lt');
+    expect(getThresholdsForQueries(gtQueries, qtCondition)).toMatchSnapshot();
+    expect(getThresholdsForQueries(ltQueries, ltCondition)).toMatchSnapshot();
   });
 
   it('should work for outside_range', () => {
-    const queries = createThresholdExample('outside_range');
-    const thresholds = getThresholdsForQueries(queries);
+    const [queries, condition] = createThresholdExample('outside_range');
+    const thresholds = getThresholdsForQueries(queries, condition);
     expect(thresholds).toMatchSnapshot();
   });
 });
 
-function createThresholdExample(thresholdType: string): AlertQuery[] {
+function createThresholdExample(thresholdType: string): [AlertQuery[], string] {
   const dataQuery: AlertQuery = {
     refId: 'A',
     datasourceUid: 'abc123',
@@ -346,21 +399,41 @@ function createThresholdExample(thresholdType: string): AlertQuery[] {
             params: [0, 10],
             type: thresholdType ?? 'gt',
           },
-          operator: {
-            type: 'and',
-          },
-          query: {
-            params: ['B'],
-          },
-          reducer: {
-            params: [],
-            type: 'last',
-          },
         },
       ],
       expression: 'B',
     },
   };
 
-  return [dataQuery, reduceExpression, thresholdExpression];
+  return [[dataQuery, reduceExpression, thresholdExpression], thresholdExpression.refId];
 }
+
+describe('findRenamedReferences', () => {
+  it('should find the renamed ids', () => {
+    const previous = [{ refId: 'A' }, { refId: 'B' }, { refId: 'C' }] as AlertQuery[];
+    const updated = [{ refId: 'FOO' }, { refId: 'B' }, { refId: 'C' }] as AlertQuery[];
+
+    expect(findRenamedDataQueryReferences(previous, updated)).toEqual(['A', 'FOO']);
+  });
+
+  it('should ignore expression queries', () => {
+    // @ts-expect-error
+    const previous = [
+      { refId: 'A' },
+      { refId: 'REDUCE', model: { datasource: '-100' } },
+      { refId: 'MATH', model: { datasource: '-100' } },
+      { refId: 'B' },
+      { refId: 'C' },
+    ] as AlertQuery[];
+
+    // @ts-expect-error
+    const updated = [
+      { refId: 'FOO' },
+      { refId: 'REDUCE', model: { datasource: '-100' } },
+      { refId: 'B' },
+      { refId: 'C' },
+    ] as AlertQuery[];
+
+    expect(findRenamedDataQueryReferences(previous, updated)).toEqual(['A', 'FOO']);
+  });
+});

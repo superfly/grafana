@@ -55,9 +55,9 @@ export interface OptionPaneRenderProps {
   plugin: PanelPlugin;
   data?: PanelData;
   dashboard: DashboardModel;
-  instanceState: any;
-  onPanelConfigChange: (configKey: keyof PanelModel, value: any) => void;
-  onPanelOptionsChanged: (options: any) => void;
+  instanceState: unknown;
+  onPanelConfigChange: <T extends keyof PanelModel>(configKey: T, value: PanelModel[T]) => void;
+  onPanelOptionsChanged: (options: PanelModel['options']) => void;
   onFieldConfigsChange: (config: FieldConfigSource) => void;
 }
 
@@ -72,4 +72,5 @@ export enum VisualizationSelectPaneTab {
   Visualizations,
   LibraryPanels,
   Suggestions,
+  Widgets,
 }

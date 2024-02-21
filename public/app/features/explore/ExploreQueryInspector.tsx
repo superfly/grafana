@@ -1,32 +1,45 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { connect, ConnectedProps } from 'react-redux';
 
-import { CoreApp, TimeZone } from '@grafana/data';
+import { CoreApp, LoadingState } from '@grafana/data';
 import { reportInteraction } from '@grafana/runtime/src';
+import { defaultTimeZone, TimeZone } from '@grafana/schema';
 import { TabbedContainer, TabConfig } from '@grafana/ui';
+import { requestIdGenerator } from 'app/core/utils/explore';
 import { ExploreDrawer } from 'app/features/explore/ExploreDrawer';
 import { InspectDataTab } from 'app/features/inspector/InspectDataTab';
 import { InspectErrorTab } from 'app/features/inspector/InspectErrorTab';
 import { InspectJSONTab } from 'app/features/inspector/InspectJSONTab';
 import { InspectStatsTab } from 'app/features/inspector/InspectStatsTab';
 import { QueryInspector } from 'app/features/inspector/QueryInspector';
-import { StoreState, ExploreItemState, ExploreId } from 'app/types';
+import { mixedRequestId } from 'app/plugins/datasource/mixed/MixedDataSource';
+import { StoreState, ExploreItemState } from 'app/types';
+
+import { GetDataOptions } from '../query/state/PanelQueryRunner';
 
 import { runQueries } from './state/query';
 
 interface DispatchProps {
   width: number;
-  exploreId: ExploreId;
+  exploreId: string;
   timeZone: TimeZone;
   onClose: () => void;
+  isMixed: boolean;
 }
 
 type Props = DispatchProps & ConnectedProps<typeof connector>;
 
 export function ExploreQueryInspector(props: Props) {
-  const { loading, width, onClose, queryResponse, timeZone } = props;
+  const { width, onClose, queryResponse, timeZone, isMixed, exploreId } = props;
+  const [dataOptions, setDataOptions] = useState<GetDataOptions>({
+    withTransforms: false,
+    withFieldConfig: true,
+  });
   const dataFrames = queryResponse?.series || [];
-  const error = queryResponse?.error;
+  let errors = queryResponse?.errors;
+  if (!errors?.length && queryResponse?.error) {
+    errors = [queryResponse.error];
+  }
 
   useEffect(() => {
     reportInteraction('grafana_explore_query_inspector_opened');
@@ -36,7 +49,7 @@ export function ExploreQueryInspector(props: Props) {
     label: 'Stats',
     value: 'stats',
     icon: 'chart-line',
-    content: <InspectStatsTab data={queryResponse!} timeZone={queryResponse?.request?.timezone as TimeZone} />,
+    content: <InspectStatsTab data={queryResponse!} timeZone={queryResponse?.request?.timezone ?? defaultTimeZone} />,
   };
 
   const jsonTab: TabConfig = {
@@ -53,10 +66,13 @@ export function ExploreQueryInspector(props: Props) {
     content: (
       <InspectDataTab
         data={dataFrames}
-        isLoading={loading}
-        options={{ withTransforms: false, withFieldConfig: false }}
+        dataName={'Explore'}
+        isLoading={queryResponse.state === LoadingState.Loading}
+        options={dataOptions}
         timeZone={timeZone}
         app={CoreApp.Explore}
+        formattedDataDescription="Matches the format in the panel"
+        onOptionsChange={setDataOptions}
       />
     ),
   };
@@ -65,16 +81,22 @@ export function ExploreQueryInspector(props: Props) {
     label: 'Query',
     value: 'query',
     icon: 'info-circle',
-    content: <QueryInspector data={dataFrames} onRefreshQuery={() => props.runQueries(props.exploreId)} />,
+    content: (
+      <QueryInspector
+        instanceId={isMixed ? mixedRequestId(0, requestIdGenerator(exploreId)) : requestIdGenerator(exploreId)}
+        data={queryResponse}
+        onRefreshQuery={() => props.runQueries({ exploreId })}
+      />
+    ),
   };
 
   const tabs = [statsTab, queryTab, jsonTab, dataTab];
-  if (error) {
+  if (errors?.length) {
     const errorTab: TabConfig = {
       label: 'Error',
       value: 'error',
       icon: 'exclamation-triangle',
-      content: <InspectErrorTab error={error} />,
+      content: <InspectErrorTab errors={errors} />,
     };
     tabs.push(errorTab);
   }
@@ -85,13 +107,12 @@ export function ExploreQueryInspector(props: Props) {
   );
 }
 
-function mapStateToProps(state: StoreState, { exploreId }: { exploreId: ExploreId }) {
+function mapStateToProps(state: StoreState, { exploreId }: { exploreId: string }) {
   const explore = state.explore;
-  const item: ExploreItemState = explore[exploreId]!;
-  const { loading, queryResponse } = item;
+  const item: ExploreItemState = explore.panes[exploreId]!;
+  const { queryResponse } = item;
 
   return {
-    loading,
     queryResponse,
   };
 }

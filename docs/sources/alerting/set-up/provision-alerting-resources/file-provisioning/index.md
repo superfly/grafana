@@ -1,6 +1,7 @@
 ---
 aliases:
   - ../../provision-alerting-resources/file-provisioning/
+canonical: https://grafana.com/docs/grafana/latest/alerting/set-up/provision-alerting-resources/file-provisioning/
 description: Create and manage resources using file provisioning
 keywords:
   - grafana
@@ -8,38 +9,45 @@ keywords:
   - alerting resources
   - file provisioning
   - provisioning
-title: Create and manage alerting resources using file provisioning
+labels:
+  products:
+    - enterprise
+    - oss
+menuTitle: Use configuration files to provision
+title: Use configuration files to provision alerting resources
 weight: 100
 ---
 
-## Create and manage alerting resources using file provisioning
+# Use configuration files to provision alerting resources
 
-Provision your alerting resources using files from disk. When you start Grafana, the data from these files is created in your Grafana system. Grafana adds any new resources you created, updates any that you changed, and deletes old ones.
+Manage your alerting resources using files from disk. When you start Grafana, the data from these files is created in your Grafana system. Grafana adds any new resources you created, updates any that you changed, and deletes old ones.
 
 Arrange your files in a directory in a way that best suits your use case. For example, you can choose a team-based layout where every team has its own file, you can have one big file for all your teams; or you can have one file per resource type.
 
 Details on how to set up the files and which fields are required for each object are listed below depending on which resource you are provisioning.
 
-**Note:**
+For a complete guide about how Grafana provisions resources, refer to the [Provision Grafana][provisioning] documentation.
 
-Provisioning takes place during the initial set up of your Grafana system, but you can re-run it at any time using the [Grafana Admin API](https://grafana.com/docs/grafana/latest/developers/http_api/admin/#reload-provisioning-configurations).
+{{< admonition type="note" >}}
 
-### Provision alert rules
+- You cannot edit provisioned resources from files in Grafana. You can only change the resource properties by changing the provisioning file and restarting Grafana or carrying out a hot reload. This prevents changes being made to the resource that would be overwritten if a file is provisioned again or a hot reload is carried out.
+
+- Importing takes place during the initial set up of your Grafana system, but you can re-run it at any time using the [Grafana Admin API][reload-provisioning-configurations].
+
+- Importing an existing alerting resource results in a conflict. First, when present, remove the resources you plan to import.
+  {{< /admonition >}}
+
+## Import alert rules
 
 Create or delete alert rules in your Grafana instance(s).
 
 1. Create alert rules in Grafana.
-1. Use the [Alerting provisioning API](https://grafana.com/docs/grafana/latest/developers/http_api/alerting_provisioning/#route-get-alert-rule-export) export endpoints to download a provisioning file for your alert rules.
-1. Copy the contents into a YAML or JSON configuration file in the default provisioning directory or in your configured directory.
+1. [Export][alerting_export] and download a provisioning file for your alert rules.
+1. Copy the contents into a YAML or JSON configuration file in the `provisioning/alerting` directory.
 
    Example configuration files can be found below.
 
-1. Ensure that your files are in the right directory on the node running the Grafana server, so that they deploy alongside your Grafana instance(s).
-1. Delete the alert rules in Grafana that will be provisioned.
-
-   **Note:**
-
-   If you do not delete the alert rule, it will clash with the provisioned alert rule once uploaded.
+1. Add the file(s) to your GitOps workflow, so that they deploy alongside your Grafana instance(s).
 
 Here is an example of a configuration file for creating alert rules.
 
@@ -59,14 +67,14 @@ groups:
     interval: 60s
     # <list, required> list of rules that are part of the rule group
     rules:
-      # <string, required> unique identifier for the rule
+      # <string, required> unique identifier for the rule. Should not exceed 40 symbols. Only letters, numbers, - (hyphen), and _ (underscore) allowed.
       - uid: my_id_1
         # <string, required> title of the rule that will be displayed in the UI
         title: my_first_rule
         # <string, required> which query should be used for the condition
         condition: A
         # <list, required> list of query objects that should be executed on each
-        #                  evaluation - should be obtained trough the API
+        #                  evaluation - should be obtained through the API
         data:
           - refId: A
             datasourceUid: '__expr__'
@@ -102,6 +110,7 @@ groups:
         # <string> the state the alert rule will have when the query execution
         #          failed - possible values: "Error", "Alerting", "OK"
         #          default = Alerting
+        execErrState: Alerting
         # <duration, required> for how long should the alert fire before alerting
         for: 60s
         # <map<string, string>> a map of strings to pass around any data
@@ -127,11 +136,13 @@ deleteRules:
     uid: my_id_1
 ```
 
-### Provision contact points
+## Import contact points
 
 Create or delete contact points in your Grafana instance(s).
 
-1. Create a YAML or JSON configuration file.
+1. Create a contact point in Grafana.
+1. [Export][alerting_export] and download a provisioning file for your contact point.
+1. Copy the contents into a YAML or JSON configuration file in the `provisioning/alerting` directory.
 
    Example configuration files can be found below.
 
@@ -150,10 +161,12 @@ contactPoints:
     # <string, required> name of the contact point
     name: cp_1
     receivers:
-      # <string, required> unique identifier for the receiver
+      # <string, required> unique identifier for the receiver. Should not exceed 40 symbols. Only letters, numbers, - (hyphen), and _ (underscore) allowed.
       - uid: first_uid
         # <string, required> type of the receiver
         type: prometheus-alertmanager
+        # <bool, optional> Disable the additional [Incident Resolved] follow-up alert, default = false
+        disableResolveMessage: false
         # <object, required> settings for the specific receiver type
         settings:
           url: http://test:9000
@@ -173,12 +186,14 @@ deleteContactPoints:
     uid: first_uid
 ```
 
-#### Settings
+### Settings
 
 Here are some examples of settings you can use for the different
 contact point integrations.
 
-##### Alertmanager
+{{< collapse title="Alertmanager" >}}
+
+#### Alertmanager
 
 ```yaml
 type: prometheus-alertmanager
@@ -191,7 +206,11 @@ settings:
   basicAuthPassword: abc123
 ```
 
-##### DingDing
+{{< /collapse >}}
+
+{{< collapse title="DingDing" >}}
+
+#### DingDing
 
 ```yaml
 type: dingding
@@ -205,7 +224,11 @@ settings:
     {{ template "default.message" . }}
 ```
 
-##### Discord
+{{< /collapse >}}
+
+{{< collapse title="Discord" >}}
+
+#### Discord
 
 ```yaml
 type: discord
@@ -221,7 +244,11 @@ settings:
     {{ template "default.message" . }}
 ```
 
-##### E-Mail
+{{< /collapse >}}
+
+{{< collapse title="E-Mail" >}}
+
+#### E-Mail
 
 ```yaml
 type: email
@@ -237,7 +264,11 @@ settings:
     {{ template "default.title" . }}
 ```
 
-##### Google Hangouts Chat
+{{< /collapse >}}
+
+{{< collapse title="Google Chat" >}}
+
+#### Google Chat
 
 ```yaml
 type: googlechat
@@ -249,7 +280,11 @@ settings:
     {{ template "default.message" . }}
 ```
 
-##### Kafka
+{{< /collapse >}}
+
+{{< collapse title="Kafka" >}}
+
+#### Kafka
 
 ```yaml
 type: kafka
@@ -260,7 +295,11 @@ settings:
   kafkaTopic: topic1
 ```
 
-##### LINE
+{{< /collapse >}}
+
+{{< collapse title="LINE" >}}
+
+#### LINE
 
 ```yaml
 type: line
@@ -269,7 +308,11 @@ settings:
   token: xxx
 ```
 
-##### Microsoft Teams
+{{< /collapse >}}
+
+{{< collapse title="Microsoft Teams" >}}
+
+#### Microsoft Teams
 
 ```yaml
 type: teams
@@ -286,7 +329,11 @@ settings:
     {{ template "default.message" . }}
 ```
 
-##### OpsGenie
+{{< /collapse >}}
+
+{{< collapse title="OpsGenie" >}}
+
+#### OpsGenie
 
 ```yaml
 type: opsgenie
@@ -308,7 +355,11 @@ settings:
   sendTagsAs: both
 ```
 
-##### PagerDuty
+{{< /collapse >}}
+
+{{< collapse title="PagerDuty" >}}
+
+#### PagerDuty
 
 ```yaml
 type: pagerduty
@@ -328,7 +379,11 @@ settings:
     {{ template "default.message" . }}
 ```
 
-##### Pushover
+{{< /collapse >}}
+
+{{< collapse title="Pushover" >}}
+
+#### Pushover
 
 ```yaml
 type: pushover
@@ -345,6 +400,8 @@ settings:
   retry: '30'
   # <string>
   expire: '120'
+  # <string> the number of seconds before a message expires and is deleted automatically. Examples: 10s, 5m30s, 8h.
+  ttl:
   # <string>
   sound: siren
   # <string>
@@ -354,7 +411,11 @@ settings:
     {{ template "default.message" . }}
 ```
 
-##### Slack
+{{< /collapse >}}
+
+{{< collapse title="Slack" >}}
+
+#### Slack
 
 ```yaml
 type: slack
@@ -386,7 +447,11 @@ settings:
     {{ template "slack.default.text" . }}
 ```
 
-##### Sensu Go
+{{< /collapse >}}
+
+{{< collapse title="Sensu Go" >}}
+
+#### Sensu Go
 
 ```yaml
 type: sensugo
@@ -408,7 +473,11 @@ settings:
     {{ template "default.message" . }}
 ```
 
-##### Telegram
+{{< /collapse >}}
+
+{{< collapse title="Telegram" >}}
+
+#### Telegram
 
 ```yaml
 type: telegram
@@ -422,7 +491,11 @@ settings:
     {{ template "default.message" . }}
 ```
 
-##### Threema Gateway
+{{< /collapse >}}
+
+{{< collapse title="Threema Gateway" >}}
+
+#### Threema Gateway
 
 ```yaml
 type: threema
@@ -435,7 +508,11 @@ settings:
   recipient_id: A9R4KL4S
 ```
 
-##### VictorOps
+{{< /collapse >}}
+
+{{< collapse title="VictorOps" >}}
+
+#### VictorOps
 
 ```yaml
 type: victorops
@@ -446,7 +523,11 @@ settings:
   messageType: CRITICAL
 ```
 
-##### Webhook
+{{< /collapse >}}
+
+{{< collapse title="Webhook" >}}
+
+#### Webhook
 
 ```yaml
 type: webhook
@@ -467,7 +548,11 @@ settings:
   maxAlerts: '10'
 ```
 
-##### WeCom
+{{< /collapse >}}
+
+{{< collapse title="WeCom" >}}
+
+#### WeCom
 
 ```yaml
 type: wecom
@@ -482,17 +567,29 @@ settings:
     {{ template "default.title" . }}
 ```
 
-### Provision notification policies
+{{< /collapse >}}
 
-Create or reset notification policies in your Grafana instance(s).
+## Import notification policies
 
-1. Create a YAML or JSON configuration file.
+Create or reset the notification policy tree in your Grafana instance(s).
+
+In Grafana, the entire notification policy tree is considered a single, large resource. Add new specific policies as sub-policies under the root policy. Since specific policies may depend on each other, you cannot provision subsets of the policy tree; the entire tree must be defined in a single place.
+
+{{% admonition type="warning" %}}
+
+Since the policy tree is a single resource, provisioning it will overwrite a policy tree created through any other means.
+
+{{< /admonition >}}
+
+1. Create a notification policy in Grafana.
+1. [Export][alerting_export] and download a provisioning file for your notification policy.
+1. Copy the contents into a YAML or JSON configuration file in the `provisioning/alerting` directory.
 
    Example configuration files can be found below.
 
-2. Add the file(s) to your GitOps workflow, so that they deploy alongside your Grafana instance(s).
+1. Add the file(s) to your GitOps workflow, so that they deploy alongside your Grafana instance(s).
 
-Here is an example of a configuration file for creating notification policiies.
+Here is an example of a configuration file for creating notification policies.
 
 ```yaml
 # config file version
@@ -546,12 +643,16 @@ policies:
     # <duration>  How long to wait before sending a notification again if it has already
     #             been sent successfully for an alert. (Usually ~3h or more), default = 4h
     repeat_interval: 4h
-    # <list> Zero or more child routes
+    # <list> Zero or more child policies. The schema is the same as the root policy.
     # routes:
-    # ...
+    #   # Another recursively nested policy...
+    #   - receiver: another-receiver
+    #     matchers:
+    #       - ...
+    #     ...
 ```
 
-Here is an example of a configuration file for resetting notification policies.
+Here is an example of a configuration file for resetting the policy tree back to its default value:
 
 ```yaml
 # config file version
@@ -562,7 +663,7 @@ resetPolicies:
   - 1
 ```
 
-### Provision templates
+## Import templates
 
 Create or delete templates in your Grafana instance(s).
 
@@ -570,7 +671,7 @@ Create or delete templates in your Grafana instance(s).
 
    Example configuration files can be found below.
 
-2. Add the file(s) to your GitOps workflow, so that they deploy alongside your Grafana instance(s).
+1. Add the file(s) to your GitOps workflow, so that they deploy alongside your Grafana instance(s).
 
 Here is an example of a configuration file for creating templates.
 
@@ -581,7 +682,7 @@ apiVersion: 1
 # List of templates to import or update
 templates:
   # <int> organization ID, default = 1
-  - orgID: 1
+  - orgId: 1
     # <string, required> name of the template, must be unique
     name: my_first_template
     # <string, required> content of the the template
@@ -602,7 +703,7 @@ deleteTemplates:
     name: my_first_template
 ```
 
-### Provision mute timings
+## Import mute timings
 
 Create or delete mute timings in your Grafana instance(s).
 
@@ -630,6 +731,7 @@ muteTimes:
       - times:
           - start_time: '06:00'
             end_time: '23:59'
+        location: 'UTC'
         weekdays: ['monday:wednesday', 'saturday', 'sunday']
         months: ['1:3', 'may:august', 'december']
         years: ['2020:2022', '2030']
@@ -650,57 +752,70 @@ deleteMuteTimes:
     name: mti_1
 ```
 
-### File provisioning using Kubernetes
+## File provisioning using Kubernetes
 
 If you are a Kubernetes user, you can leverage file provisioning using Kubernetes configuration maps.
 
 1. Create one or more configuration maps as follows.
 
-```yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: grafana-alerting
-data:
-  provisioning.yaml: |
-    templates:
-    - name: my_first_template
-      template: the content for my template
-```
+   ```yaml
+   apiVersion: v1
+   kind: ConfigMap
+   metadata:
+     name: grafana-alerting
+   data:
+     provisioning.yaml: |
+       templates:
+       - name: my_first_template
+         template: the content for my template
+   ```
 
-2. Add the file(s) to your GitOps workflow, so that they deploy alongside your Grafana instance(s).
+1. Add the file(s) to your GitOps workflow, so that they deploy alongside your Grafana instance(s).
 
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: grafana
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: grafana
-  template:
-    metadata:
-      name: grafana
-      labels:
-        app: grafana
-    spec:
-      containers:
-        - name: grafana
-          image: grafana/grafana:latest
-          ports:
-            - name: grafana
-              containerPort: 3000
-          volumeMounts:
-            - mountPath: /etc/grafana/provisioning/alerting
-              name: grafana-alerting
-              readOnly: false
-      volumes:
-        - name: grafana-alerting
-          configMap:
-            defaultMode: 420
-            name: grafana-alerting
-```
+   ```yaml
+   apiVersion: apps/v1
+   kind: Deployment
+   metadata:
+     name: grafana
+   spec:
+     replicas: 1
+     selector:
+       matchLabels:
+         app: grafana
+     template:
+       metadata:
+         name: grafana
+         labels:
+           app: grafana
+       spec:
+         containers:
+           - name: grafana
+             image: grafana/grafana:latest
+             ports:
+               - name: grafana
+                 containerPort: 3000
+             volumeMounts:
+               - mountPath: /etc/grafana/provisioning/alerting
+                 name: grafana-alerting
+                 readOnly: false
+         volumes:
+           - name: grafana-alerting
+             configMap:
+               defaultMode: 420
+               name: grafana-alerting
+   ```
 
-This eliminates the need for a persistent database to use Grafana Alerting in Kubernetes; all your provisioned resources appear after each restart or re-deployment.
+This eliminates the need for a persistent database to use Grafana Alerting in Kubernetes; all your provisioned resources appear after each restart or re-deployment. Grafana still requires a database for normal operation, you do not need to persist the contents of the database between restarts if all objects are provisioned using files.
+
+**Useful Links:**
+
+[Grafana provisioning][provisioning]
+
+{{% docs/reference %}}
+[alerting_export]: "/docs/grafana/ -> /docs/grafana/<GRAFANA_VERSION>/alerting/set-up/provision-alerting-resources/export-alerting-resources"
+[alerting_export]: "/docs/grafana-cloud/ -> /docs/grafana-cloud/alerting-and-irm/alerting/set-up/provision-alerting-resources/export-alerting-resources"
+
+[provisioning]: "/docs/ -> /docs/grafana/<GRAFANA_VERSION>/administration/provisioning"
+
+[reload-provisioning-configurations]: "/docs/ -> /docs/grafana/<GRAFANA_VERSION>/developers/http_api/admin#reload-provisioning-configurations"
+{{% /docs/reference %}}

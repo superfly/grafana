@@ -32,7 +32,7 @@ func (s *sqlStore) Get(ctx context.Context, query *pref.Preference) (*pref.Prefe
 
 func (s *sqlStore) List(ctx context.Context, query *pref.Preference) ([]*pref.Preference, error) {
 	prefs := make([]*pref.Preference, 0)
-	params := make([]interface{}, 0)
+	params := make([]any, 0)
 	filter := ""
 
 	if len(query.Teams) > 0 {
@@ -73,7 +73,8 @@ func (s *sqlStore) Insert(ctx context.Context, cmd *pref.Preference) (int64, err
 	var ID int64
 	var err error
 	err = s.db.WithTransactionalDbSession(ctx, func(sess *db.Session) error {
-		ID, err = sess.Insert(cmd)
+		_, err = sess.Insert(cmd)
+		ID = cmd.ID
 		return err
 	})
 	return ID, err

@@ -1,9 +1,9 @@
 import { css, cx } from '@emotion/css';
-import React, { FC } from 'react';
+import React from 'react';
 
 import { DataFrame, DataLink, GrafanaTheme2 } from '@grafana/data';
 
-import { stylesFactory, useTheme2 } from '../../../themes';
+import { useStyles2 } from '../../../themes';
 import { isCompactUrl } from '../../../utils/dataLinks';
 import { FieldValidationMessage } from '../../Forms/FieldValidationMessage';
 import { IconButton } from '../../IconButton/IconButton';
@@ -18,9 +18,8 @@ export interface DataLinksListItemProps {
   isEditing?: boolean;
 }
 
-export const DataLinksListItem: FC<DataLinksListItemProps> = ({ link, onEdit, onRemove }) => {
-  const theme = useTheme2();
-  const styles = getDataLinkListItemStyles(theme);
+export const DataLinksListItem = ({ link, onEdit, onRemove }: DataLinksListItemProps) => {
+  const styles = useStyles2(getDataLinkListItemStyles);
   const { title = '', url = '' } = link;
 
   const hasTitle = title.trim() !== '';
@@ -35,8 +34,8 @@ export const DataLinksListItem: FC<DataLinksListItemProps> = ({ link, onEdit, on
           {hasTitle ? title : 'Data link title not provided'}
         </div>
         <div className={styles.actionButtons}>
-          <IconButton name="pen" onClick={onEdit} />
-          <IconButton name="times" onClick={onRemove} />
+          <IconButton name="pen" onClick={onEdit} tooltip="Edit data link title" />
+          <IconButton name="times" onClick={onRemove} tooltip="Remove data link title" />
         </div>
       </div>
       <div
@@ -52,47 +51,47 @@ export const DataLinksListItem: FC<DataLinksListItemProps> = ({ link, onEdit, on
   );
 };
 
-const getDataLinkListItemStyles = stylesFactory((theme: GrafanaTheme2) => {
+const getDataLinkListItemStyles = (theme: GrafanaTheme2) => {
   return {
-    wrapper: css`
-      margin-bottom: ${theme.spacing(2)};
-      width: 100%;
-      &:last-child {
-        margin-bottom: 0;
-      }
-      display: flex;
-      flex-direction: column;
-    `,
-    titleWrapper: css`
-      label: data-links-list-item-title;
-      justify-content: space-between;
-      display: flex;
-      width: 100%;
-      align-items: center;
-    `,
-    actionButtons: css`
-      margin-left: ${theme.spacing(1)};
-      display: flex;
-    `,
-    errored: css`
-      color: ${theme.colors.error.text};
-      font-style: italic;
-    `,
-    notConfigured: css`
-      font-style: italic;
-    `,
-    title: css`
-      color: ${theme.colors.text.primary};
-      font-size: ${theme.typography.size.sm};
-      font-weight: ${theme.typography.fontWeightMedium};
-    `,
-    url: css`
-      color: ${theme.colors.text.secondary};
-      font-size: ${theme.typography.size.sm};
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      max-width: 90%;
-    `,
+    wrapper: css({
+      marginBottom: theme.spacing(2),
+      width: '100%',
+      '&:last-child': {
+        marginBottom: 0,
+      },
+      display: 'flex',
+      flexDirection: 'column',
+    }),
+    titleWrapper: css({
+      label: 'data-links-list-item-title',
+      justifyContent: 'space-between',
+      display: 'flex',
+      width: '100%',
+      alignItems: 'center',
+    }),
+    actionButtons: css({
+      marginLeft: theme.spacing(1),
+      display: 'flex',
+    }),
+    errored: css({
+      color: theme.colors.error.text,
+      fontStyle: 'italic',
+    }),
+    notConfigured: css({
+      fontStyle: 'italic',
+    }),
+    title: css({
+      color: theme.colors.text.primary,
+      fontSize: theme.typography.size.sm,
+      fontWeight: theme.typography.fontWeightMedium,
+    }),
+    url: css({
+      color: theme.colors.text.secondary,
+      fontSize: theme.typography.size.sm,
+      whiteSpace: 'nowrap',
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+      maxWidth: '90%',
+    }),
   };
-});
+};

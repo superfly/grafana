@@ -3,10 +3,10 @@ import { histogramFieldInfo } from '@grafana/data/src/transformations/transforme
 import { commonOptionsBuilder, graphFieldOptions } from '@grafana/ui';
 
 import { HistogramPanel } from './HistogramPanel';
-import { PanelFieldConfig, PanelOptions, defaultPanelFieldConfig, defaultPanelOptions } from './panelcfg.gen';
+import { FieldConfig, Options, defaultFieldConfig, defaultOptions } from './panelcfg.gen';
 import { originalDataHasHistogram } from './utils';
 
-export const plugin = new PanelPlugin<PanelOptions, PanelFieldConfig>(HistogramPanel)
+export const plugin = new PanelPlugin<Options, FieldConfig>(HistogramPanel)
   .setPanelOptions((builder) => {
     builder
       .addCustomEditor({
@@ -18,6 +18,16 @@ export const plugin = new PanelPlugin<PanelOptions, PanelFieldConfig>(HistogramP
         showIf: (opts, data) => originalDataHasHistogram(data),
       })
       .addNumberInput({
+        path: 'bucketCount',
+        name: histogramFieldInfo.bucketCount.name,
+        description: histogramFieldInfo.bucketCount.description,
+        settings: {
+          placeholder: `Default: ${defaultOptions.bucketCount}`,
+          min: 0,
+        },
+        showIf: (opts, data) => !originalDataHasHistogram(data),
+      })
+      .addNumberInput({
         path: 'bucketSize',
         name: histogramFieldInfo.bucketSize.name,
         description: histogramFieldInfo.bucketSize.description,
@@ -25,7 +35,7 @@ export const plugin = new PanelPlugin<PanelOptions, PanelFieldConfig>(HistogramP
           placeholder: 'Auto',
           min: 0,
         },
-        defaultValue: defaultPanelOptions.bucketSize,
+        defaultValue: defaultOptions.bucketSize,
         showIf: (opts, data) => !originalDataHasHistogram(data),
       })
       .addNumberInput({
@@ -33,17 +43,16 @@ export const plugin = new PanelPlugin<PanelOptions, PanelFieldConfig>(HistogramP
         name: histogramFieldInfo.bucketOffset.name,
         description: histogramFieldInfo.bucketOffset.description,
         settings: {
-          placeholder: '0',
+          placeholder: `Default: ${defaultOptions.bucketOffset}`,
           min: 0,
         },
-        defaultValue: defaultPanelOptions.bucketOffset,
         showIf: (opts, data) => !originalDataHasHistogram(data),
       })
       .addBooleanSwitch({
         path: 'combine',
         name: histogramFieldInfo.combine.name,
         description: histogramFieldInfo.combine.description,
-        defaultValue: defaultPanelOptions.combine,
+        defaultValue: defaultOptions.combine,
         showIf: (opts, data) => !originalDataHasHistogram(data),
       });
 
@@ -54,7 +63,9 @@ export const plugin = new PanelPlugin<PanelOptions, PanelFieldConfig>(HistogramP
     standardOptions: {
       [FieldConfigProperty.Color]: {
         settings: {
-          byValueSupport: true,
+          byValueSupport: false,
+          bySeriesSupport: true,
+          preferThresholdsMode: false,
         },
         defaultValue: {
           mode: FieldColorModeId.PaletteClassic,
@@ -62,7 +73,7 @@ export const plugin = new PanelPlugin<PanelOptions, PanelFieldConfig>(HistogramP
       },
     },
     useCustomConfig: (builder) => {
-      const cfg = defaultPanelFieldConfig;
+      const cfg = defaultFieldConfig;
 
       builder
         .addSliderInput({

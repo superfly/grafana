@@ -6,7 +6,7 @@ import (
 	"errors"
 	"strings"
 
-	"gopkg.in/square/go-jose.v2/jwt"
+	"github.com/go-jose/go-jose/v3/jwt"
 
 	"github.com/grafana/grafana/pkg/infra/log"
 	"github.com/grafana/grafana/pkg/infra/remotecache"
@@ -33,7 +33,7 @@ func newService(cfg *setting.Cfg, remoteCache *remotecache.RemoteCache) *AuthSer
 }
 
 func (s *AuthService) init() error {
-	if !s.Cfg.JWTAuthEnabled {
+	if !s.Cfg.JWTAuth.Enabled {
 		return nil
 	}
 
@@ -53,7 +53,7 @@ type AuthService struct {
 
 	keySet           keySet
 	log              log.Logger
-	expect           map[string]interface{}
+	expect           map[string]any
 	expectRegistered jwt.Expected
 }
 

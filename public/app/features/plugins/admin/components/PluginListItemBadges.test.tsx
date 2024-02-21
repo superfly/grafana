@@ -18,6 +18,7 @@ describe('PluginListItemBadges', () => {
         small: 'https://grafana.com/api/plugins/test-plugin/versions/0.0.10/logos/small',
         large: 'https://grafana.com/api/plugins/test-plugin/versions/0.0.10/logos/large',
       },
+      keywords: ['test', 'plugin'],
     },
     name: 'Testing Plugin',
     orgName: 'Test',
@@ -31,6 +32,7 @@ describe('PluginListItemBadges', () => {
     isDev: false,
     isEnterprise: false,
     isDisabled: false,
+    isDeprecated: false,
     isPublished: true,
   };
 
@@ -74,5 +76,15 @@ describe('PluginListItemBadges', () => {
   it('renders an upgrade badge (when plugin has an available update)', () => {
     render(<PluginListItemBadges plugin={{ ...plugin, hasUpdate: true, installedVersion: '0.0.9' }} />);
     expect(screen.getByText(/update available/i)).toBeVisible();
+  });
+
+  it('renders an angular badge (when plugin is angular)', () => {
+    render(<PluginListItemBadges plugin={{ ...plugin, angularDetected: true }} />);
+    expect(screen.getByText(/angular/i)).toBeVisible();
+  });
+
+  it('does not render an angular badge (when plugin is not angular)', () => {
+    render(<PluginListItemBadges plugin={{ ...plugin, angularDetected: false }} />);
+    expect(screen.queryByText(/angular/i)).toBeNull();
   });
 });

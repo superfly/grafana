@@ -22,7 +22,9 @@ import (
 	"github.com/grafana/grafana/pkg/plugins"
 	"github.com/grafana/grafana/pkg/services/datasources"
 	"github.com/grafana/grafana/pkg/services/ngalert/models"
+	"github.com/grafana/grafana/pkg/services/pluginsintegration/pluginstore"
 	"github.com/grafana/grafana/pkg/setting"
+	"github.com/grafana/grafana/pkg/util/errutil"
 )
 
 var logger = log.New("ngalert.eval")
@@ -30,7 +32,7 @@ var logger = log.New("ngalert.eval")
 type EvaluatorFactory interface {
 	// Validate validates that the condition is correct. Returns nil if the condition is correct. Otherwise, error that describes the failure
 	Validate(ctx EvaluationContext, condition models.Condition) error
-	// BuildRuleEvaluator build an evaluator pipeline ready to evaluate a rule's query
+	// Create builds an evaluator pipeline ready to evaluate a rule's query
 	Create(ctx EvaluationContext, condition models.Condition) (ConditionEvaluator, error)
 }
 
@@ -56,7 +58,7 @@ type conditionEvaluator struct {
 func (r *conditionEvaluator) EvaluateRaw(ctx context.Context, now time.Time) (resp *backend.QueryDataResponse, err error) {
 	defer func() {
 		if e := recover(); e != nil {
-			logger.FromContext(ctx).Error("alert rule panic", "error", e, "stack", string(debug.Stack()))
+			logger.FromContext(ctx).Error("Alert rule panic", "error", e, "stack", string(debug.Stack()))
 			panicErr := fmt.Errorf("alert rule panic; please check the logs for the full stack")
 			if err != nil {
 				err = fmt.Errorf("queries and expressions execution failed: %w; %v", err, panicErr.Error())
@@ -89,14 +91,14 @@ type evaluatorImpl struct {
 	evaluationTimeout time.Duration
 	dataSourceCache   datasources.CacheService
 	expressionService *expr.Service
-	pluginsStore      plugins.Store
+	pluginsStore      pluginstore.Store
 }
 
 func NewEvaluatorFactory(
 	cfg setting.UnifiedAlertingSettings,
 	datasourceCache datasources.CacheService,
 	expressionService *expr.Service,
-	pluginsStore plugins.Store,
+	pluginsStore pluginstore.Store,
 ) EvaluatorFactory {
 	return &evaluatorImpl{
 		evaluationTimeout: cfg.EvaluationTimeout,
@@ -134,6 +136,9 @@ type ExecutionResults struct {
 	// Results contains the results of all queries, reduce and math expressions
 	Results map[string]data.Frames
 
+	// Errors contains a map of RefIDs that returned an error
+	Errors map[string]error
+
 	// NoData contains the DatasourceUID for RefIDs that returned no data.
 	NoData map[string]string
 
@@ -143,6 +148,7 @@ type ExecutionResults struct {
 // Results is a slice of evaluated alert instances states.
 type Results []Result
 
+// HasErrors returns true when Results contains at least one element with error
 func (evalResults Results) HasErrors() bool {
 	for _, r := range evalResults {
 		if r.State == Error {
@@ -150,6 +156,55 @@ func (evalResults Results) HasErrors() bool {
 		}
 	}
 	return false
+}
+
+// HasNonRetryableErrors returns true if we have at least 1 result with:
+// 1. A `State` of `Error`
+// 2. The `Error` attribute is not nil
+// 3. The `Error` type is of `&invalidEvalResultFormatError`
+// Our thinking with this approach, is that we don't want to retry errors that have relation with invalid alert definition format.
+func (evalResults Results) HasNonRetryableErrors() bool {
+	for _, r := range evalResults {
+		if r.State == Error && r.Error != nil {
+			var nonRetryableError *invalidEvalResultFormatError
+			if errors.As(r.Error, &nonRetryableError) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// HasErrors returns true when Results contains at least one element and all elements are errors
+func (evalResults Results) IsError() bool {
+	for _, r := range evalResults {
+		if r.State != Error {
+			return false
+		}
+	}
+	return len(evalResults) > 0
+}
+
+// IsNoData returns true when all items are NoData or Results is empty
+func (evalResults Results) IsNoData() bool {
+	for _, result := range evalResults {
+		if result.State != NoData {
+			return false
+		}
+	}
+	return true
+}
+
+// Error returns the aggregated `error` of all results of which state is `Error`.
+func (evalResults Results) Error() error {
+	var errs []error
+	for _, result := range evalResults {
+		if result.State == Error && result.Error != nil {
+			errs = append(errs, result.Error)
+		}
+	}
+
+	return errors.Join(errs...)
 }
 
 // Result contains the evaluated State of an alert instance
@@ -164,7 +219,10 @@ type Result struct {
 	// Results contains the results of all queries, reduce and math expressions
 	Results map[string]data.Frames
 
-	// Values contains the metric and value of the condition's reduce or math expression.
+	// Values contains the labels and values for all Threshold, Reduce and Math expressions,
+	// and all conditions of a Classic Condition that are firing. Threshold, Reduce and Math
+	// expressions are indexed by their Ref ID, while conditions in a Classic Condition are
+	// indexed by their Ref ID and the index of the condition. For example, B0, B1, etc.
 	Values map[string]NumberValueCapture
 
 	EvaluatedAt        time.Time
@@ -218,7 +276,24 @@ func (s State) String() string {
 	return [...]string{"Normal", "Alerting", "Pending", "NoData", "Error"}[s]
 }
 
-func buildDatasourceHeaders(ctx EvaluationContext) map[string]string {
+func ParseStateString(repr string) (State, error) {
+	switch strings.ToLower(repr) {
+	case "normal":
+		return Normal, nil
+	case "alerting":
+		return Alerting, nil
+	case "pending":
+		return Pending, nil
+	case "nodata":
+		return NoData, nil
+	case "error":
+		return Error, nil
+	default:
+		return -1, fmt.Errorf("invalid state: %s", repr)
+	}
+}
+
+func buildDatasourceHeaders(ctx context.Context) map[string]string {
 	headers := map[string]string{
 		// Many data sources check this in query method as sometimes alerting needs special considerations.
 		// Several existing systems also compare against the value of this header. Altering this constitutes a breaking change.
@@ -231,7 +306,7 @@ func buildDatasourceHeaders(ctx EvaluationContext) map[string]string {
 		models.CacheSkipHeaderName: "true",
 	}
 
-	key, ok := models.RuleKeyFromContext(ctx.Ctx)
+	key, ok := models.RuleKeyFromContext(ctx)
 	if ok {
 		headers["X-Rule-Uid"] = key.UID
 		headers["X-Grafana-Org-Id"] = strconv.FormatInt(key.OrgID, 10)
@@ -241,15 +316,55 @@ func buildDatasourceHeaders(ctx EvaluationContext) map[string]string {
 }
 
 // getExprRequest validates the condition, gets the datasource information and creates an expr.Request from it.
-func getExprRequest(ctx EvaluationContext, data []models.AlertQuery, dsCacheService datasources.CacheService) (*expr.Request, error) {
+func getExprRequest(ctx EvaluationContext, condition models.Condition, dsCacheService datasources.CacheService, reader AlertingResultsReader) (*expr.Request, error) {
 	req := &expr.Request{
-		OrgId:   ctx.User.OrgID,
-		Headers: buildDatasourceHeaders(ctx),
+		OrgId:   ctx.User.GetOrgID(),
+		Headers: buildDatasourceHeaders(ctx.Ctx),
+		User:    ctx.User,
 	}
+	datasources := make(map[string]*datasources.DataSource, len(condition.Data))
 
-	datasources := make(map[string]*datasources.DataSource, len(data))
+	for _, q := range condition.Data {
+		var err error
+		ds, ok := datasources[q.DatasourceUID]
+		if !ok {
+			switch nodeType := expr.NodeTypeFromDatasourceUID(q.DatasourceUID); nodeType {
+			case expr.TypeDatasourceNode:
+				ds, err = dsCacheService.GetDatasourceByUID(ctx.Ctx, q.DatasourceUID, ctx.User, false /*skipCache*/)
+			default:
+				ds, err = expr.DataSourceModelFromNodeType(nodeType)
+			}
+			if err != nil {
+				return nil, fmt.Errorf("failed to build query '%s': %w", q.RefID, err)
+			}
+			datasources[q.DatasourceUID] = ds
+		}
 
-	for _, q := range data {
+		// TODO rewrite the code below and remove the mutable component from AlertQuery
+
+		// if the query is command expression and it's a hysteresis, patch it with the current state
+		// it's important to do this before GetModel
+		if ds.Type == expr.DatasourceType {
+			isHysteresis, err := q.IsHysteresisExpression()
+			if err != nil {
+				return nil, fmt.Errorf("failed to build query '%s': %w", q.RefID, err)
+			}
+			if isHysteresis {
+				// make sure we allow hysteresis expressions to be specified only as the alert condition.
+				// This guarantees us that the AlertResultsReader can be correctly applied to the expression tree.
+				if q.RefID != condition.Condition {
+					return nil, fmt.Errorf("recovery threshold '%s' is only allowed to be the alert condition", q.RefID)
+				}
+				if reader != nil {
+					logger.FromContext(ctx.Ctx).Debug("Detected hysteresis threshold command. Populating with the results")
+					err = q.PatchHysteresisExpression(reader.Read())
+					if err != nil {
+						return nil, fmt.Errorf("failed to amend hysteresis command '%s': %w", q.RefID, err)
+					}
+				}
+			}
+		}
+
 		model, err := q.GetModel()
 		if err != nil {
 			return nil, fmt.Errorf("failed to get query model from '%s': %w", q.RefID, err)
@@ -262,19 +377,6 @@ func getExprRequest(ctx EvaluationContext, data []models.AlertQuery, dsCacheServ
 		maxDatapoints, err := q.GetMaxDatapoints()
 		if err != nil {
 			return nil, fmt.Errorf("failed to retrieve maxDatapoints from '%s': %w", q.RefID, err)
-		}
-
-		ds, ok := datasources[q.DatasourceUID]
-		if !ok {
-			if expr.IsDataSource(q.DatasourceUID) {
-				ds = expr.DataSourceModel()
-			} else {
-				ds, err = dsCacheService.GetDatasourceByUID(ctx.Ctx, q.DatasourceUID, ctx.User, false /*skipCache*/)
-				if err != nil {
-					return nil, fmt.Errorf("failed to build query '%s': %w", q.RefID, err)
-				}
-			}
-			datasources[q.DatasourceUID] = ds
 		}
 
 		req.Queries = append(req.Queries, expr.Query{
@@ -293,20 +395,28 @@ func getExprRequest(ctx EvaluationContext, data []models.AlertQuery, dsCacheServ
 type NumberValueCapture struct {
 	Var    string // RefID
 	Labels data.Labels
+
 	Value  *float64
 	Metric string
 }
 
+//nolint:gocyclo
 func queryDataResponseToExecutionResults(c models.Condition, execResp *backend.QueryDataResponse) ExecutionResults {
-	// eval captures for the '__value_string__' annotation and the Value property of the API response.
-	captures := make([]NumberValueCapture, 0, len(execResp.Responses))
-	captureVal := func(refID string, labels data.Labels, name string, value *float64) {
-		captures = append(captures, NumberValueCapture{
+	// captures contains the values of all instant queries and expressions for each dimension
+	captures := make(map[string]map[data.Fingerprint]NumberValueCapture)
+	captureFn := func(refID string, labels data.Labels, name string, value *float64) {
+		m := captures[refID]
+		if m == nil {
+			m = make(map[data.Fingerprint]NumberValueCapture)
+		}
+		fp := labels.Fingerprint()
+		m[fp] = NumberValueCapture{
 			Var:    refID,
 			Value:  value,
 			Labels: labels.Copy(),
 			Metric: name,
-		})
+		}
+		captures[refID] = m
 	}
 
 	// datasourceUIDsForRefIDs is a short-lived lookup table of RefID to DatasourceUID
@@ -315,19 +425,40 @@ func queryDataResponseToExecutionResults(c models.Condition, execResp *backend.Q
 	for _, next := range c.Data {
 		datasourceUIDsForRefIDs[next.RefID] = next.DatasourceUID
 	}
-	// datasourceExprUID is a special DatasourceUID for expressions
-	datasourceExprUID := strconv.FormatInt(expr.DatasourceID, 10)
 
 	result := ExecutionResults{Results: make(map[string]data.Frames)}
 	for refID, res := range execResp.Responses {
-		if len(res.Frames) == 0 {
-			// to ensure that NoData is consistent with Results we do not initialize NoData
-			// unless there is at least one RefID that returned no data
+		if res.Error != nil {
+			if result.Errors == nil {
+				result.Errors = make(map[string]error)
+			}
+			result.Errors[refID] = res.Error
+			if refID == c.Condition {
+				result.Error = res.Error
+			}
+		}
+
+		// There are two possible frame formats for No Data:
+		//
+		// 1. A response with no frames
+		// 2. A response with 1 frame but no fields
+		//
+		// The first format is not documented in the data plane contract but needs to be
+		// supported for older datasource plugins. The second format is documented in
+		// https://github.com/grafana/grafana-plugin-sdk-go/blob/main/data/contract_docs/contract.md
+		// and is what datasource plugins should use going forward.
+		if len(res.Frames) <= 1 {
+			// To make sure NoData is nil when Results are also nil we wait to initialize
+			// NoData until there is at least one query or expression that returned no data
 			if result.NoData == nil {
 				result.NoData = make(map[string]string)
 			}
-			if s, ok := datasourceUIDsForRefIDs[refID]; ok && s != datasourceExprUID {
-				result.NoData[refID] = s
+			hasNoFrames := len(res.Frames) == 0
+			hasNoFields := len(res.Frames) == 1 && len(res.Frames[0].Fields) == 0
+			if hasNoFrames || hasNoFields {
+				if s, ok := datasourceUIDsForRefIDs[refID]; ok && expr.NodeTypeFromDatasourceUID(s) == expr.TypeDatasourceNode { // TODO perhaps extract datasource UID from ML expression too.
+					result.NoData[refID] = s
+				}
 			}
 		}
 
@@ -336,12 +467,12 @@ func queryDataResponseToExecutionResults(c models.Condition, execResp *backend.Q
 			if len(frame.Fields) != 1 || frame.Fields[0].Type() != data.FieldTypeNullableFloat64 {
 				if series, err := mathexp.SeriesFromFrame(frame); err == nil {
 					// Capture nil value for time series data that contains multiple values.
-					captureVal(frame.RefID, series.GetLabels(), series.GetName(), nil)
+					captureFn(frame.RefID, series.GetLabels(), series.GetName(), nil)
 				}
 				continue
 			}
 			number := mathexp.Number{Frame: frame}
-			captureVal(frame.RefID, number.GetLabels(), number.GetName(), number.GetFloat64Value())
+			captureFn(frame.RefID, number.GetLabels(), number.GetName(), number.GetFloat64Value())
 		}
 
 		if refID == c.Condition {
@@ -363,14 +494,51 @@ func queryDataResponseToExecutionResults(c models.Condition, execResp *backend.Q
 
 		if len(frame.Fields) == 1 {
 			theseLabels := frame.Fields[0].Labels
-			for _, cap := range captures {
-				// matching labels are equal labels, or when one set of labels includes the labels of the other.
-				if theseLabels.Equals(cap.Labels) || theseLabels.Contains(cap.Labels) || cap.Labels.Contains(theseLabels) {
+			fp := theseLabels.Fingerprint()
+
+			for _, fps := range captures {
+				// First look for a capture whose labels are an exact match
+				if v, ok := fps[fp]; ok {
 					if frame.Meta.Custom == nil {
 						frame.Meta.Custom = []NumberValueCapture{}
 					}
-					frame.Meta.Custom = append(frame.Meta.Custom.([]NumberValueCapture), cap)
+					frame.Meta.Custom = append(frame.Meta.Custom.([]NumberValueCapture), v)
+				} else {
+					// If no exact match was found, look for captures whose labels are either subsets
+					// or supersets
+					for _, v := range fps {
+						// matching labels are equal labels, or when one set of labels includes the labels of the other.
+						if theseLabels.Equals(v.Labels) || theseLabels.Contains(v.Labels) || v.Labels.Contains(theseLabels) {
+							if frame.Meta.Custom == nil {
+								frame.Meta.Custom = []NumberValueCapture{}
+							}
+							frame.Meta.Custom = append(frame.Meta.Custom.([]NumberValueCapture), v)
+						}
+					}
 				}
+			}
+		}
+	}
+
+	// If the error of the condition is an Error that indicates the condition failed
+	// because one of its dependent query or expressions failed, then we follow
+	// the dependency chain to an error that is not a dependency error.
+	if len(result.Errors) > 0 && result.Error != nil {
+		if errors.Is(result.Error, expr.DependencyError) {
+			var utilError errutil.Error
+			e := result.Error
+			for {
+				errors.As(e, &utilError)
+				depRefID := utilError.PublicPayload["depRefId"].(string)
+				depError, ok := result.Errors[depRefID]
+				if !ok {
+					return result
+				}
+				if !errors.Is(depError, expr.DependencyError) {
+					result.Error = depError
+					return result
+				}
+				e = depError
 			}
 		}
 	}
@@ -601,20 +769,29 @@ func (evalResults Results) AsDataFrame() data.Frame {
 }
 
 func (e *evaluatorImpl) Validate(ctx EvaluationContext, condition models.Condition) error {
-	req, err := getExprRequest(ctx, condition.Data, e.dataSourceCache)
+	req, err := getExprRequest(ctx, condition, e.dataSourceCache, ctx.AlertingResultsReader)
 	if err != nil {
 		return err
 	}
 	for _, query := range req.Queries {
-		if query.DataSource == nil || expr.IsDataSource(query.DataSource.UID) {
+		if query.DataSource == nil {
 			continue
 		}
-		p, found := e.pluginsStore.Plugin(ctx.Ctx, query.DataSource.Type)
-		if !found { // technically this should fail earlier during datasource resolution phase.
-			return fmt.Errorf("datasource refID %s could not be found: %w", query.RefID, plugins.ErrPluginUnavailable)
-		}
-		if !p.Backend {
-			return fmt.Errorf("datasource refID %s is not a backend datasource", query.RefID)
+		switch expr.NodeTypeFromDatasourceUID(query.DataSource.UID) {
+		case expr.TypeDatasourceNode:
+			p, found := e.pluginsStore.Plugin(ctx.Ctx, query.DataSource.Type)
+			if !found { // technically this should fail earlier during datasource resolution phase.
+				return fmt.Errorf("datasource refID %s could not be found: %w", query.RefID, plugins.ErrPluginUnavailable)
+			}
+			if !p.Backend {
+				return fmt.Errorf("datasource refID %s is not a backend datasource", query.RefID)
+			}
+		case expr.TypeMLNode:
+			_, found := e.pluginsStore.Plugin(ctx.Ctx, query.DataSource.Type)
+			if !found {
+				return fmt.Errorf("datasource refID %s could not be found: %w", query.RefID, plugins.ErrPluginUnavailable)
+			}
+		case expr.TypeCMDNode:
 		}
 	}
 	_, err = e.create(condition, req)
@@ -628,7 +805,7 @@ func (e *evaluatorImpl) Create(ctx EvaluationContext, condition models.Condition
 	if len(condition.Condition) == 0 {
 		return nil, errors.New("condition must not be empty")
 	}
-	req, err := getExprRequest(ctx, condition.Data, e.dataSourceCache)
+	req, err := getExprRequest(ctx, condition, e.dataSourceCache, ctx.AlertingResultsReader)
 	if err != nil {
 		return nil, err
 	}

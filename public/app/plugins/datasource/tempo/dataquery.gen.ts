@@ -10,44 +10,121 @@
 
 import * as common from '@grafana/schema';
 
-export const DataQueryModelVersion = Object.freeze([0, 0]);
-
-/**
- * search = Loki search, nativeSearch = Tempo search for backwards compatibility
- */
-export type TempoQueryType = ('traceql' | 'search' | 'serviceMap' | 'upload' | 'nativeSearch' | 'clear');
-
-export interface Tempo extends common.DataQuery {
+export interface TempoQuery extends common.DataQuery {
+  filters: Array<TraceqlFilter>;
+  /**
+   * Filters that are used to query the metrics summary
+   */
+  groupBy?: Array<TraceqlFilter>;
   /**
    * Defines the maximum number of traces that are returned from Tempo
    */
   limit?: number;
   /**
-   * Define the maximum duration to select traces. Use duration format, for example: 1.2s, 100ms
+   * @deprecated Define the maximum duration to select traces. Use duration format, for example: 1.2s, 100ms
    */
   maxDuration?: string;
   /**
-   * Define the minimum duration to select traces. Use duration format, for example: 1.2s, 100ms
+   * @deprecated Define the minimum duration to select traces. Use duration format, for example: 1.2s, 100ms
    */
   minDuration?: string;
   /**
    * TraceQL query or trace ID
    */
-  query: string;
+  query?: string;
   /**
-   * Logfmt query to filter traces by their tags. Example: http.status_code=200 error=true
+   * @deprecated Logfmt query to filter traces by their tags. Example: http.status_code=200 error=true
    */
   search?: string;
   /**
-   * Filters to be included in a PromQL query to select data for the service graph. Example: {client="app",service="app"}
+   * Use service.namespace in addition to service.name to uniquely identify a service.
    */
-  serviceMapQuery?: string;
+  serviceMapIncludeNamespace?: boolean;
   /**
-   * Query traces by service name
+   * Filters to be included in a PromQL query to select data for the service graph. Example: {client="app",service="app"}. Providing multiple values will produce union of results for each filter, using PromQL OR operator internally.
+   */
+  serviceMapQuery?: (string | Array<string>);
+  /**
+   * @deprecated Query traces by service name
    */
   serviceName?: string;
   /**
-   * Query traces by span name
+   * @deprecated Query traces by span name
    */
   spanName?: string;
+  /**
+   * Defines the maximum number of spans per spanset that are returned from Tempo
+   */
+  spss?: number;
+  /**
+   * The type of the table that is used to display the search results
+   */
+  tableType?: SearchTableType;
 }
+
+export const defaultTempoQuery: Partial<TempoQuery> = {
+  filters: [],
+  groupBy: [],
+};
+
+/**
+ * search = Loki search, nativeSearch = Tempo search for backwards compatibility
+ */
+export type TempoQueryType = ('traceql' | 'traceqlSearch' | 'search' | 'serviceMap' | 'upload' | 'nativeSearch' | 'traceId' | 'clear');
+
+/**
+ * The state of the TraceQL streaming search query
+ */
+export enum SearchStreamingState {
+  Done = 'done',
+  Error = 'error',
+  Pending = 'pending',
+  Streaming = 'streaming',
+}
+
+/**
+ * The type of the table that is used to display the search results
+ */
+export enum SearchTableType {
+  Spans = 'spans',
+  Traces = 'traces',
+}
+
+/**
+ * static fields are pre-set in the UI, dynamic fields are added by the user
+ */
+export enum TraceqlSearchScope {
+  Intrinsic = 'intrinsic',
+  Resource = 'resource',
+  Span = 'span',
+  Unscoped = 'unscoped',
+}
+
+export interface TraceqlFilter {
+  /**
+   * Uniquely identify the filter, will not be used in the query generation
+   */
+  id: string;
+  /**
+   * The operator that connects the tag to the value, for example: =, >, !=, =~
+   */
+  operator?: string;
+  /**
+   * The scope of the filter, can either be unscoped/all scopes, resource or span
+   */
+  scope?: TraceqlSearchScope;
+  /**
+   * The tag for the search filter, for example: .http.status_code, .service.name, status
+   */
+  tag?: string;
+  /**
+   * The value for the search filter
+   */
+  value?: (string | Array<string>);
+  /**
+   * The type of the value, used for example to check whether we need to wrap the value in quotes when generating the query
+   */
+  valueType?: string;
+}
+
+export interface Tempo {}

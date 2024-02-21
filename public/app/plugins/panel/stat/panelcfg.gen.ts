@@ -10,18 +10,20 @@
 
 import * as common from '@grafana/schema';
 
-export const PanelCfgModelVersion = Object.freeze([0, 0]);
-
-export interface PanelOptions extends common.SingleStatBaseOptions {
+export interface Options extends common.SingleStatBaseOptions {
   colorMode: common.BigValueColorMode;
   graphMode: common.BigValueGraphMode;
   justifyMode: common.BigValueJustifyMode;
+  showPercentChange: boolean;
   textMode: common.BigValueTextMode;
+  wideLayout: boolean;
 }
 
-export const defaultPanelOptions: Partial<PanelOptions> = {
+export const defaultOptions: Partial<Options> = {
   colorMode: common.BigValueColorMode.Value,
   graphMode: common.BigValueGraphMode.Area,
   justifyMode: common.BigValueJustifyMode.Auto,
+  showPercentChange: false,
   textMode: common.BigValueTextMode.Auto,
+  wideLayout: true,
 };

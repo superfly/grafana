@@ -63,10 +63,10 @@ func TestSaveDashboardCommand_GetDashboardModel(t *testing.T) {
 		json := simplejson.New()
 		json.Set("title", "test dash")
 
-		cmd := &SaveDashboardCommand{Dashboard: json, FolderID: 1}
+		cmd := &SaveDashboardCommand{Dashboard: json, FolderUID: "1"}
 		dash := cmd.GetDashboardModel()
 
-		assert.Equal(t, int64(1), dash.FolderID)
+		assert.Equal(t, "1", dash.FolderUID)
 	})
 }
 
@@ -74,9 +74,9 @@ func TestSlugifyTitle(t *testing.T) {
 	testCases := map[string]string{
 		"Grafana Play Home": "grafana-play-home",
 		"snöräv-över-ån":    "snorav-over-an",
-		"漢字":                "5ryi5a2X",    // "han-zi",      // Hanzi for hanzi
-		"🇦🇶":                "8J-HpvCfh7Y", // flag of Antarctica-emoji, using fallback
-		"𒆠":                 "8JKGoA",      // cuneiform Ki, using fallback
+		"漢字":                "e6bca2-e5ad97",     // "han-zi",      // Hanzi for hanzi
+		"🇦🇶":                "f09f87a6-f09f87b6", // flag of Antarctica-emoji, using fallback
+		"𒆠":                 "f09286a0",          // cuneiform Ki, using fallback
 	}
 
 	for input, expected := range testCases {

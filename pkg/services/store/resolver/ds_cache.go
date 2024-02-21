@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/grafana/grafana/pkg/infra/appcontext"
-	"github.com/grafana/grafana/pkg/plugins"
 	"github.com/grafana/grafana/pkg/services/datasources"
+	"github.com/grafana/grafana/pkg/services/pluginsintegration/pluginstore"
 	"github.com/grafana/grafana/pkg/tsdb/grafanads"
 )
 
@@ -23,7 +23,7 @@ type dsVal struct {
 
 type dsCache struct {
 	ds          datasources.DataSourceService
-	pluginStore plugins.Store
+	pluginStore pluginstore.Store
 	cache       map[int64]map[string]*dsVal
 	timestamp   time.Time // across all orgIDs
 	mu          sync.Mutex
@@ -43,12 +43,12 @@ func (c *dsCache) refreshCache(ctx context.Context) error {
 	defaultDS := make(map[int64]*dsVal, 0)
 
 	q := &datasources.GetAllDataSourcesQuery{}
-	err := c.ds.GetAllDataSources(ctx, q)
+	dsList, err := c.ds.GetAllDataSources(ctx, q)
 	if err != nil {
 		return err
 	}
 
-	for _, ds := range q.Result {
+	for _, ds := range dsList {
 		val := &dsVal{
 			InternalID: ds.ID,
 			Name:       ds.Name,

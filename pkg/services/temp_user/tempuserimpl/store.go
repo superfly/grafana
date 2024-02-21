@@ -6,6 +6,7 @@ import (
 
 	"github.com/grafana/grafana/pkg/infra/db"
 	tempuser "github.com/grafana/grafana/pkg/services/temp_user"
+	"github.com/grafana/grafana/pkg/setting"
 )
 
 type store interface {
@@ -15,10 +16,13 @@ type store interface {
 	GetTempUsersQuery(ctx context.Context, query *tempuser.GetTempUsersQuery) ([]*tempuser.TempUserDTO, error)
 	GetTempUserByCode(ctx context.Context, query *tempuser.GetTempUserByCodeQuery) (*tempuser.TempUserDTO, error)
 	ExpireOldUserInvites(ctx context.Context, cmd *tempuser.ExpireTempUsersCommand) error
+	ExpireOldVerifications(ctx context.Context, cmd *tempuser.ExpireTempUsersCommand) error
+	ExpirePreviousVerifications(ctx context.Context, cmd *tempuser.ExpirePreviousVerificationsCommand) error
 }
 
 type xormStore struct {
-	db db.DB
+	db  db.DB
+	cfg *setting.Cfg
 }
 
 func (ss *xormStore) UpdateTempUserStatus(ctx context.Context, cmd *tempuser.UpdateTempUserStatusCommand) error {
@@ -94,7 +98,7 @@ func (ss *xormStore) GetTempUsersQuery(ctx context.Context, query *tempuser.GetT
 	                FROM ` + ss.db.GetDialect().Quote("temp_user") + ` as tu
 									LEFT OUTER JOIN ` + ss.db.GetDialect().Quote("user") + ` as u on u.id = tu.invited_by_user_id
 									WHERE tu.status=?`
-		params := []interface{}{string(query.Status)}
+		params := []any{string(query.Status)}
 
 		if query.OrgID > 0 {
 			rawSQL += ` AND tu.org_id=?`
@@ -102,7 +106,11 @@ func (ss *xormStore) GetTempUsersQuery(ctx context.Context, query *tempuser.GetT
 		}
 
 		if query.Email != "" {
-			rawSQL += ` AND tu.email=?`
+			if ss.cfg.CaseInsensitiveLogin {
+				rawSQL += ` AND LOWER(tu.email)=LOWER(?)`
+			} else {
+				rawSQL += ` AND tu.email=?`
+			}
 			params = append(params, query.Email)
 		}
 
@@ -162,6 +170,30 @@ func (ss *xormStore) ExpireOldUserInvites(ctx context.Context, cmd *tempuser.Exp
 	return ss.db.WithTransactionalDbSession(ctx, func(sess *db.Session) error {
 		var rawSQL = "UPDATE temp_user SET status = ?, updated = ? WHERE created <= ? AND status in (?, ?)"
 		if result, err := sess.Exec(rawSQL, string(tempuser.TmpUserExpired), time.Now().Unix(), cmd.OlderThan.Unix(), string(tempuser.TmpUserSignUpStarted), string(tempuser.TmpUserInvitePending)); err != nil {
+			return err
+		} else if cmd.NumExpired, err = result.RowsAffected(); err != nil {
+			return err
+		}
+		return nil
+	})
+}
+
+func (ss *xormStore) ExpireOldVerifications(ctx context.Context, cmd *tempuser.ExpireTempUsersCommand) error {
+	return ss.db.WithTransactionalDbSession(ctx, func(sess *db.Session) error {
+		var rawSQL = "UPDATE temp_user SET status = ?, updated = ? WHERE created <= ? AND status = ?"
+		if result, err := sess.Exec(rawSQL, string(tempuser.TmpUserEmailUpdateExpired), time.Now().Unix(), cmd.OlderThan.Unix(), string(tempuser.TmpUserEmailUpdateStarted)); err != nil {
+			return err
+		} else if cmd.NumExpired, err = result.RowsAffected(); err != nil {
+			return err
+		}
+		return nil
+	})
+}
+
+func (ss *xormStore) ExpirePreviousVerifications(ctx context.Context, cmd *tempuser.ExpirePreviousVerificationsCommand) error {
+	return ss.db.WithTransactionalDbSession(ctx, func(sess *db.Session) error {
+		var rawSQL = "UPDATE temp_user SET status = ?, updated = ? WHERE invited_by_user_id = ? AND status = ?"
+		if result, err := sess.Exec(rawSQL, string(tempuser.TmpUserEmailUpdateExpired), time.Now().Unix(), cmd.InvitedByUserID, string(tempuser.TmpUserEmailUpdateStarted)); err != nil {
 			return err
 		} else if cmd.NumExpired, err = result.RowsAffected(); err != nil {
 			return err

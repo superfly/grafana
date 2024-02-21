@@ -43,16 +43,6 @@ function mockLocationHref(href: string) {
   };
 }
 
-function setUTCTimeZone() {
-  (window as any).Intl.DateTimeFormat = () => {
-    return {
-      resolvedOptions: () => {
-        return { timeZone: 'UTC' };
-      },
-    };
-  };
-}
-
 const mockUid = 'abc123';
 jest.mock('@grafana/runtime', () => {
   const original = jest.requireActual('@grafana/runtime');
@@ -80,7 +70,13 @@ describe('ShareModal', () => {
 
   beforeEach(() => {
     const defaultTimeRange = getDefaultTimeRange();
-    setUTCTimeZone();
+    jest.spyOn(window.Intl, 'DateTimeFormat').mockImplementation(() => {
+      return {
+        resolvedOptions: () => {
+          return { timeZone: 'UTC' };
+        },
+      } as Intl.DateTimeFormat;
+    });
     mockLocationHref('http://server/#!/test');
     config.rendererAvailable = true;
     config.bootData.user.orgId = 1;
@@ -148,13 +144,14 @@ describe('ShareModal', () => {
       mockLocationHref('http://server/#!/test?editPanel=1');
       render(<ShareLink {...props} />);
 
-      const base = 'http://server/#!/test';
+      const base = 'http://server';
+      const path = '/#!/test';
       expect(await screen.findByRole('textbox', { name: 'Link URL' })).toHaveValue(
-        base + '?editPanel=1&from=1000&to=2000&orgId=1'
+        base + path + '?editPanel=1&from=1000&to=2000&orgId=1'
       );
       expect(
         await screen.findByRole('link', { name: selectors.pages.SharePanelModal.linkToRenderedImage })
-      ).toHaveAttribute('href', base + '?from=1000&to=2000&orgId=1&panelId=1&width=1000&height=500&tz=UTC');
+      ).toHaveAttribute('href', base + path + '?from=1000&to=2000&orgId=1&panelId=1&width=1000&height=500&tz=UTC');
     });
 
     it('should shorten url', async () => {
@@ -164,6 +161,17 @@ describe('ShareModal', () => {
       expect(await screen.findByRole('textbox', { name: 'Link URL' })).toHaveValue(
         `http://localhost:3000/goto/${mockUid}`
       );
+    });
+
+    it('should generate render url without shareView param', async () => {
+      mockLocationHref('http://dashboards.grafana.com/d/abcdefghi/my-dash?shareView=link');
+      render(<ShareLink {...props} />);
+
+      const base = 'http://dashboards.grafana.com/render/d-solo/abcdefghi/my-dash';
+      const params = '?from=1000&to=2000&orgId=1&panelId=22&width=1000&height=500&tz=UTC';
+      expect(
+        await screen.findByRole('link', { name: selectors.pages.SharePanelModal.linkToRenderedImage })
+      ).toHaveAttribute('href', base + params);
     });
   });
 });

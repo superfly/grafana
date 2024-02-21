@@ -6,32 +6,34 @@ import (
 	"time"
 
 	"github.com/grafana/grafana/pkg/infra/db"
-	"github.com/grafana/grafana/pkg/services/featuremgmt"
 	pref "github.com/grafana/grafana/pkg/services/preference"
 	"github.com/grafana/grafana/pkg/setting"
 )
 
 type Service struct {
 	store    store
-	cfg      *setting.Cfg
-	features *featuremgmt.FeatureManager
+	defaults pref.Preference
 }
 
-func ProvideService(db db.DB, cfg *setting.Cfg, features *featuremgmt.FeatureManager) pref.Service {
-	service := &Service{
-		cfg:      cfg,
-		features: features,
-	}
-	if features.IsEnabled(featuremgmt.FlagNewDBLibrary) {
-		service.store = &sqlxStore{
-			sess: db.GetSqlxSession(),
-		}
-	} else {
-		service.store = &sqlStore{
+func ProvideService(db db.DB, cfg *setting.Cfg) pref.Service {
+	return &Service{
+		store: &sqlStore{
 			db: db,
-		}
+		},
+		defaults: prefsFromConfig(cfg),
 	}
-	return service
+}
+
+func prefsFromConfig(cfg *setting.Cfg) pref.Preference {
+	return pref.Preference{
+		Theme:           cfg.DefaultTheme,
+		Timezone:        cfg.DateFormats.DefaultTimezone,
+		WeekStart:       &cfg.DateFormats.DefaultWeekStart,
+		HomeDashboardID: 0,
+		JSONData: &pref.PreferenceJSONData{
+			Language: cfg.DefaultLanguage,
+		},
+	}
 }
 
 func (s *Service) GetWithDefaults(ctx context.Context, query *pref.GetPreferenceWithDefaultsQuery) (*pref.Preference, error) {
@@ -68,6 +70,10 @@ func (s *Service) GetWithDefaults(ctx context.Context, query *pref.GetPreference
 			if p.JSONData.QueryHistory.HomeTab != "" {
 				res.JSONData.QueryHistory.HomeTab = p.JSONData.QueryHistory.HomeTab
 			}
+
+			if p.JSONData.CookiePreferences != nil {
+				res.JSONData.CookiePreferences = p.JSONData.CookiePreferences
+			}
 		}
 	}
 
@@ -91,6 +97,11 @@ func (s *Service) Get(ctx context.Context, query *pref.GetPreferenceQuery) (*pre
 }
 
 func (s *Service) Save(ctx context.Context, cmd *pref.SavePreferenceCommand) error {
+	jsonData, err := preferenceData(cmd)
+	if err != nil {
+		return err
+	}
+
 	preference, err := s.store.Get(ctx, &pref.Preference{
 		OrgID:  cmd.OrgID,
 		UserID: cmd.UserID,
@@ -108,9 +119,7 @@ func (s *Service) Save(ctx context.Context, cmd *pref.SavePreferenceCommand) err
 				Theme:           cmd.Theme,
 				Created:         time.Now(),
 				Updated:         time.Now(),
-				JSONData: &pref.PreferenceJSONData{
-					Language: cmd.Language,
-				},
+				JSONData:        jsonData,
 			}
 			_, err = s.store.Insert(ctx, preference)
 			if err != nil {
@@ -126,13 +135,8 @@ func (s *Service) Save(ctx context.Context, cmd *pref.SavePreferenceCommand) err
 	preference.Updated = time.Now()
 	preference.Version += 1
 	preference.HomeDashboardID = cmd.HomeDashboardID
-	preference.JSONData = &pref.PreferenceJSONData{
-		Language: cmd.Language,
-	}
+	preference.JSONData = jsonData
 
-	if cmd.QueryHistory != nil {
-		preference.JSONData.QueryHistory = *cmd.QueryHistory
-	}
 	return s.store.Update(ctx, preference)
 }
 
@@ -179,6 +183,18 @@ func (s *Service) Patch(ctx context.Context, cmd *pref.PatchPreferenceCommand) e
 		preference.HomeDashboardID = *cmd.HomeDashboardID
 	}
 
+	if cmd.CookiePreferences != nil {
+		cookies, err := parseCookiePreferences(cmd.CookiePreferences)
+		if err != nil {
+			return err
+		}
+
+		if preference.JSONData == nil {
+			preference.JSONData = &pref.PreferenceJSONData{}
+		}
+		preference.JSONData.CookiePreferences = cookies
+	}
+
 	if cmd.Timezone != nil {
 		preference.Timezone = *cmd.Timezone
 	}
@@ -203,21 +219,54 @@ func (s *Service) Patch(ctx context.Context, cmd *pref.PatchPreferenceCommand) e
 }
 
 func (s *Service) GetDefaults() *pref.Preference {
-	defaults := &pref.Preference{
-		Theme:           s.cfg.DefaultTheme,
-		Timezone:        s.cfg.DateFormats.DefaultTimezone,
-		WeekStart:       &s.cfg.DateFormats.DefaultWeekStart,
+	return &pref.Preference{
+		Theme:           s.defaults.Theme,
+		Timezone:        s.defaults.Timezone,
+		WeekStart:       s.defaults.WeekStart,
 		HomeDashboardID: 0,
-		JSONData:        &pref.PreferenceJSONData{},
+		JSONData: &pref.PreferenceJSONData{
+			Language: s.defaults.JSONData.Language,
+		},
 	}
-
-	if s.features.IsEnabled(featuremgmt.FlagInternationalization) {
-		defaults.JSONData.Language = s.cfg.DefaultLanguage
-	}
-
-	return defaults
 }
 
 func (s *Service) DeleteByUser(ctx context.Context, userID int64) error {
 	return s.store.DeleteByUser(ctx, userID)
+}
+
+func parseCookiePreferences(prefs []pref.CookieType) (map[string]struct{}, error) {
+	allowed := map[pref.CookieType]struct{}{
+		"analytics":   {},
+		"performance": {},
+		"functional":  {},
+	}
+
+	m := map[string]struct{}{}
+	for _, c := range prefs {
+		if _, ok := allowed[c]; !ok {
+			return nil, pref.ErrUnknownCookieType.Errorf("'%s' is not an allowed cookie type", c)
+		}
+
+		m[string(c)] = struct{}{}
+	}
+	return m, nil
+}
+
+func preferenceData(cmd *pref.SavePreferenceCommand) (*pref.PreferenceJSONData, error) {
+	jsonData := &pref.PreferenceJSONData{
+		Language: cmd.Language,
+	}
+
+	if cmd.QueryHistory != nil {
+		jsonData.QueryHistory = *cmd.QueryHistory
+	}
+	if cmd.CookiePreferences != nil {
+		cookies, err := parseCookiePreferences(cmd.CookiePreferences)
+		if err != nil {
+			return nil, err
+		}
+		jsonData.CookiePreferences = cookies
+	}
+
+	return jsonData, nil
 }

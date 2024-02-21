@@ -21,31 +21,24 @@ func TestIntegrationDeleteCorrelation(t *testing.T) {
 	}
 	ctx := NewTestEnv(t)
 
-	adminUser := User{
-		username: "admin",
-		password: "admin",
-	}
-	editorUser := User{
-		username: "editor",
-		password: "editor",
-	}
-
-	ctx.createUser(user.CreateUserCommand{
-		DefaultOrgRole: string(org.RoleEditor),
-		Password:       editorUser.password,
-		Login:          editorUser.username,
-	})
-	ctx.createUser(user.CreateUserCommand{
+	adminUser := ctx.createUser(user.CreateUserCommand{
 		DefaultOrgRole: string(org.RoleAdmin),
-		Password:       adminUser.password,
-		Login:          adminUser.username,
+		Password:       "admin",
+		Login:          "admin",
+	})
+
+	editorUser := ctx.createUser(user.CreateUserCommand{
+		DefaultOrgRole: string(org.RoleEditor),
+		Password:       "editor",
+		Login:          "editor",
+		OrgID:          adminUser.User.OrgID,
 	})
 
 	createDsCommand := &datasources.AddDataSourceCommand{
 		Name:     "read-only",
 		Type:     "loki",
 		ReadOnly: true,
-		OrgID:    1,
+		OrgID:    adminUser.User.OrgID,
 	}
 	dataSource := ctx.createDs(createDsCommand)
 	readOnlyDS := dataSource.UID
@@ -53,10 +46,11 @@ func TestIntegrationDeleteCorrelation(t *testing.T) {
 	createDsCommand = &datasources.AddDataSourceCommand{
 		Name:  "writable",
 		Type:  "loki",
-		OrgID: 1,
+		OrgID: adminUser.User.OrgID,
 	}
 	dataSource = ctx.createDs(createDsCommand)
 	writableDs := dataSource.UID
+	writableDsId := dataSource.ID
 	writableDsOrgId := dataSource.OrgID
 
 	t.Run("Unauthenticated users shouldn't be able to delete correlations", func(t *testing.T) {
@@ -112,7 +106,6 @@ func TestIntegrationDeleteCorrelation(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Equal(t, "Data source not found", response.Message)
-		require.Equal(t, correlations.ErrSourceDataSourceDoesNotExists.Error(), response.Error)
 
 		require.NoError(t, res.Body.Close())
 	})
@@ -132,14 +125,20 @@ func TestIntegrationDeleteCorrelation(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Equal(t, "Correlation not found", response.Message)
-		require.Equal(t, correlations.ErrCorrelationNotFound.Error(), response.Error)
 
 		require.NoError(t, res.Body.Close())
 	})
 
-	t.Run("deleting a correlation originating from a read-only data source should result in a 403", func(t *testing.T) {
+	t.Run("deleting a read-only correlation should result in a 403", func(t *testing.T) {
+		correlation := ctx.createCorrelation(correlations.CreateCorrelationCommand{
+			SourceUID:   writableDs,
+			TargetUID:   &writableDs,
+			OrgId:       writableDsOrgId,
+			Provisioned: true,
+		})
+
 		res := ctx.Delete(DeleteParams{
-			url:  fmt.Sprintf("/api/datasources/uid/%s/correlations/%s", readOnlyDS, "nonexistent-correlation-uid"),
+			url:  fmt.Sprintf("/api/datasources/uid/%s/correlations/%s", correlation.SourceUID, correlation.UID),
 			user: adminUser,
 		})
 		require.Equal(t, http.StatusForbidden, res.StatusCode)
@@ -151,8 +150,7 @@ func TestIntegrationDeleteCorrelation(t *testing.T) {
 		err = json.Unmarshal(responseBody, &response)
 		require.NoError(t, err)
 
-		require.Equal(t, "Data source is read only", response.Message)
-		require.Equal(t, correlations.ErrSourceDataSourceReadOnly.Error(), response.Error)
+		require.Equal(t, "Correlation can only be edited via provisioning", response.Message)
 
 		require.NoError(t, res.Body.Close())
 	})
@@ -219,5 +217,46 @@ func TestIntegrationDeleteCorrelation(t *testing.T) {
 		})
 		require.NoError(t, res.Body.Close())
 		require.Equal(t, http.StatusNotFound, res.StatusCode)
+	})
+
+	t.Run("deleting data source removes related correlations", func(t *testing.T) {
+		ctx.createCorrelation(correlations.CreateCorrelationCommand{
+			SourceUID:   writableDs,
+			TargetUID:   &readOnlyDS,
+			OrgId:       writableDsOrgId,
+			Provisioned: false,
+		})
+
+		ctx.createCorrelation(correlations.CreateCorrelationCommand{
+			SourceUID:   writableDs,
+			TargetUID:   &readOnlyDS,
+			OrgId:       writableDsOrgId,
+			Provisioned: true,
+		})
+
+		res := ctx.Delete(DeleteParams{
+			url:  fmt.Sprintf("/api/datasources/%d", writableDsId),
+			user: adminUser,
+		})
+		require.Equal(t, http.StatusOK, res.StatusCode)
+		require.NoError(t, res.Body.Close())
+
+		res = ctx.Get(GetParams{
+			url:  "/api/datasources/correlations",
+			user: adminUser,
+			page: "0",
+		})
+		require.Equal(t, http.StatusOK, res.StatusCode)
+
+		responseBody, err := io.ReadAll(res.Body)
+		require.NoError(t, err)
+
+		var response correlations.GetCorrelationsResponseBody
+		err = json.Unmarshal(responseBody, &response)
+		require.NoError(t, err)
+
+		require.Len(t, response.Correlations, 0)
+
+		require.NoError(t, res.Body.Close())
 	})
 }

@@ -1,13 +1,16 @@
 import { FieldConfigProperty, PanelOptionsEditorBuilder, PanelPlugin } from '@grafana/data';
+import { config } from '@grafana/runtime';
 import { FrameState } from 'app/features/canvas/runtime/frame';
 
 import { CanvasPanel, InstanceState } from './CanvasPanel';
-import { getElementEditor } from './editor/elementEditor';
-import { getLayerEditor } from './editor/layerEditor';
+import { getConnectionEditor } from './editor/connectionEditor';
+import { getElementEditor } from './editor/element/elementEditor';
+import { getLayerEditor } from './editor/layer/layerEditor';
+import { PanZoomHelp } from './editor/panZoomHelp';
 import { canvasMigrationHandler } from './migrations';
-import { PanelOptions } from './models.gen';
+import { Options } from './panelcfg.gen';
 
-export const addStandardCanvasEditorOptions = (builder: PanelOptionsEditorBuilder<PanelOptions>) => {
+export const addStandardCanvasEditorOptions = (builder: PanelOptionsEditorBuilder<Options>) => {
   builder.addBooleanSwitch({
     path: 'inlineEditing',
     name: 'Inline editing',
@@ -17,13 +20,28 @@ export const addStandardCanvasEditorOptions = (builder: PanelOptionsEditorBuilde
 
   builder.addBooleanSwitch({
     path: 'showAdvancedTypes',
-    name: 'Show advanced element types',
-    description: '',
+    name: 'Experimental element types',
+    description: 'Enable selection of experimental element types',
+    defaultValue: true,
+  });
+
+  builder.addBooleanSwitch({
+    path: 'panZoom',
+    name: 'Pan and zoom',
+    description: 'Enable pan and zoom',
     defaultValue: false,
+    showIf: (opts) => config.featureToggles.canvasPanelPanZoom,
+  });
+  builder.addCustomEditor({
+    id: 'panZoomHelp',
+    path: 'panZoomHelp',
+    name: '',
+    editor: PanZoomHelp,
+    showIf: (opts) => config.featureToggles.canvasPanelPanZoom && opts.panZoom,
   });
 };
 
-export const plugin = new PanelPlugin<PanelOptions>(CanvasPanel)
+export const plugin = new PanelPlugin<Options>(CanvasPanel)
   .setNoPadding() // extend to panel edges
   .useFieldConfig({
     standardOptions: {
@@ -44,6 +62,8 @@ export const plugin = new PanelPlugin<PanelOptions>(CanvasPanel)
       builder.addNestedOptions(getLayerEditor(state));
 
       const selection = state.selected;
+      const connectionSelection = state.selectedConnection;
+
       if (selection?.length === 1) {
         const element = selection[0];
         if (!(element instanceof FrameState)) {
@@ -55,6 +75,16 @@ export const plugin = new PanelPlugin<PanelOptions>(CanvasPanel)
             })
           );
         }
+      }
+
+      if (connectionSelection) {
+        builder.addNestedOptions(
+          getConnectionEditor({
+            category: ['Selected connection'],
+            connection: connectionSelection,
+            scene: state.scene,
+          })
+        );
       }
     }
   });

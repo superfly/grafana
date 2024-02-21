@@ -10,22 +10,12 @@ export interface Props {
   isDefault: boolean;
   onNameChange: (name: string) => void;
   onDefaultChange: (value: boolean) => void;
-  alertingSupported: boolean;
   disabled?: boolean;
 }
 
-export function BasicSettings({
-  dataSourceName,
-  isDefault,
-  onDefaultChange,
-  onNameChange,
-  alertingSupported,
-  disabled,
-}: Props) {
+export function BasicSettings({ dataSourceName, isDefault, onDefaultChange, onNameChange, disabled }: Props) {
   return (
     <>
-      <AlertingEnabled enabled={alertingSupported} />
-
       <div className="gf-form-group" aria-label="Datasource settings page basic settings">
         <div className="gf-form-inline">
           {/* Name */}
@@ -44,7 +34,7 @@ export function BasicSettings({
                 placeholder="Name"
                 onChange={(event) => onNameChange(event.currentTarget.value)}
                 required
-                aria-label={selectors.pages.DataSource.name}
+                data-testid={selectors.pages.DataSource.name}
               />
             </InlineField>
           </div>

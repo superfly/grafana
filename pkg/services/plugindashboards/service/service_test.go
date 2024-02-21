@@ -1,10 +1,8 @@
 package service
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"sort"
 	"testing"
 
@@ -12,9 +10,9 @@ import (
 
 	"github.com/grafana/grafana/pkg/components/simplejson"
 	"github.com/grafana/grafana/pkg/plugins"
-	"github.com/grafana/grafana/pkg/plugins/manager/dashboards"
 	dashmodels "github.com/grafana/grafana/pkg/services/dashboards"
 	"github.com/grafana/grafana/pkg/services/plugindashboards"
+	"github.com/grafana/grafana/pkg/services/pluginsintegration/dashboards"
 )
 
 func TestGetPluginDashboards(t *testing.T) {
@@ -193,7 +191,7 @@ func (m pluginDashboardStoreMock) GetPluginDashboardFileContents(ctx context.Con
 	if dashboardFiles, exists := m.pluginDashboardFiles[args.PluginID]; exists {
 		if content, exists := dashboardFiles[args.FileReference]; exists {
 			return &dashboards.GetPluginDashboardFileContentsResult{
-				Content: io.NopCloser(bytes.NewReader(content)),
+				Content: content,
 			}, nil
 		}
 	} else if !exists {

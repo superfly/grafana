@@ -1,14 +1,17 @@
 import { css } from '@emotion/css';
+import debounce from 'debounce-promise';
 import { startCase, uniqBy } from 'lodash';
 import React, { useCallback, useEffect, useState } from 'react';
 
 import { GrafanaTheme2, SelectableValue, TimeRange } from '@grafana/data';
 import { EditorField, EditorFieldGroup, EditorRow } from '@grafana/experimental';
-import { getSelectStyles, Select, useStyles2, useTheme2 } from '@grafana/ui';
+import { reportInteraction } from '@grafana/runtime';
+import { getSelectStyles, Select, AsyncSelect, useStyles2, useTheme2 } from '@grafana/ui';
 
 import CloudMonitoringDatasource from '../datasource';
 import { getAlignmentPickerData, getMetricType, setMetricType } from '../functions';
-import { CustomMetaData, MetricDescriptor, MetricKind, PreprocessorType, TimeSeriesList, ValueTypes } from '../types';
+import { PreprocessorType, TimeSeriesList, MetricKind, ValueTypes } from '../types/query';
+import { CustomMetaData, MetricDescriptor } from '../types/types';
 
 import { AliasBy } from './AliasBy';
 import { Alignment } from './Alignment';
@@ -27,6 +30,7 @@ export interface Props {
   variableOptionGroup: SelectableValue<string>;
   aliasBy?: string;
   onChangeAliasBy: (aliasBy: string) => void;
+  range: TimeRange;
 }
 
 export function Editor({
@@ -38,22 +42,27 @@ export function Editor({
   customMetaData,
   aliasBy,
   onChangeAliasBy,
+  range,
 }: React.PropsWithChildren<Props>) {
-  const [labels, setLabels] = useState<{ [k: string]: any }>({});
+  const [labels, setLabels] = useState<{ [k: string]: string[] }>({});
   const [metricDescriptors, setMetricDescriptors] = useState<MetricDescriptor[]>([]);
   const [metricDescriptor, setMetricDescriptor] = useState<MetricDescriptor>();
   const [metrics, setMetrics] = useState<Array<SelectableValue<string>>>([]);
   const [services, setServices] = useState<Array<SelectableValue<string>>>([]);
   const [service, setService] = useState<string>('');
-  const [timeRange, setTimeRange] = useState<TimeRange>({ ...datasource.timeSrv.timeRange() });
+  const [timeRange, setTimeRange] = useState<TimeRange>({ ...range });
 
   const useTime = (time: TimeRange) => {
-    if (timeRange !== null && (timeRange.raw.from !== time.raw.from || timeRange.raw.to !== time.raw.to)) {
+    if (
+      timeRange !== null &&
+      (timeRange.raw.from.toString() !== time.raw.from.toString() ||
+        timeRange.raw.to.toString() !== time.raw.to.toString())
+    ) {
       setTimeRange({ ...time });
     }
   };
 
-  useTime(datasource.timeSrv.timeRange());
+  useTime(range);
 
   const theme = useTheme2();
   const selectStyles = getSelectStyles(theme);
@@ -83,6 +92,9 @@ export function Editor({
     const loadMetricDescriptors = async () => {
       if (projectName) {
         const metricDescriptors = await datasource.getMetricTypes(projectName);
+        reportInteraction('cloud-monitoring-metric-descriptors-loaded', {
+          count: metricDescriptors.length,
+        });
         const services = getServicesList(metricDescriptors);
         setMetricDescriptors(metricDescriptors);
         setServices(services);
@@ -155,6 +167,33 @@ export function Editor({
     return services.length > 0 ? uniqBy(services, (s) => s.value) : [];
   };
 
+  const filterMetrics = async (filter: string) => {
+    const metrics = await datasource.filterMetricsByType(projectName, service);
+    const filtered = metrics
+      .filter((m) => m.type.includes(filter.toLowerCase()))
+      .map((m) => ({
+        value: m.type,
+        label: m.displayName,
+        component: function optionComponent() {
+          return (
+            <div>
+              <div className={customStyle}>{m.type}</div>
+              <div className={selectStyles.optionDescription}>{m.description}</div>
+            </div>
+          );
+        },
+      }));
+    return [
+      {
+        label: 'Template Variables',
+        options: variableOptionGroup.options,
+      },
+      ...filtered,
+    ];
+  };
+
+  const debounceFilter = debounce(filterMetrics, 400);
+
   const onMetricTypeChange = ({ value }: SelectableValue<string>) => {
     const metricDescriptor = getSelectedMetricDescriptor(metricDescriptors, value!);
     setMetricDescriptor(metricDescriptor);
@@ -201,6 +240,7 @@ export function Editor({
             <Select
               width="auto"
               onChange={onServiceChange}
+              isLoading={services.length === 0}
               value={[...services, ...variableOptionGroup.options].find((s) => s.value === service)}
               options={[
                 {
@@ -213,21 +253,25 @@ export function Editor({
               inputId={`${refId}-service`}
             />
           </EditorField>
-          <EditorField label="Metric name" width="auto">
-            <Select
-              width="auto"
-              onChange={onMetricTypeChange}
-              value={[...metrics, ...variableOptionGroup.options].find((s) => s.value === metricType)}
-              options={[
-                {
-                  label: 'Template Variables',
-                  options: variableOptionGroup.options,
-                },
-                ...metrics,
-              ]}
-              placeholder="Select Metric"
-              inputId={`${refId}-select-metric`}
-            />
+          <EditorField label="Metric name" width="auto" htmlFor={`${refId}-select-metric`}>
+            <span title={service === '' ? 'Select a service first' : 'Type to search metrics'}>
+              <AsyncSelect
+                width="auto"
+                onChange={onMetricTypeChange}
+                value={[...metrics, ...variableOptionGroup.options].find((s) => s.value === metricType)}
+                loadOptions={debounceFilter}
+                defaultOptions={[
+                  {
+                    label: 'Template Variables',
+                    options: variableOptionGroup.options,
+                  },
+                  ...metrics.slice(0, 100),
+                ]}
+                placeholder="Select Metric"
+                inputId={`${refId}-select-metric`}
+                disabled={service === ''}
+              />
+            </span>
           </EditorField>
         </EditorFieldGroup>
       </EditorRow>

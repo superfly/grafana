@@ -29,6 +29,8 @@ type NGAlert struct {
 	stateMetrics                *State
 	multiOrgAlertmanagerMetrics *MultiOrgAlertmanager
 	apiMetrics                  *API
+	historianMetrics            *Historian
+	remoteAlertmanagerMetrics   *RemoteAlertmanager
 }
 
 // NewNGAlert manages the metrics of all the alerting components.
@@ -39,6 +41,8 @@ func NewNGAlert(r prometheus.Registerer) *NGAlert {
 		stateMetrics:                NewStateMetrics(r),
 		multiOrgAlertmanagerMetrics: NewMultiOrgAlertmanagerMetrics(r),
 		apiMetrics:                  NewAPIMetrics(r),
+		historianMetrics:            NewHistorianMetrics(r, Subsystem),
+		remoteAlertmanagerMetrics:   NewRemoteAlertmanagerMetrics(r),
 	}
 }
 
@@ -56,4 +60,12 @@ func (ng *NGAlert) GetAPIMetrics() *API {
 
 func (ng *NGAlert) GetMultiOrgAlertmanagerMetrics() *MultiOrgAlertmanager {
 	return ng.multiOrgAlertmanagerMetrics
+}
+
+func (ng *NGAlert) GetHistorianMetrics() *Historian {
+	return ng.historianMetrics
+}
+
+func (ng *NGAlert) GetRemoteAlertmanagerMetrics() *RemoteAlertmanager {
+	return ng.remoteAlertmanagerMetrics
 }

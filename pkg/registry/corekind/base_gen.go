@@ -12,14 +12,15 @@ package corekind
 import (
 	"fmt"
 
+	"github.com/grafana/grafana/pkg/kinds/accesspolicy"
 	"github.com/grafana/grafana/pkg/kinds/dashboard"
 	"github.com/grafana/grafana/pkg/kinds/librarypanel"
-	"github.com/grafana/grafana/pkg/kinds/playlist"
 	"github.com/grafana/grafana/pkg/kinds/preferences"
 	"github.com/grafana/grafana/pkg/kinds/publicdashboard"
-	"github.com/grafana/grafana/pkg/kinds/serviceaccount"
+	"github.com/grafana/grafana/pkg/kinds/role"
+	"github.com/grafana/grafana/pkg/kinds/rolebinding"
 	"github.com/grafana/grafana/pkg/kinds/team"
-	"github.com/grafana/grafana/pkg/kindsys"
+	"github.com/grafana/kindsys"
 	"github.com/grafana/thema"
 )
 
@@ -40,25 +41,32 @@ import (
 // kind-schematized type.
 type Base struct {
 	all             []kindsys.Core
+	accesspolicy    *accesspolicy.Kind
 	dashboard       *dashboard.Kind
 	librarypanel    *librarypanel.Kind
-	playlist        *playlist.Kind
 	preferences     *preferences.Kind
 	publicdashboard *publicdashboard.Kind
-	serviceaccount  *serviceaccount.Kind
+	role            *role.Kind
+	rolebinding     *rolebinding.Kind
 	team            *team.Kind
 }
 
 // type guards
 var (
+	_ kindsys.Core = &accesspolicy.Kind{}
 	_ kindsys.Core = &dashboard.Kind{}
 	_ kindsys.Core = &librarypanel.Kind{}
-	_ kindsys.Core = &playlist.Kind{}
 	_ kindsys.Core = &preferences.Kind{}
 	_ kindsys.Core = &publicdashboard.Kind{}
-	_ kindsys.Core = &serviceaccount.Kind{}
+	_ kindsys.Core = &role.Kind{}
+	_ kindsys.Core = &rolebinding.Kind{}
 	_ kindsys.Core = &team.Kind{}
 )
+
+// AccessPolicy returns the [kindsys.Interface] implementation for the accesspolicy kind.
+func (b *Base) AccessPolicy() *accesspolicy.Kind {
+	return b.accesspolicy
+}
 
 // Dashboard returns the [kindsys.Interface] implementation for the dashboard kind.
 func (b *Base) Dashboard() *dashboard.Kind {
@@ -68,11 +76,6 @@ func (b *Base) Dashboard() *dashboard.Kind {
 // LibraryPanel returns the [kindsys.Interface] implementation for the librarypanel kind.
 func (b *Base) LibraryPanel() *librarypanel.Kind {
 	return b.librarypanel
-}
-
-// Playlist returns the [kindsys.Interface] implementation for the playlist kind.
-func (b *Base) Playlist() *playlist.Kind {
-	return b.playlist
 }
 
 // Preferences returns the [kindsys.Interface] implementation for the preferences kind.
@@ -85,9 +88,14 @@ func (b *Base) PublicDashboard() *publicdashboard.Kind {
 	return b.publicdashboard
 }
 
-// ServiceAccount returns the [kindsys.Interface] implementation for the serviceaccount kind.
-func (b *Base) ServiceAccount() *serviceaccount.Kind {
-	return b.serviceaccount
+// Role returns the [kindsys.Interface] implementation for the role kind.
+func (b *Base) Role() *role.Kind {
+	return b.role
+}
+
+// RoleBinding returns the [kindsys.Interface] implementation for the rolebinding kind.
+func (b *Base) RoleBinding() *rolebinding.Kind {
+	return b.rolebinding
 }
 
 // Team returns the [kindsys.Interface] implementation for the team kind.
@@ -98,6 +106,12 @@ func (b *Base) Team() *team.Kind {
 func doNewBase(rt *thema.Runtime) *Base {
 	var err error
 	reg := &Base{}
+
+	reg.accesspolicy, err = accesspolicy.NewKind(rt)
+	if err != nil {
+		panic(fmt.Sprintf("error while initializing the accesspolicy Kind: %s", err))
+	}
+	reg.all = append(reg.all, reg.accesspolicy)
 
 	reg.dashboard, err = dashboard.NewKind(rt)
 	if err != nil {
@@ -111,12 +125,6 @@ func doNewBase(rt *thema.Runtime) *Base {
 	}
 	reg.all = append(reg.all, reg.librarypanel)
 
-	reg.playlist, err = playlist.NewKind(rt)
-	if err != nil {
-		panic(fmt.Sprintf("error while initializing the playlist Kind: %s", err))
-	}
-	reg.all = append(reg.all, reg.playlist)
-
 	reg.preferences, err = preferences.NewKind(rt)
 	if err != nil {
 		panic(fmt.Sprintf("error while initializing the preferences Kind: %s", err))
@@ -129,11 +137,17 @@ func doNewBase(rt *thema.Runtime) *Base {
 	}
 	reg.all = append(reg.all, reg.publicdashboard)
 
-	reg.serviceaccount, err = serviceaccount.NewKind(rt)
+	reg.role, err = role.NewKind(rt)
 	if err != nil {
-		panic(fmt.Sprintf("error while initializing the serviceaccount Kind: %s", err))
+		panic(fmt.Sprintf("error while initializing the role Kind: %s", err))
 	}
-	reg.all = append(reg.all, reg.serviceaccount)
+	reg.all = append(reg.all, reg.role)
+
+	reg.rolebinding, err = rolebinding.NewKind(rt)
+	if err != nil {
+		panic(fmt.Sprintf("error while initializing the rolebinding Kind: %s", err))
+	}
+	reg.all = append(reg.all, reg.rolebinding)
 
 	reg.team, err = team.NewKind(rt)
 	if err != nil {

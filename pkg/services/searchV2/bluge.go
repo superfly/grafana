@@ -207,7 +207,7 @@ func getDashboardPanelDocs(dash dashboard, location string) []*bluge.Document {
 			AddField(bluge.NewKeywordField(documentFieldLocation, location).Aggregatable().StoreValue()).
 			AddField(bluge.NewKeywordField(documentFieldKind, string(entityKindPanel)).Aggregatable().StoreValue()) // likely want independent index for this
 
-		for _, ref := range dash.summary.References {
+		for _, ref := range panel.References {
 			switch ref.Family {
 			case entity.StandardKindDashboard:
 				if ref.Type != "" {
@@ -380,7 +380,7 @@ func doSearchQuery(
 
 	reader, cancel, err := index.readerForIndex(indexTypeDashboard)
 	if err != nil {
-		logger.Error("error getting reader for dashboard index: %v", err)
+		logger.Error("Error getting reader for dashboard index: %v", err)
 		response.Error = err
 		return response
 	}
@@ -493,7 +493,7 @@ func doSearchQuery(
 	// execute this search on the reader
 	documentMatchIterator, err := reader.Search(ctx, req)
 	if err != nil {
-		logger.Error("error executing search", "err", err)
+		logger.Error("Error executing search", "err", err)
 		response.Error = err
 		return response
 	}
@@ -575,7 +575,7 @@ func doSearchQuery(
 			return true
 		})
 		if err != nil {
-			logger.Error("error loading stored fields", "err", err)
+			logger.Error("Error loading stored fields", "err", err)
 			response.Error = err
 			return response
 		}

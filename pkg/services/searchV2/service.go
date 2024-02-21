@@ -18,7 +18,6 @@ import (
 	"github.com/grafana/grafana/pkg/services/featuremgmt"
 	"github.com/grafana/grafana/pkg/services/folder"
 	"github.com/grafana/grafana/pkg/services/org"
-	"github.com/grafana/grafana/pkg/services/querylibrary"
 	"github.com/grafana/grafana/pkg/services/store"
 	"github.com/grafana/grafana/pkg/services/user"
 	"github.com/grafana/grafana/pkg/setting"
@@ -75,7 +74,6 @@ type StandardSearchService struct {
 	dashboardIndex *searchIndex
 	extender       DashboardIndexExtender
 	reIndexCh      chan struct{}
-	queries        querylibrary.Service
 	features       featuremgmt.FeatureToggles
 }
 
@@ -85,7 +83,7 @@ func (s *StandardSearchService) IsReady(ctx context.Context, orgId int64) IsSear
 
 func ProvideService(cfg *setting.Cfg, sql db.DB, entityEventStore store.EntityEventsService,
 	ac accesscontrol.Service, tracer tracing.Tracer, features featuremgmt.FeatureToggles, orgService org.Service,
-	userService user.Service, queries querylibrary.Service, folderService folder.Service) SearchService {
+	userService user.Service, folderService folder.Service) SearchService {
 	extender := &NoopExtender{}
 	logger := log.New("searchV2")
 	s := &StandardSearchService{
@@ -112,17 +110,13 @@ func ProvideService(cfg *setting.Cfg, sql db.DB, entityEventStore store.EntityEv
 		reIndexCh:   make(chan struct{}, 1),
 		orgService:  orgService,
 		userService: userService,
-		queries:     queries,
 		features:    features,
 	}
 	return s
 }
 
 func (s *StandardSearchService) IsDisabled() bool {
-	if s.cfg == nil {
-		return true
-	}
-	return !s.cfg.IsFeatureToggleEnabled(featuremgmt.FlagPanelTitleSearch)
+	return !s.features.IsEnabledGlobally(featuremgmt.FlagPanelTitleSearch)
 }
 
 func (s *StandardSearchService) Run(ctx context.Context) error {
@@ -188,10 +182,6 @@ func (s *StandardSearchService) getUser(ctx context.Context, backendUser *backen
 		}
 	}
 
-	if s.ac.IsDisabled() {
-		return usr, nil
-	}
-
 	if usr.Permissions == nil {
 		usr.Permissions = make(map[int64]map[string][]string)
 	}
@@ -205,7 +195,7 @@ func (s *StandardSearchService) getUser(ctx context.Context, backendUser *backen
 	permissions, err := s.ac.GetUserPermissions(ctx, usr,
 		accesscontrol.Options{ReloadCache: false})
 	if err != nil {
-		s.logger.Error("failed to retrieve user permissions", "error", err, "email", backendUser.Email)
+		s.logger.Error("Failed to retrieve user permissions", "error", err, "email", backendUser.Email)
 		return nil, errors.New("auth error")
 	}
 
@@ -242,10 +232,6 @@ func (s *StandardSearchService) DoDashboardQuery(ctx context.Context, user *back
 }
 
 func (s *StandardSearchService) doDashboardQuery(ctx context.Context, signedInUser *user.SignedInUser, orgID int64, q DashboardQuery) *backend.DataResponse {
-	if !s.queries.IsDisabled() && len(q.Kind) == 1 && q.Kind[0] == string(entityKindQuery) {
-		return s.searchQueries(ctx, signedInUser, q)
-	}
-
 	rsp := &backend.DataResponse{}
 
 	filter, err := s.auth.GetDashboardReadFilter(ctx, orgID, signedInUser)
@@ -279,7 +265,7 @@ func (s *StandardSearchService) doDashboardQuery(ctx context.Context, signedInUs
 
 	if q.WithAllowedActions {
 		if err := s.addAllowedActionsField(ctx, orgID, signedInUser, response); err != nil {
-			s.logger.Error("error when adding the allowedActions field", "err", err)
+			s.logger.Error("Error when adding the allowedActions field", "err", err)
 		}
 	}
 

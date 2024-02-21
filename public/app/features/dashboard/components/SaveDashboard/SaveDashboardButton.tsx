@@ -11,9 +11,10 @@ interface SaveDashboardButtonProps {
   dashboard: DashboardModel;
   onSaveSuccess?: () => void;
   size?: ComponentSize;
+  onClick?: () => void;
 }
 
-export const SaveDashboardButton: React.FC<SaveDashboardButtonProps> = ({ dashboard, onSaveSuccess, size }) => {
+export const SaveDashboardButton = ({ dashboard, onSaveSuccess, size }: SaveDashboardButtonProps) => {
   return (
     <ModalsController>
       {({ showModal, hideModal }) => {
@@ -37,12 +38,9 @@ export const SaveDashboardButton: React.FC<SaveDashboardButtonProps> = ({ dashbo
   );
 };
 
-export const SaveDashboardAsButton: React.FC<SaveDashboardButtonProps & { variant?: ButtonVariant }> = ({
-  dashboard,
-  onSaveSuccess,
-  variant,
-  size,
-}) => {
+type Props = SaveDashboardButtonProps & { variant?: ButtonVariant };
+
+export const SaveDashboardAsButton = ({ dashboard, onClick, onSaveSuccess, variant, size }: Props) => {
   return (
     <ModalsController>
       {({ showModal, hideModal }) => {
@@ -51,6 +49,7 @@ export const SaveDashboardAsButton: React.FC<SaveDashboardButtonProps & { varian
             size={size}
             onClick={() => {
               reportInteraction('grafana_dashboard_save_as_clicked');
+              onClick?.();
               showModal(SaveDashboardDrawer, {
                 dashboard,
                 onSaveSuccess,

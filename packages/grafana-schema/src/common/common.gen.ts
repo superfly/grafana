@@ -9,6 +9,16 @@
 
 
 /**
+ * A topic is attached to DataFrame metadata in query results.
+ * This specifies where the data should be used.
+ */
+export enum DataTopic {
+  AlertStates = 'alertStates',
+  Annotations = 'annotations',
+  Series = 'series',
+}
+
+/**
  * TODO docs
  */
 export interface DataSourceJsonData {
@@ -34,42 +44,73 @@ export interface DataQuery {
   datasource?: unknown;
   /**
    * true if query is disabled (ie should not be returned to the dashboard)
+   * Note this does not always imply that the query should not be executed since
+   * the results from a hidden query may be used as the input to other queries (SSE etc)
    */
   hide?: boolean;
-  /**
-   * Unique, guid like, string used in explore mode
-   */
-  key?: string;
   /**
    * Specify the query flavor
    * TODO make this required and give it a default
    */
   queryType?: string;
   /**
-   * A - Z
+   * A unique identifier for the query within the list of targets.
+   * In server side expressions, the refId is used as a variable name to identify results.
+   * By default, the UI will assign A->Z; however setting meaningful names may be useful.
    */
   refId: string;
 }
 
 export interface BaseDimensionConfig {
+  /**
+   * fixed: T -- will be added by each element
+   */
   field?: string;
-  fixed: (string | number);
+}
+
+export enum ScaleDimensionMode {
+  Linear = 'linear',
+  Quad = 'quad',
 }
 
 export interface ScaleDimensionConfig extends BaseDimensionConfig {
+  fixed?: number;
   max: number;
   min: number;
+  mode?: ScaleDimensionMode; // | *"linear"
 }
 
-/**
- * This is actually an empty interface used mainly for naming?
- */
-export interface ColorDimensionConfig extends BaseDimensionConfig {}
+export interface ColorDimensionConfig extends BaseDimensionConfig {
+  fixed?: string; // color value
+}
+
+export enum ScalarDimensionMode {
+  Clamped = 'clamped',
+  Mod = 'mod',
+}
+
+export interface ScalarDimensionConfig extends BaseDimensionConfig {
+  fixed?: number;
+  max: number;
+  min: number;
+  mode?: ScalarDimensionMode;
+}
 
 export enum TextDimensionMode {
   Field = 'field',
   Fixed = 'fixed',
   Template = 'template',
+}
+
+export interface TextDimensionConfig extends BaseDimensionConfig {
+  fixed?: string;
+  mode: TextDimensionMode;
+}
+
+export enum ResourceDimensionMode {
+  Field = 'field',
+  Fixed = 'fixed',
+  Mapping = 'mapping',
 }
 
 export interface MapLayerOptions {
@@ -107,6 +148,38 @@ export enum FrameGeometrySourceMode {
   Coords = 'coords',
   Geohash = 'geohash',
   Lookup = 'lookup',
+}
+
+export enum HeatmapCalculationMode {
+  Count = 'count',
+  Size = 'size',
+}
+
+export enum HeatmapCellLayout {
+  auto = 'auto',
+  ge = 'ge',
+  le = 'le',
+  unknown = 'unknown',
+}
+
+export interface HeatmapCalculationBucketConfig {
+  /**
+   * Sets the bucket calculation mode
+   */
+  mode?: HeatmapCalculationMode;
+  /**
+   * Controls the scale of the buckets
+   */
+  scale?: ScaleDistributionConfig;
+  /**
+   * The number of buckets to use for the axis in the heatmap
+   */
+  value?: string;
+}
+
+export enum LogsSortOrder {
+  Ascending = 'Ascending',
+  Descending = 'Descending',
 }
 
 /**
@@ -290,6 +363,7 @@ export interface ScaleDistributionConfig {
  * TODO docs
  */
 export interface AxisConfig {
+  axisBorderShow?: boolean;
   axisCenteredZero?: boolean;
   axisColorMode?: AxisColorMode;
   axisGridShow?: boolean;
@@ -335,7 +409,7 @@ export interface HideableFieldConfig {
 /**
  * TODO docs
  */
-export enum GraphTresholdsStyleMode {
+export enum GraphThresholdsStyleMode {
   Area = 'area',
   Dashed = 'dashed',
   DashedAndArea = 'dashed+area',
@@ -349,7 +423,7 @@ export enum GraphTresholdsStyleMode {
  * TODO docs
  */
 export interface GraphThresholdsStyleConfig {
-  mode: GraphTresholdsStyleMode;
+  mode: GraphThresholdsStyleMode;
 }
 
 /**
@@ -447,6 +521,7 @@ export interface OptionsWithTextFormatting {
  */
 export enum BigValueColorMode {
   Background = 'background',
+  BackgroundSolid = 'background_solid',
   None = 'none',
   Value = 'value',
 }
@@ -562,12 +637,42 @@ export enum BarGaugeDisplayMode {
 }
 
 /**
+ * Allows for the table cell gauge display type to set the gauge mode.
+ */
+export enum BarGaugeValueMode {
+  Color = 'color',
+  Hidden = 'hidden',
+  Text = 'text',
+}
+
+/**
+ * Allows for the bar gauge name to be placed explicitly
+ */
+export enum BarGaugeNamePlacement {
+  Auto = 'auto',
+  Left = 'left',
+  Top = 'top',
+}
+
+/**
+ * Allows for the bar gauge size to be set explicitly
+ */
+export enum BarGaugeSizing {
+  Auto = 'auto',
+  Manual = 'manual',
+}
+
+/**
  * TODO docs
  */
 export interface VizTooltipOptions {
+  maxHeight?: number;
+  maxWidth?: number;
   mode: TooltipDisplayMode;
   sort: SortOrder;
 }
+
+export interface Labels {}
 
 /**
  * Internally, this is the "type" of cell that's being displayed
@@ -581,11 +686,14 @@ export enum TableCellDisplayMode {
   ColorBackground = 'color-background',
   ColorBackgroundSolid = 'color-background-solid',
   ColorText = 'color-text',
+  Custom = 'custom',
+  DataLinks = 'data-links',
   Gauge = 'gauge',
   GradientGauge = 'gradient-gauge',
   Image = 'image',
   JSONView = 'json-view',
   LcdGauge = 'lcd-gauge',
+  Sparkline = 'sparkline',
 }
 
 /**
@@ -599,12 +707,34 @@ export enum TableCellBackgroundDisplayMode {
 }
 
 /**
- * TODO docs
+ * Sort by field state
  */
 export interface TableSortByFieldState {
+  /**
+   * Flag used to indicate descending sort order
+   */
   desc?: boolean;
+  /**
+   * Sets the display name of the field to sort by
+   */
   displayName: string;
 }
+
+/**
+ * Footer options
+ */
+export interface TableFooterOptions {
+  countRows?: boolean;
+  enablePagination?: boolean;
+  fields?: Array<string>;
+  reducer: Array<string>; // actually 1 value
+  show: boolean;
+}
+
+export const defaultTableFooterOptions: Partial<TableFooterOptions> = {
+  fields: [],
+  reducer: [],
+};
 
 /**
  * Auto mode table cell options
@@ -635,11 +765,27 @@ export interface TableImageCellOptions {
 }
 
 /**
+ * Show data links in the cell
+ */
+export interface TableDataLinksCellOptions {
+  type: TableCellDisplayMode.DataLinks;
+}
+
+/**
  * Gauge cell options
  */
 export interface TableBarGaugeCellOptions {
   mode?: BarGaugeDisplayMode;
   type: TableCellDisplayMode.Gauge;
+  valueDisplayMode?: BarGaugeValueMode;
+}
+
+/**
+ * Sparkline cell options
+ */
+export interface TableSparklineCellOptions extends GraphFieldConfig {
+  hideValue?: boolean;
+  type: TableCellDisplayMode.Sparkline;
 }
 
 /**
@@ -651,10 +797,19 @@ export interface TableColoredBackgroundCellOptions {
 }
 
 /**
+ * Height of a table cell
+ */
+export enum TableCellHeight {
+  Lg = 'lg',
+  Md = 'md',
+  Sm = 'sm',
+}
+
+/**
  * Table cell options. Each cell has a display mode
  * and other potential options for that display.
  */
-export type TableCellOptions = (TableAutoCellOptions | TableBarGaugeCellOptions | TableColoredBackgroundCellOptions | TableColorTextCellOptions | TableImageCellOptions | TableJsonViewCellOptions);
+export type TableCellOptions = (TableAutoCellOptions | TableSparklineCellOptions | TableBarGaugeCellOptions | TableColoredBackgroundCellOptions | TableColorTextCellOptions | TableImageCellOptions | TableDataLinksCellOptions | TableJsonViewCellOptions);
 
 /**
  * Use UTC/GMT timezone
@@ -665,6 +820,30 @@ export type TimeZoneUtc = 'utc';
  * Use the timezone defined by end user web browser
  */
 export type TimeZoneBrowser = 'browser';
+
+/**
+ * Optional formats for the template variable replace functions
+ * See also https://grafana.com/docs/grafana/latest/dashboards/variables/variable-syntax/#advanced-variable-format-options
+ */
+export enum VariableFormatID {
+  CSV = 'csv',
+  Date = 'date',
+  Distributed = 'distributed',
+  DoubleQuote = 'doublequote',
+  Glob = 'glob',
+  HTML = 'html',
+  JSON = 'json',
+  Lucene = 'lucene',
+  PercentEncode = 'percentencode',
+  Pipe = 'pipe',
+  QueryParam = 'queryparam',
+  Raw = 'raw',
+  Regex = 'regex',
+  SQLString = 'sqlstring',
+  SingleQuote = 'singlequote',
+  Text = 'text',
+  UriEncode = 'uriencode',
+}
 
 export interface DataSourceRef {
   /**
@@ -677,8 +856,12 @@ export interface DataSourceRef {
   uid?: string;
 }
 
-export interface TextDimensionConfig extends BaseDimensionConfig {
-  mode: TextDimensionMode;
+/**
+ * Links to a resource (image/svg path)
+ */
+export interface ResourceDimensionConfig extends BaseDimensionConfig {
+  fixed?: string;
+  mode: ResourceDimensionMode;
 }
 
 export interface FrameGeometrySource {
@@ -697,7 +880,35 @@ export interface FrameGeometrySource {
   wkt?: string;
 }
 
-export interface Labels {}
+export interface HeatmapCalculationOptions {
+  /**
+   * The number of buckets to use for the xAxis in the heatmap
+   */
+  xBuckets?: HeatmapCalculationBucketConfig;
+  /**
+   * The number of buckets to use for the yAxis in the heatmap
+   */
+  yBuckets?: HeatmapCalculationBucketConfig;
+}
+
+export enum LogsDedupStrategy {
+  exact = 'exact',
+  none = 'none',
+  numbers = 'numbers',
+  signature = 'signature',
+}
+
+/**
+ * Compare two values
+ */
+export enum ComparisonOperation {
+  EQ = 'eq',
+  GT = 'gt',
+  GTE = 'gte',
+  LT = 'lt',
+  LTE = 'lte',
+  NEQ = 'neq',
+}
 
 /**
  * Field options for each field within a table (e.g 10, "The String", 64.20, etc.)
@@ -711,7 +922,11 @@ export interface TableFieldOptions {
    */
   displayMode?: TableCellDisplayMode;
   filterable?: boolean;
-  hidden?: boolean;
+  hidden?: boolean; // ?? default is missing or false ??
+  /**
+   * Hides any header for a column, useful for columns that show some static content or buttons.
+   */
+  hideHeader?: boolean;
   inspect: boolean;
   minWidth?: number;
   width?: number;

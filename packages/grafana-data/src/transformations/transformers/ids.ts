@@ -36,4 +36,9 @@ export enum DataTransformerID {
   groupingToMatrix = 'groupingToMatrix',
   limit = 'limit',
   partitionByValues = 'partitionByValues',
+  timeSeriesTable = 'timeSeriesTable',
+  formatTime = 'formatTime',
+  formatString = 'formatString',
+  regression = 'regression',
+  groupToNestedTable = 'groupToNestedTable',
 }

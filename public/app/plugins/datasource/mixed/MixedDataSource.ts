@@ -6,6 +6,7 @@ import {
   DataQuery,
   DataQueryRequest,
   DataQueryResponse,
+  TestDataSourceResponse,
   DataSourceApi,
   DataSourceInstanceSettings,
   LoadingState,
@@ -13,6 +14,8 @@ import {
 import { getDataSourceSrv, toDataQueryError } from '@grafana/runtime';
 
 export const MIXED_DATASOURCE_NAME = '-- Mixed --';
+
+export const mixedRequestId = (queryIdx: number, requestId?: string) => `mixed-${queryIdx}-${requestId || ''}`;
 
 export interface BatchedQueries {
   datasource: Promise<DataSourceApi>;
@@ -60,7 +63,7 @@ export class MixedDatasource extends DataSourceApi<DataQuery> {
       from(query.datasource).pipe(
         mergeMap((api: DataSourceApi) => {
           const dsRequest = cloneDeep(request);
-          dsRequest.requestId = `mixed-${i}-${dsRequest.requestId || ''}`;
+          dsRequest.requestId = mixedRequestId(i, dsRequest.requestId);
           dsRequest.targets = query.targets;
 
           return from(api.query(dsRequest)).pipe(
@@ -69,7 +72,7 @@ export class MixedDatasource extends DataSourceApi<DataQuery> {
                 ...response,
                 data: response.data || [],
                 state: LoadingState.Loading,
-                key: `mixed-${i}-${response.key || ''}`,
+                key: mixedRequestId(i, response.key),
               };
             }),
             toArray(),
@@ -82,7 +85,7 @@ export class MixedDatasource extends DataSourceApi<DataQuery> {
                   data: [],
                   state: LoadingState.Error,
                   error: err,
-                  key: `mixed-${i}-${dsRequest.requestId || ''}`,
+                  key: mixedRequestId(i, dsRequest.requestId),
                 },
               ]);
             })
@@ -94,8 +97,8 @@ export class MixedDatasource extends DataSourceApi<DataQuery> {
     return forkJoin(runningQueries).pipe(flattenResponses(), map(this.finalizeResponses), mergeAll());
   }
 
-  testDatasource() {
-    return Promise.resolve({});
+  testDatasource(): Promise<TestDataSourceResponse> {
+    return Promise.resolve({ message: '', status: '' });
   }
 
   private isQueryable(query: BatchedQueries): boolean {

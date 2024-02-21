@@ -58,6 +58,8 @@ export class UPlotConfigBuilder {
   private tooltipInterpolator: PlotTooltipInterpolator | undefined = undefined;
   private padding?: Padding = undefined;
 
+  private cachedConfig?: PlotConfig;
+
   prepData: PrepData | undefined = undefined;
 
   constructor(timeZone: TimeZone = DefaultTimeZone) {
@@ -74,7 +76,7 @@ export class UPlotConfigBuilder {
       this.hooks[type] = [];
     }
 
-    this.hooks[type]!.push(hook as any);
+    this.hooks[type].push(hook);
   }
 
   addThresholds(options: UPlotThresholdOptions) {
@@ -190,6 +192,10 @@ export class UPlotConfigBuilder {
   }
 
   getConfig() {
+    if (this.cachedConfig) {
+      return this.cachedConfig;
+    }
+
     const config: PlotConfig = {
       ...DEFAULT_PLOT_CONFIG,
       mode: this.mode,
@@ -220,7 +226,7 @@ export class UPlotConfigBuilder {
         // interpolate for gradients/thresholds
         if (typeof s !== 'string') {
           let field = this.frames![0].fields[seriesIdx];
-          s = field.display!(field.values.get(u.cursor.idxs![seriesIdx]!)).color!;
+          s = field.display!(field.values[u.cursor.idxs![seriesIdx]!]).color!;
         }
 
         return s + alphaHex;
@@ -244,17 +250,17 @@ export class UPlotConfigBuilder {
       config.padding = this.padding;
     }
 
-    if (this.stackingGroups.length) {
-      this.stackingGroups.forEach((group) => {
-        getStackingBands(group).forEach((band) => {
-          this.addBand(band);
-        });
+    this.stackingGroups.forEach((group) => {
+      getStackingBands(group).forEach((band) => {
+        this.addBand(band);
       });
-    }
+    });
 
     if (this.bands.length) {
       config.bands = this.bands;
     }
+
+    this.cachedConfig = config;
 
     return config;
   }
@@ -295,7 +301,7 @@ export type Renderers = Array<{
 }>;
 
 /** @alpha */
-type UPlotConfigPrepOpts<T extends Record<string, any> = {}> = {
+type UPlotConfigPrepOpts<T extends Record<string, unknown> = {}> = {
   frame: DataFrame;
   theme: GrafanaTheme2;
   timeZones: TimeZone[];
@@ -305,6 +311,9 @@ type UPlotConfigPrepOpts<T extends Record<string, any> = {}> = {
   renderers?: Renderers;
   tweakScale?: (opts: ScaleProps, forField: Field) => ScaleProps;
   tweakAxis?: (opts: AxisProps, forField: Field) => AxisProps;
+  // Identifies the shared key for uPlot cursor sync
+  eventsScope?: string;
+  hoverProximity?: number;
 } & T;
 
 /** @alpha */

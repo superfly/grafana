@@ -1,7 +1,8 @@
 import { css } from '@emotion/css';
+import memoizeOne from 'memoize-one';
 import tinycolor from 'tinycolor2';
 
-import { GrafanaTheme2, LogLevel } from '@grafana/data';
+import { colorManipulator, GrafanaTheme2, LogLevel } from '@grafana/data';
 import { styleMixins } from '@grafana/ui';
 
 export const getLogLevelStyles = (theme: GrafanaTheme2, logLevel?: LogLevel) => {
@@ -39,7 +40,7 @@ export const getLogLevelStyles = (theme: GrafanaTheme2, logLevel?: LogLevel) => 
   };
 };
 
-export const getLogRowStyles = (theme: GrafanaTheme2) => {
+export const getLogRowStyles = memoizeOne((theme: GrafanaTheme2) => {
   const hoverBgColor = styleMixins.hoverColor(theme.colors.background.secondary, theme);
   const contextOutlineColor = tinycolor(theme.components.dashboard.background).setAlpha(0.7).toRgbString();
   return {
@@ -64,14 +65,21 @@ export const getLogRowStyles = (theme: GrafanaTheme2) => {
       color: ${theme.components.textHighlight.text}
       background-color: ${theme.components.textHighlight};
     `,
+    logRows: css({
+      position: 'relative',
+    }),
     logsRowsTable: css`
       label: logs-rows;
       font-family: ${theme.typography.fontFamilyMonospace};
       font-size: ${theme.typography.bodySmall.fontSize};
       width: 100%;
+      position: relative;
     `,
-    contextBackground: css`
-      background: ${hoverBgColor};
+    logsRowsTableContain: css`
+      contain: strict;
+    `,
+    highlightBackground: css`
+      background-color: ${tinycolor(theme.colors.info.transparent).setAlpha(0.25).toString()};
     `,
     logsRow: css`
       label: logs-row;
@@ -81,7 +89,6 @@ export const getLogRowStyles = (theme: GrafanaTheme2) => {
 
       &:hover {
         .log-row-menu {
-          visibility: visible;
           z-index: 1;
         }
 
@@ -137,12 +144,23 @@ export const getLogRowStyles = (theme: GrafanaTheme2) => {
       width: 100%;
       text-align: left;
     `,
+    copyLogButton: css`
+      padding: 0 0 0 ${theme.spacing(0.5)};
+      height: ${theme.spacing(3)};
+      width: ${theme.spacing(3.25)};
+      line-height: ${theme.spacing(2.5)};
+      overflow: hidden;
+      &:hover {
+          background-color: ${colorManipulator.alpha(theme.colors.text.primary, 0.12)};
+        }
+      }
+    `,
     //Log details specific CSS
     logDetailsContainer: css`
       label: logs-row-details-table;
       border: 1px solid ${theme.colors.border.medium};
       padding: 0 ${theme.spacing(1)} ${theme.spacing(1)};
-      border-radius: ${theme.shape.borderRadius(1.5)};
+      border-radius: ${theme.shape.radius.default};
       margin: ${theme.spacing(2.5)} ${theme.spacing(1)} ${theme.spacing(2.5)} ${theme.spacing(2)};
       cursor: default;
     `,
@@ -219,6 +237,7 @@ export const getLogRowStyles = (theme: GrafanaTheme2) => {
       margin-left: 0px;
     `,
     rowMenu: css`
+      label: rowMenu;
       display: flex;
       flex-wrap: nowrap;
       flex-direction: row;
@@ -228,29 +247,25 @@ export const getLogRowStyles = (theme: GrafanaTheme2) => {
       position: absolute;
       top: 0;
       bottom: auto;
-      height: ${theme.spacing(4.5)};
       background: ${theme.colors.background.primary};
       box-shadow: ${theme.shadows.z3};
-      padding: ${theme.spacing(0, 0, 0, 0.5)};
+      padding: ${theme.spacing(0.5, 1, 0.5, 1)};
       z-index: 100;
-      visibility: hidden;
-      width: ${theme.spacing(5)};
-    `,
-    rowMenuWithContextButton: css`
-      width: ${theme.spacing(10)};
+      gap: ${theme.spacing(0.5)};
+
+      & > button {
+        margin: 0;
+      }
     `,
     logRowMenuCell: css`
-      position: absolute;
+      position: sticky;
+      z-index: ${theme.zIndex.dropdown};
       margin-top: -${theme.spacing(0.125)};
-    `,
-    logRowMenuCellDefaultPosition: css`
-      right: 40px;
-    `,
-    logRowMenuCellExplore: css`
-      right: calc(115px + ${theme.spacing(1)});
-    `,
-    logRowMenuCellExploreWithContextButton: css`
-      right: calc(155px + ${theme.spacing(1)});
+      right: 0px;
+
+      & > span {
+        transform: translateX(-100%);
+      }
     `,
     logLine: css`
       background-color: transparent;
@@ -263,7 +278,41 @@ export const getLogRowStyles = (theme: GrafanaTheme2) => {
       padding: 0;
       user-select: text;
     `,
+    // Log details
+    logsRowLevelDetails: css`
+      label: logs-row__level_details;
+      &::after {
+        top: -3px;
+      }
+    `,
+    logDetails: css`
+      label: logDetailsDefaultCursor;
+      cursor: default;
+
+      &:hover {
+        background-color: ${theme.colors.background.primary};
+      }
+    `,
+    visibleRowMenu: css`
+      label: visibleRowMenu;
+      aspect-ratio: 1/1;
+      z-index: 90;
+    `,
+    linkButton: css`
+      label: linkButton;
+      > button {
+        padding-top: ${theme.spacing(0.5)};
+      }
+    `,
+    hidden: css`
+      label: hidden;
+      visibility: hidden;
+    `,
+    unPinButton: css`
+      height: ${theme.spacing(3)};
+      line-height: ${theme.spacing(2.5)};
+    `,
   };
-};
+});
 
 export type LogRowStyles = ReturnType<typeof getLogRowStyles>;

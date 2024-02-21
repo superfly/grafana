@@ -15,12 +15,16 @@ import (
 	"github.com/grafana/grafana/pkg/services/featuremgmt"
 	"github.com/grafana/grafana/pkg/services/org"
 	"github.com/grafana/grafana/pkg/services/org/orgtest"
-	"github.com/grafana/grafana/pkg/services/querylibrary/querylibraryimpl"
 	"github.com/grafana/grafana/pkg/services/sqlstore"
 	"github.com/grafana/grafana/pkg/services/store"
 	"github.com/grafana/grafana/pkg/services/user"
 	"github.com/grafana/grafana/pkg/setting"
+	"github.com/grafana/grafana/pkg/tests/testsuite"
 )
+
+func TestMain(m *testing.M) {
+	testsuite.Run(m)
+}
 
 // setupBenchEnv will set up a database with folderCount folders and dashboardsPerFolder dashboards per folder
 // It will also set up and run the search service
@@ -37,9 +41,8 @@ func setupBenchEnv(b *testing.B, folderCount, dashboardsPerFolder int) (*Standar
 	orgSvc := &orgtest.FakeOrgService{
 		ExpectedOrgs: []*org.OrgDTO{{ID: 1}},
 	}
-	querySvc := querylibraryimpl.ProvideService(cfg, features)
 	searchService, ok := ProvideService(cfg, sqlStore, store.NewDummyEntityEventsService(), actest.FakeService{},
-		tracing.InitializeTracerForTest(), features, orgSvc, nil, querySvc, nil).(*StandardSearchService)
+		tracing.InitializeTracerForTest(), features, orgSvc, nil, nil).(*StandardSearchService)
 	require.True(b, ok)
 
 	err = runSearchService(searchService)
@@ -136,16 +139,16 @@ func populateDB(folderCount, dashboardsPerFolder int, sqlStore *sqlstore.SQLStor
 
 		for u := start; u < end; u++ {
 			dashID := int64(u + offset)
-			folderID := int64((u+offset)%folderCount + 1)
+			folderUID := fmt.Sprintf("folder%v", int64((u+offset)%folderCount+1))
 			dbs = append(dbs, dashboards.Dashboard{
-				ID:       dashID,
-				UID:      fmt.Sprintf("dashboard%v", dashID),
-				Title:    fmt.Sprintf("dashboard%v", dashID),
-				IsFolder: false,
-				FolderID: folderID,
-				OrgID:    1,
-				Created:  now,
-				Updated:  now,
+				ID:        dashID,
+				UID:       fmt.Sprintf("dashboard%v", dashID),
+				Title:     fmt.Sprintf("dashboard%v", dashID),
+				IsFolder:  false,
+				FolderUID: folderUID,
+				OrgID:     1,
+				Created:   now,
+				Updated:   now,
 			})
 		}
 

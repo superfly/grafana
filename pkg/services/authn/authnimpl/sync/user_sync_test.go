@@ -4,12 +4,13 @@ import (
 	"context"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/grafana/grafana/pkg/services/authn"
 	"github.com/grafana/grafana/pkg/services/login"
-	"github.com/grafana/grafana/pkg/services/login/authinfoservice"
-	"github.com/grafana/grafana/pkg/services/login/logintest"
+	"github.com/grafana/grafana/pkg/services/login/authinfoimpl"
+	"github.com/grafana/grafana/pkg/services/login/authinfotest"
 	"github.com/grafana/grafana/pkg/services/quota"
 	"github.com/grafana/grafana/pkg/services/quota/quotatest"
 	"github.com/grafana/grafana/pkg/services/user"
@@ -28,11 +29,10 @@ func ptrInt64(i int64) *int64 {
 	return &i
 }
 
-func TestUserSync_SyncUser(t *testing.T) {
-	userProtection := &authinfoservice.OSSUserProtectionImpl{}
+func TestUserSync_SyncUserHook(t *testing.T) {
+	userProtection := &authinfoimpl.OSSUserProtectionImpl{}
 
-	authFakeNil := &logintest.AuthInfoServiceFake{
-		ExpectedUser:  nil,
+	authFakeNil := &authinfotest.FakeService{
 		ExpectedError: user.ErrUserNotFound,
 		SetAuthInfoFn: func(ctx context.Context, cmd *login.SetAuthInfoCommand) error {
 			return nil
@@ -41,8 +41,7 @@ func TestUserSync_SyncUser(t *testing.T) {
 			return nil
 		},
 	}
-	authFakeUserID := &logintest.AuthInfoServiceFake{
-		ExpectedUser:  nil,
+	authFakeUserID := &authinfotest.FakeService{
 		ExpectedError: nil,
 		ExpectedUserAuth: &login.UserAuth{
 			AuthModule: "oauth",
@@ -67,7 +66,6 @@ func TestUserSync_SyncUser(t *testing.T) {
 	}}
 
 	userServiceNil := &usertest.FakeUserService{
-		ExpectedUser:  nil,
 		ExpectedError: user.ErrUserNotFound,
 		CreateFn: func(ctx context.Context, cmd *user.CreateUserCommand) (*user.User, error) {
 			return &user.User{
@@ -266,12 +264,13 @@ func TestUserSync_SyncUser(t *testing.T) {
 			},
 			args: args{
 				ctx: context.Background(),
-
 				id: &authn.Identity{
-					ID:    "",
-					Login: "test",
-					Name:  "test",
-					Email: "test",
+					ID:              "",
+					AuthID:          "2032",
+					AuthenticatedBy: "oauth",
+					Login:           "test",
+					Name:            "test",
+					Email:           "test",
 					ClientParams: authn.ClientParams{
 						SyncUser: true,
 						LookUpParams: login.UserLookupParams{
@@ -284,11 +283,13 @@ func TestUserSync_SyncUser(t *testing.T) {
 			},
 			wantErr: false,
 			wantID: &authn.Identity{
-				ID:             "user:1",
-				Login:          "test",
-				Name:           "test",
-				Email:          "test",
-				IsGrafanaAdmin: ptrBool(false),
+				ID:              "user:1",
+				AuthID:          "2032",
+				AuthenticatedBy: "oauth",
+				Login:           "test",
+				Name:            "test",
+				Email:           "test",
+				IsGrafanaAdmin:  ptrBool(false),
 				ClientParams: authn.ClientParams{
 					SyncUser: true,
 					LookUpParams: login.UserLookupParams{
@@ -309,12 +310,12 @@ func TestUserSync_SyncUser(t *testing.T) {
 			args: args{
 				ctx: context.Background(),
 				id: &authn.Identity{
-					ID:         "",
-					Login:      "test",
-					Name:       "test",
-					Email:      "test",
-					AuthModule: "oauth",
-					AuthID:     "2032",
+					ID:              "",
+					Login:           "test",
+					Name:            "test",
+					Email:           "test",
+					AuthenticatedBy: "oauth",
+					AuthID:          "2032",
 					ClientParams: authn.ClientParams{
 						SyncUser: true,
 						LookUpParams: login.UserLookupParams{
@@ -337,17 +338,17 @@ func TestUserSync_SyncUser(t *testing.T) {
 			args: args{
 				ctx: context.Background(),
 				id: &authn.Identity{
-					ID:             "",
-					Login:          "test_create",
-					Name:           "test_create",
-					IsGrafanaAdmin: ptrBool(true),
-					Email:          "test_create",
-					AuthModule:     "oauth",
-					AuthID:         "2032",
+					ID:              "",
+					Login:           "test_create",
+					Name:            "test_create",
+					IsGrafanaAdmin:  ptrBool(true),
+					Email:           "test_create",
+					AuthenticatedBy: "oauth",
+					AuthID:          "2032",
 					ClientParams: authn.ClientParams{
-						SyncUser:            true,
-						AllowSignUp:         true,
-						EnableDisabledUsers: true,
+						SyncUser:    true,
+						AllowSignUp: true,
+						EnableUser:  true,
 						LookUpParams: login.UserLookupParams{
 							UserID: nil,
 							Email:  ptrString("test_create"),
@@ -358,17 +359,17 @@ func TestUserSync_SyncUser(t *testing.T) {
 			},
 			wantErr: false,
 			wantID: &authn.Identity{
-				ID:             "user:2",
-				Login:          "test_create",
-				Name:           "test_create",
-				Email:          "test_create",
-				AuthModule:     "oauth",
-				AuthID:         "2032",
-				IsGrafanaAdmin: ptrBool(true),
+				ID:              "user:2",
+				Login:           "test_create",
+				Name:            "test_create",
+				Email:           "test_create",
+				AuthenticatedBy: "oauth",
+				AuthID:          "2032",
+				IsGrafanaAdmin:  ptrBool(true),
 				ClientParams: authn.ClientParams{
-					SyncUser:            true,
-					AllowSignUp:         true,
-					EnableDisabledUsers: true,
+					SyncUser:    true,
+					AllowSignUp: true,
+					EnableUser:  true,
 					LookUpParams: login.UserLookupParams{
 						UserID: nil,
 						Email:  ptrString("test_create"),
@@ -394,8 +395,8 @@ func TestUserSync_SyncUser(t *testing.T) {
 					IsDisabled:     false,
 					IsGrafanaAdmin: ptrBool(true),
 					ClientParams: authn.ClientParams{
-						SyncUser:            true,
-						EnableDisabledUsers: true,
+						SyncUser:   true,
+						EnableUser: true,
 						LookUpParams: login.UserLookupParams{
 							UserID: ptrInt64(3),
 							Email:  nil,
@@ -413,8 +414,8 @@ func TestUserSync_SyncUser(t *testing.T) {
 				IsDisabled:     false,
 				IsGrafanaAdmin: ptrBool(true),
 				ClientParams: authn.ClientParams{
-					SyncUser:            true,
-					EnableDisabledUsers: true,
+					SyncUser:   true,
+					EnableUser: true,
 					LookUpParams: login.UserLookupParams{
 						UserID: ptrInt64(3),
 						Email:  nil,
@@ -427,7 +428,7 @@ func TestUserSync_SyncUser(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := ProvideUserSync(tt.fields.userService, userProtection, tt.fields.authInfoService, tt.fields.quotaService)
-			err := s.SyncUser(tt.args.ctx, tt.args.id, nil)
+			err := s.SyncUserHook(tt.args.ctx, tt.args.id, nil)
 			if tt.wantErr {
 				require.Error(t, err)
 				return
@@ -435,6 +436,90 @@ func TestUserSync_SyncUser(t *testing.T) {
 			require.NoError(t, err)
 
 			require.EqualValues(t, tt.wantID, tt.args.id)
+		})
+	}
+}
+
+func TestUserSync_FetchSyncedUserHook(t *testing.T) {
+	type testCase struct {
+		desc        string
+		req         *authn.Request
+		identity    *authn.Identity
+		expectedErr error
+	}
+
+	tests := []testCase{
+		{
+			desc:     "should skip hook when flag is not enabled",
+			req:      &authn.Request{},
+			identity: &authn.Identity{ClientParams: authn.ClientParams{FetchSyncedUser: false}},
+		},
+		{
+			desc:     "should skip hook when identity is not a user",
+			req:      &authn.Request{},
+			identity: &authn.Identity{ID: "apikey:1", ClientParams: authn.ClientParams{FetchSyncedUser: true}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			s := UserSync{}
+			err := s.FetchSyncedUserHook(context.Background(), tt.identity, tt.req)
+			require.ErrorIs(t, err, tt.expectedErr)
+		})
+	}
+}
+
+func TestUserSync_EnableDisabledUserHook(t *testing.T) {
+	type testCase struct {
+		desc       string
+		identity   *authn.Identity
+		enableUser bool
+	}
+
+	tests := []testCase{
+		{
+			desc: "should skip if correct flag is not set",
+			identity: &authn.Identity{
+				ID:           authn.NamespacedID(authn.NamespaceUser, 1),
+				IsDisabled:   true,
+				ClientParams: authn.ClientParams{EnableUser: false},
+			},
+			enableUser: false,
+		},
+		{
+			desc: "should skip if identity is not a user",
+			identity: &authn.Identity{
+				ID:           authn.NamespacedID(authn.NamespaceAPIKey, 1),
+				IsDisabled:   true,
+				ClientParams: authn.ClientParams{EnableUser: true},
+			},
+			enableUser: false,
+		},
+		{
+			desc: "should enabled disabled user",
+			identity: &authn.Identity{
+				ID:           authn.NamespacedID(authn.NamespaceUser, 1),
+				IsDisabled:   true,
+				ClientParams: authn.ClientParams{EnableUser: true},
+			},
+			enableUser: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			userSvc := usertest.NewUserServiceFake()
+			called := false
+			userSvc.DisableFn = func(ctx context.Context, cmd *user.DisableUserCommand) error {
+				called = true
+				return nil
+			}
+
+			s := UserSync{userService: userSvc}
+			err := s.EnableUserHook(context.Background(), tt.identity, nil)
+			require.NoError(t, err)
+			assert.Equal(t, tt.enableUser, called)
 		})
 	}
 }

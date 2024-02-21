@@ -6,11 +6,11 @@ import (
 	"reflect"
 	"time"
 
-	"gopkg.in/square/go-jose.v2/jwt"
+	"github.com/go-jose/go-jose/v3/jwt"
 )
 
 func (s *AuthService) initClaimExpectations() error {
-	if err := json.Unmarshal([]byte(s.Cfg.JWTAuthExpectClaims), &s.expect); err != nil {
+	if err := json.Unmarshal([]byte(s.Cfg.JWTAuth.ExpectClaims), &s.expect); err != nil {
 		return err
 	}
 
@@ -32,7 +32,7 @@ func (s *AuthService) initClaimExpectations() error {
 			delete(s.expect, key)
 		case "aud":
 			switch value := value.(type) {
-			case []interface{}:
+			case []any:
 				for _, val := range value {
 					if v, ok := val.(string); ok {
 						s.expectRegistered.Audience = append(s.expectRegistered.Audience, v)
@@ -70,7 +70,7 @@ func (s *AuthService) validateClaims(claims JWTClaims) error {
 			}
 		case "aud":
 			switch value := value.(type) {
-			case []interface{}:
+			case []any:
 				for _, val := range value {
 					if v, ok := val.(string); ok {
 						registeredClaims.Audience = append(registeredClaims.Audience, v)

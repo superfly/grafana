@@ -1,9 +1,10 @@
 import { css } from '@emotion/css';
-import React, { FC, MouseEvent, useCallback } from 'react';
+import React, { MouseEvent, useCallback } from 'react';
 
 import { GrafanaTheme2 } from '@grafana/data';
 import { selectors } from '@grafana/e2e-selectors';
-import { Icon, Tooltip, useStyles2 } from '@grafana/ui';
+import { Icon, useStyles2 } from '@grafana/ui';
+import { LoadingIndicator } from '@grafana/ui/src/components/PanelChrome/LoadingIndicator';
 import { t } from 'app/core/internationalization';
 
 import { ALL_VARIABLE_TEXT } from '../../constants';
@@ -20,7 +21,7 @@ interface Props {
   id: string;
 }
 
-export const VariableLink: FC<Props> = ({ loading, disabled, onClick: propsOnClick, text, onCancel, id }) => {
+export const VariableLink = ({ loading, disabled, onClick: propsOnClick, text, onCancel, id }: Props) => {
   const styles = useStyles2(getStyles);
   const onClick = useCallback(
     (event: MouseEvent<HTMLButtonElement>) => {
@@ -40,7 +41,7 @@ export const VariableLink: FC<Props> = ({ loading, disabled, onClick: propsOnCli
         id={id}
       >
         <VariableLinkText text={text} />
-        <LoadingIndicator onCancel={onCancel} />
+        <LoadingIndicator loading onCancel={onCancel} />
       </div>
     );
   }
@@ -66,34 +67,12 @@ interface VariableLinkTextProps {
   text: string;
 }
 
-const VariableLinkText: FC<VariableLinkTextProps> = ({ text }) => {
+const VariableLinkText = ({ text }: VariableLinkTextProps) => {
   const styles = useStyles2(getStyles);
   return (
     <span className={styles.textAndTags}>
       {text === ALL_VARIABLE_TEXT ? t('variable.picker.link-all', 'All') : text}
     </span>
-  );
-};
-
-const LoadingIndicator: FC<Pick<Props, 'onCancel'>> = ({ onCancel }) => {
-  const onClick = useCallback(
-    (event: MouseEvent) => {
-      event.preventDefault();
-      onCancel();
-    },
-    [onCancel]
-  );
-
-  return (
-    <Tooltip content="Cancel query">
-      <Icon
-        className="spin-clockwise"
-        name="sync"
-        size="xs"
-        onClick={onClick}
-        aria-label={selectors.components.LoadingIndicator.icon}
-      />
-    </Tooltip>
   );
 };
 
@@ -104,7 +83,7 @@ const getStyles = (theme: GrafanaTheme2) => ({
     padding: 0 ${theme.spacing(1)};
     background-color: ${theme.components.input.background};
     border: 1px solid ${theme.components.input.borderColor};
-    border-radius: ${theme.shape.borderRadius(1)};
+    border-radius: ${theme.shape.radius.default};
     display: flex;
     align-items: center;
     color: ${theme.colors.text};

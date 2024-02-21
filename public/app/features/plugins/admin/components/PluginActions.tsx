@@ -1,6 +1,10 @@
-import React from 'react';
+import { css } from '@emotion/css';
+import React, { useState } from 'react';
 
+import { GrafanaTheme2 } from '@grafana/data';
 import { config } from '@grafana/runtime';
+import { HorizontalGroup, Icon, useStyles2, VerticalGroup } from '@grafana/ui';
+import configCore from 'app/core/config';
 
 import { GetStartedWithPlugin } from '../components/GetStartedWithPlugin';
 import { InstallControlsButton } from '../components/InstallControls';
@@ -14,8 +18,10 @@ interface Props {
 }
 
 export const PluginActions = ({ plugin }: Props) => {
+  const styles = useStyles2(getStyles);
   const isRemotePluginsAvailable = useIsRemotePluginsAvailable();
   const latestCompatibleVersion = getLatestCompatibleVersion(plugin?.details?.versions);
+  const [needReload, setNeedReload] = useState(false);
 
   if (!plugin) {
     return null;
@@ -28,25 +34,46 @@ export const PluginActions = ({ plugin }: Props) => {
       ? PluginStatus.UPDATE
       : PluginStatus.UNINSTALL
     : PluginStatus.INSTALL;
-  const isInstallControlsDisabled =
-    plugin.isCore || plugin.isDisabled || !isInstallControlsEnabled() || hasInstallWarning;
+  const isInstallControlsDisabled = plugin.isCore || plugin.isDisabled || !isInstallControlsEnabled();
 
   return (
-    <>
-      {!isInstallControlsDisabled && (
-        <>
-          {isExternallyManaged ? (
-            <ExternallyManagedButton pluginId={plugin.id} pluginStatus={pluginStatus} />
-          ) : (
-            <InstallControlsButton
-              plugin={plugin}
-              latestCompatibleVersion={latestCompatibleVersion}
-              pluginStatus={pluginStatus}
-            />
-          )}
-        </>
+    <VerticalGroup>
+      <HorizontalGroup>
+        {!isInstallControlsDisabled && (
+          <>
+            {isExternallyManaged && !hasInstallWarning && !configCore.featureToggles.managedPluginsInstall ? (
+              <ExternallyManagedButton
+                pluginId={plugin.id}
+                pluginStatus={pluginStatus}
+                angularDetected={plugin.angularDetected}
+              />
+            ) : (
+              <InstallControlsButton
+                plugin={plugin}
+                latestCompatibleVersion={latestCompatibleVersion}
+                pluginStatus={pluginStatus}
+                setNeedReload={setNeedReload}
+                hasInstallWarning={hasInstallWarning}
+              />
+            )}
+          </>
+        )}
+        <GetStartedWithPlugin plugin={plugin} />
+      </HorizontalGroup>
+      {needReload && (
+        <HorizontalGroup>
+          <Icon name="exclamation-triangle" />
+          <span className={styles.message}>Refresh the page to see the changes</span>
+        </HorizontalGroup>
       )}
-      <GetStartedWithPlugin plugin={plugin} />
-    </>
+    </VerticalGroup>
   );
+};
+
+const getStyles = (theme: GrafanaTheme2) => {
+  return {
+    message: css`
+      color: ${theme.colors.text.secondary};
+    `,
+  };
 };

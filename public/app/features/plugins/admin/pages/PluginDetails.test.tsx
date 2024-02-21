@@ -52,8 +52,8 @@ jest.mock('../helpers.ts', () => ({
 
 jest.mock('app/core/core', () => ({
   contextSrv: {
-    hasAccess: (action: string, fallBack: boolean) => true,
-    hasAccessInMetadata: (action: string, object: WithAccessControlMetadata, fallBack: boolean) => true,
+    hasPermission: (action: string) => true,
+    hasPermissionInMetadata: (action: string, object: WithAccessControlMetadata) => true,
   },
 }));
 
@@ -324,12 +324,13 @@ describe('Plugin details page', () => {
       expect(await queryByRole('button', { name: /install/i })).toBeInTheDocument();
     });
 
-    it('should not display install button for enterprise plugins if license is invalid', async () => {
+    it('should not display install button for enterprise plugins if license is invalid (but allow uninstall)', async () => {
       config.licenseInfo.enabledFeatures = {};
 
       const { queryByRole, queryByText } = renderPluginDetails({ id, isInstalled: true, isEnterprise: true });
 
-      expect(await queryByRole('button', { name: /install/i })).not.toBeInTheDocument();
+      expect(await queryByRole('button', { name: /Install/ })).not.toBeInTheDocument();
+      expect(await queryByRole('button', { name: /Uninstall/ })).toBeInTheDocument();
       expect(queryByText(/no valid Grafana Enterprise license detected/i)).toBeInTheDocument();
       expect(queryByRole('link', { name: /learn more/i })).toBeInTheDocument();
     });
@@ -381,14 +382,14 @@ describe('Plugin details page', () => {
     });
 
     it('should display alert with information about why the plugin is disabled', async () => {
-      const { queryByLabelText } = renderPluginDetails({
+      const { queryByTestId } = renderPluginDetails({
         id,
         isInstalled: true,
         isDisabled: true,
         error: PluginErrorCode.modifiedSignature,
       });
 
-      expect(await queryByLabelText(selectors.pages.PluginPage.disabledInfo)).toBeInTheDocument();
+      expect(queryByTestId(selectors.pages.PluginPage.disabledInfo)).toBeInTheDocument();
     });
 
     it('should display grafana dependencies for a plugin if they are available', async () => {
@@ -465,17 +466,17 @@ describe('Plugin details page', () => {
 
       // Does not show an Install button
       rendered = renderPluginDetails({ id }, { pluginsStateOverride });
-      expect(await rendered.queryByRole('button', { name: /(un)?install/i })).not.toBeInTheDocument();
+      expect(rendered.queryByRole('button', { name: /(un)?install/i })).not.toBeInTheDocument();
       rendered.unmount();
 
       // Does not show a Uninstall button
       rendered = renderPluginDetails({ id, isInstalled: true }, { pluginsStateOverride });
-      expect(await rendered.queryByRole('button', { name: /(un)?install/i })).not.toBeInTheDocument();
+      expect(rendered.queryByRole('button', { name: /(un)?install/i })).not.toBeInTheDocument();
       rendered.unmount();
 
       // Does not show an Update button
       rendered = renderPluginDetails({ id, isInstalled: true, hasUpdate: true }, { pluginsStateOverride });
-      expect(await rendered.queryByRole('button', { name: /update/i })).not.toBeInTheDocument();
+      expect(rendered.queryByRole('button', { name: /update/i })).not.toBeInTheDocument();
 
       // Shows a message to the user
       // TODO<Import these texts from a single source of truth instead of having them defined in multiple places>
@@ -491,15 +492,17 @@ describe('Plugin details page', () => {
 
       // Should not show an "Install" button
       rendered = renderPluginDetails({ id, isInstalled: false });
-      expect(await rendered.queryByRole('button', { name: /^install/i })).not.toBeInTheDocument();
+      expect(rendered.queryByRole('button', { name: /^install/i })).not.toBeInTheDocument();
+      rendered.unmount();
 
       // Should not show an "Uninstall" button
       rendered = renderPluginDetails({ id, isInstalled: true });
-      expect(await rendered.queryByRole('button', { name: /^uninstall/i })).not.toBeInTheDocument();
+      expect(rendered.queryByRole('button', { name: /^uninstall/i })).not.toBeInTheDocument();
+      rendered.unmount();
 
       // Should not show an "Update" button
       rendered = renderPluginDetails({ id, isInstalled: true, hasUpdate: true });
-      expect(await rendered.queryByRole('button', { name: /^update/i })).not.toBeInTheDocument();
+      expect(rendered.queryByRole('button', { name: /^update/i })).not.toBeInTheDocument();
     });
 
     it('should display a "Create" button as a post installation step for installed data source plugins', async () => {
@@ -511,7 +514,7 @@ describe('Plugin details page', () => {
       });
 
       await waitFor(() => queryByText('Uninstall'));
-      expect(queryByText(`Create a ${name} data source`)).toBeInTheDocument();
+      expect(queryByText('Add new data source')).toBeInTheDocument();
     });
 
     it('should not display a "Create" button as a post installation step for disabled data source plugins', async () => {
@@ -524,7 +527,7 @@ describe('Plugin details page', () => {
       });
 
       await waitFor(() => queryByText('Uninstall'));
-      expect(queryByText(`Create a ${name} data source`)).toBeNull();
+      expect(queryByText('Add new data source')).toBeNull();
     });
 
     it('should not display post installation step for panel plugins', async () => {
@@ -536,7 +539,7 @@ describe('Plugin details page', () => {
       });
 
       await waitFor(() => queryByText('Uninstall'));
-      expect(queryByText(`Create a ${name} data source`)).toBeNull();
+      expect(queryByText('Add new data source')).toBeNull();
     });
 
     it('should display an enable button for app plugins that are not enabled as a post installation step', async () => {
@@ -723,6 +726,78 @@ describe('Plugin details page', () => {
 
       expect(queryByRole('button', { name: /uninstall/i })).not.toBeInTheDocument();
     });
+
+    it('shows a "angular warning" if the plugin uses Angular', async () => {
+      const { queryByText } = renderPluginDetails({
+        angularDetected: true,
+      });
+
+      await waitFor(() => expect(queryByText(/angular plugin/i)).toBeInTheDocument);
+    });
+
+    it('does not show an "angular warning" if the plugin is not using Angular', async () => {
+      const { queryByText } = renderPluginDetails({
+        angularDetected: false,
+      });
+
+      await waitFor(() => expect(queryByText(/angular plugin/i)).not.toBeInTheDocument);
+    });
+
+    it('should display a deprecation warning if the plugin is deprecated', async () => {
+      const { findByRole } = renderPluginDetails({
+        id,
+        isInstalled: true,
+        isDeprecated: true,
+      });
+
+      expect(await findByRole('link', { name: 'deprecated' })).toBeInTheDocument();
+    });
+
+    it('should not display a deprecation warning in the plugin is not deprecated', async () => {
+      const { queryByRole } = renderPluginDetails({
+        id,
+        isInstalled: true,
+        isDeprecated: false,
+      });
+
+      await waitFor(() => expect(queryByRole('link', { name: 'deprecated' })).not.toBeInTheDocument());
+    });
+
+    it('should display a custom deprecation message if the plugin has it set', async () => {
+      const statusContext = 'A detailed explanation of why this plugin is deprecated.';
+      const { findByText, findByRole } = renderPluginDetails({
+        id,
+        isInstalled: true,
+        isDeprecated: true,
+        details: {
+          statusContext,
+          links: [],
+        },
+      });
+
+      expect(await findByRole('link', { name: 'deprecated' })).toBeInTheDocument();
+      expect(await findByText(statusContext)).toBeInTheDocument();
+    });
+
+    it('should be possible to render markdown inside a custom deprecation message', async () => {
+      const statusContext =
+        '**This is a custom deprecation message.** [Link 1](https://grafana.com) <a href="https://grafana.com" target="_blank">Link 2</a>';
+      const { findByText, findByRole } = renderPluginDetails({
+        id,
+        isInstalled: true,
+        isDeprecated: true,
+        details: {
+          statusContext,
+          links: [],
+        },
+      });
+
+      expect(await findByRole('link', { name: 'deprecated' })).toBeInTheDocument();
+      expect(await findByText('This is a custom deprecation message.')).toBeInTheDocument();
+      expect(await findByRole('link', { name: 'Link 1' })).toBeInTheDocument();
+      expect(await findByRole('link', { name: 'Link 2' })).toBeInTheDocument();
+      expect(await findByRole('link', { name: 'Link 2' })).toHaveAttribute('href', 'https://grafana.com');
+    });
   });
 
   describe('viewed as user without grafana admin permissions', () => {
@@ -785,7 +860,7 @@ describe('Plugin details page', () => {
       });
 
       await waitFor(() => queryByText('Uninstall'));
-      expect(queryByText(`Create a ${name} data source`)).toBeNull();
+      expect(queryByText('Add new data source')).toBeNull();
     });
   });
 });

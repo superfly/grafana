@@ -7,6 +7,7 @@ import {
   DataQuery,
   DataQueryRequest,
   DataQueryResponse,
+  TestDataSourceResponse,
   DataSourceApi,
   DataSourceInstanceSettings,
   DataSourceJsonData,
@@ -15,6 +16,7 @@ import {
   makeClassES5Compatible,
   parseLiveChannelAddress,
   ScopedVars,
+  AdHocVariableFilter,
 } from '@grafana/data';
 
 import { config } from '../config';
@@ -28,6 +30,7 @@ import {
   StreamingFrameOptions,
 } from '../services';
 
+import { publicDashboardQueryHandler } from './publicDashboardQueryHandler';
 import { BackendDataSourceResponse, toDataQueryResponse } from './queryResponse';
 
 /**
@@ -47,7 +50,7 @@ export function isExpressionReference(ref?: DataSourceRef | string | null): bool
     return false;
   }
   const v = typeof ref === 'string' ? ref : ref.type;
-  return v === ExpressionDatasourceRef.type || v === '-100'; // -100 was a legacy accident that should be removed
+  return v === ExpressionDatasourceRef.type || v === ExpressionDatasourceRef.name || v === '-100'; // -100 was a legacy accident that should be removed
 }
 
 export class HealthCheckError extends Error {
@@ -75,8 +78,12 @@ export enum HealthStatus {
 enum PluginRequestHeaders {
   PluginID = 'X-Plugin-Id', // can be used for routing
   DatasourceUID = 'X-Datasource-Uid', // can be used for routing/ load balancing
-  DashboardUID = 'X-Dashboard-Uid', // mainly useful for debuging slow queries
-  PanelID = 'X-Panel-Id', // mainly useful for debuging slow queries
+  DashboardUID = 'X-Dashboard-Uid', // mainly useful for debugging slow queries
+  PanelID = 'X-Panel-Id', // mainly useful for debugging slow queries
+  PanelPluginId = 'X-Panel-Plugin-Id',
+  QueryGroupID = 'X-Query-Group-Id', // mainly useful to find related queries with query splitting
+  FromExpression = 'X-Grafana-From-Expr', // used by datasources to identify expression queries
+  SkipQueryCache = 'X-Cache-Skip', // used by datasources to skip the query cache
 }
 
 /**
@@ -110,7 +117,7 @@ export interface HealthCheckResult {
  */
 class DataSourceWithBackend<
   TQuery extends DataQuery = DataQuery,
-  TOptions extends DataSourceJsonData = DataSourceJsonData
+  TOptions extends DataSourceJsonData = DataSourceJsonData,
 > extends DataSourceApi<TQuery, TOptions> {
   constructor(instanceSettings: DataSourceInstanceSettings<TOptions>) {
     super(instanceSettings);
@@ -120,6 +127,10 @@ class DataSourceWithBackend<
    * Ideally final -- any other implementation may not work as expected
    */
   query(request: DataQueryRequest<TQuery>): Observable<DataQueryResponse> {
+    if (config.publicDashboardAccessToken) {
+      return publicDashboardQueryHandler(request);
+    }
+
     const { intervalMs, maxDataPoints, queryCachingTTL, range, requestId, hideFromInspector = false } = request;
     let targets = request.targets;
 
@@ -167,7 +178,7 @@ class DataSourceWithBackend<
         dsUIDs.add(datasource.uid);
       }
       return {
-        ...(shouldApplyTemplateVariables ? this.applyTemplateVariables(q, request.scopedVars) : q),
+        ...(shouldApplyTemplateVariables ? this.applyTemplateVariables(q, request.scopedVars, request.filters) : q),
         datasource,
         datasourceId, // deprecated!
         intervalMs,
@@ -181,13 +192,11 @@ class DataSourceWithBackend<
       return of({ data: [] });
     }
 
-    const body: any = { queries };
-
-    if (range) {
-      body.range = range;
-      body.from = range.from.valueOf().toString();
-      body.to = range.to.valueOf().toString();
-    }
+    const body = {
+      queries,
+      from: range?.from.valueOf().toString(),
+      to: range?.to.valueOf().toString(),
+    };
 
     if (config.featureToggles.queryOverLive) {
       return getGrafanaLiveSrv().getQueryData({
@@ -196,19 +205,36 @@ class DataSourceWithBackend<
       });
     }
 
-    let url = '/api/ds/query';
-    if (hasExpr) {
-      url += '?expression=true';
-    }
-
     const headers: Record<string, string> = {};
     headers[PluginRequestHeaders.PluginID] = Array.from(pluginIDs).join(', ');
     headers[PluginRequestHeaders.DatasourceUID] = Array.from(dsUIDs).join(', ');
+
+    let url = '/api/ds/query?ds_type=' + this.type;
+
+    if (hasExpr) {
+      headers[PluginRequestHeaders.FromExpression] = 'true';
+      url += '&expression=true';
+    }
+
+    // Appending request ID to url to facilitate client-side performance metrics. See #65244 for more context.
+    if (requestId) {
+      url += `&requestId=${requestId}`;
+    }
+
     if (request.dashboardUID) {
       headers[PluginRequestHeaders.DashboardUID] = request.dashboardUID;
     }
     if (request.panelId) {
       headers[PluginRequestHeaders.PanelID] = `${request.panelId}`;
+    }
+    if (request.panelPluginId) {
+      headers[PluginRequestHeaders.PanelPluginId] = `${request.panelPluginId}`;
+    }
+    if (request.queryGroupId) {
+      headers[PluginRequestHeaders.QueryGroupID] = `${request.queryGroupId}`;
+    }
+    if (request.skipQueryCache) {
+      headers[PluginRequestHeaders.SkipQueryCache] = 'true';
     }
     return getBackendSrv()
       .fetch<BackendDataSourceResponse>({
@@ -245,12 +271,22 @@ class DataSourceWithBackend<
   /**
    * Apply template variables for explore
    */
-  interpolateVariablesInQueries(queries: TQuery[], scopedVars: ScopedVars | {}): TQuery[] {
-    return queries.map((q) => this.applyTemplateVariables(q, scopedVars) as TQuery);
+  interpolateVariablesInQueries(queries: TQuery[], scopedVars: ScopedVars, filters?: AdHocVariableFilter[]): TQuery[] {
+    return queries.map((q) => this.applyTemplateVariables(q, scopedVars, filters));
   }
 
   /**
-   * Override to apply template variables.  The result is usually also `TQuery`, but sometimes this can
+   * Override to skip executing a query.  Note this function may not be called
+   * if the query method is overwritten.
+   *
+   * @returns false if the query should be skipped
+   *
+   * @virtual
+   */
+  filterQuery?(query: TQuery): boolean;
+
+  /**
+   * Override to apply template variables and adhoc filters.  The result is usually also `TQuery`, but sometimes this can
    * be used to modify the query structure before sending to the backend.
    *
    * NOTE: if you do modify the structure or use template variables, alerting queries may not work
@@ -258,7 +294,7 @@ class DataSourceWithBackend<
    *
    * @virtual
    */
-  applyTemplateVariables(query: TQuery, scopedVars: ScopedVars): Record<string, any> {
+  applyTemplateVariables(query: TQuery, scopedVars: ScopedVars, filters?: AdHocVariableFilter[]) {
     return query;
   }
 
@@ -291,7 +327,7 @@ class DataSourceWithBackend<
   /**
    * Send a POST request to the datasource resource path
    */
-  async postResource<T = any>(
+  async postResource<T = unknown>(
     path: string,
     data?: BackendSrvRequest['data'],
     options?: Partial<BackendSrvRequest>
@@ -329,7 +365,7 @@ class DataSourceWithBackend<
    * Checks the plugin health
    * see public/app/features/datasources/state/actions.ts for what needs to be returned here
    */
-  async testDatasource(): Promise<any> {
+  async testDatasource(): Promise<TestDataSourceResponse> {
     return this.callHealthCheck().then((res) => {
       if (res.status === HealthStatus.OK) {
         return {
@@ -338,7 +374,11 @@ class DataSourceWithBackend<
         };
       }
 
-      throw new HealthCheckError(res.message, res.details);
+      return Promise.reject({
+        status: 'error',
+        message: res.message,
+        error: new HealthCheckError(res.message, res.details),
+      });
     });
   }
 }

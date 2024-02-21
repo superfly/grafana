@@ -10,6 +10,7 @@ import {
   FieldSparkline,
   FieldType,
   getFieldColorModeForField,
+  nullToValue,
 } from '@grafana/data';
 import {
   AxisPlacement,
@@ -44,6 +45,7 @@ const defaultConfig: GraphFieldConfig = {
   drawStyle: GraphDrawStyle.Line,
   showPoints: VisibilityMode.Auto,
   axisPlacement: AxisPlacement.Hidden,
+  pointSize: 2,
 };
 
 /** @internal */
@@ -61,7 +63,8 @@ export class Sparkline extends PureComponent<SparklineProps, State> {
   }
 
   static getDerivedStateFromProps(props: SparklineProps, state: State) {
-    const frame = preparePlotFrame(props.sparkline, props.config);
+    const _frame = preparePlotFrame(props.sparkline, props.config);
+    const frame = nullToValue(_frame);
     if (!frame) {
       return { ...state };
     }
@@ -95,6 +98,12 @@ export class Sparkline extends PureComponent<SparklineProps, State> {
 
   getYRange(field: Field): Range.MinMax {
     let { min, max } = this.state.alignedDataFrame.fields[1].state?.range!;
+    const noValue = +this.state.alignedDataFrame.fields[1].config?.noValue!;
+
+    if (!Number.isNaN(noValue)) {
+      min = Math.min(min!, +noValue);
+      max = Math.max(max!, +noValue);
+    }
 
     if (min === max) {
       if (min === 0) {
@@ -134,7 +143,7 @@ export class Sparkline extends PureComponent<SparklineProps, State> {
             return [sparkline.timeRange.from.valueOf(), sparkline.timeRange.to.valueOf()];
           }
           const vals = sparkline.x.values;
-          return [vals.get(0), vals.get(vals.length - 1)];
+          return [vals[0], vals[vals.length - 1]];
         }
         return [0, sparkline.y.values.length - 1];
       },
@@ -181,6 +190,8 @@ export class Sparkline extends PureComponent<SparklineProps, State> {
         pxAlign: false,
         scaleKey,
         theme,
+        colorMode,
+        thresholds: config.thresholds,
         drawStyle: customConfig.drawStyle!,
         lineColor: customConfig.lineColor ?? seriesColor,
         lineWidth: customConfig.lineWidth,
@@ -188,7 +199,9 @@ export class Sparkline extends PureComponent<SparklineProps, State> {
         showPoints: pointsMode,
         pointSize: customConfig.pointSize,
         fillOpacity: customConfig.fillOpacity,
-        fillColor: customConfig.fillColor ?? seriesColor,
+        fillColor: customConfig.fillColor,
+        lineStyle: customConfig.lineStyle,
+        gradientMode: customConfig.gradientMode,
       });
     }
 
@@ -197,9 +210,7 @@ export class Sparkline extends PureComponent<SparklineProps, State> {
 
   render() {
     const { data, configBuilder } = this.state;
-    const { width, height, sparkline } = this.props;
-    return (
-      <UPlotChart data={data} config={configBuilder} width={width} height={height} timeRange={sparkline.timeRange!} />
-    );
+    const { width, height } = this.props;
+    return <UPlotChart data={data} config={configBuilder} width={width} height={height} />;
   }
 }

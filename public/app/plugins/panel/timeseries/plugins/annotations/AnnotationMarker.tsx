@@ -1,8 +1,18 @@
 import { css } from '@emotion/css';
-import React, { HTMLAttributes, useCallback, useRef, useState } from 'react';
-import { usePopper } from 'react-popper';
+import {
+  autoUpdate,
+  flip,
+  safePolygon,
+  shift,
+  useDismiss,
+  useFloating,
+  useHover,
+  useInteractions,
+} from '@floating-ui/react';
+import React, { HTMLAttributes, useCallback, useState } from 'react';
 
 import { GrafanaTheme2, dateTimeFormat, systemDateFormats, TimeZone } from '@grafana/data';
+import { selectors } from '@grafana/e2e-selectors';
 import { Portal, useStyles2, usePanelContext } from '@grafana/ui';
 import { getTooltipContainerStyles } from '@grafana/ui/src/themes/mixins';
 
@@ -20,34 +30,40 @@ interface Props extends HTMLAttributes<HTMLDivElement> {
 
 const MIN_REGION_ANNOTATION_WIDTH = 6;
 
-const POPPER_CONFIG = {
-  modifiers: [
-    { name: 'arrow', enabled: false },
-    {
-      name: 'preventOverflow',
-      enabled: true,
-      options: {
-        rootBoundary: 'viewport',
-      },
-    },
-  ],
-};
-
 export function AnnotationMarker({ annotation, timeZone, width }: Props) {
-  const { canAddAnnotations, canEditAnnotations, canDeleteAnnotations, ...panelCtx } = usePanelContext();
+  const { canEditAnnotations, canDeleteAnnotations, ...panelCtx } = usePanelContext();
   const commonStyles = useStyles2(getCommonAnnotationStyles);
   const styles = useStyles2(getStyles);
 
   const [isOpen, setIsOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [markerRef, setMarkerRef] = useState<HTMLDivElement | null>(null);
-  const [tooltipRef, setTooltipRef] = useState<HTMLDivElement | null>(null);
-  const [editorRef, setEditorRef] = useState<HTMLDivElement | null>(null);
 
-  const popoverRenderTimeout = useRef<NodeJS.Timer>();
+  // the order of middleware is important!
+  const middleware = [
+    flip({
+      fallbackAxisSideDirection: 'end',
+      // see https://floating-ui.com/docs/flip#combining-with-shift
+      crossAxis: false,
+      boundary: document.body,
+    }),
+    shift(),
+  ];
 
-  const popper = usePopper(markerRef, tooltipRef, POPPER_CONFIG);
-  const editorPopper = usePopper(markerRef, editorRef, POPPER_CONFIG);
+  const { context, refs, floatingStyles } = useFloating({
+    open: isOpen,
+    placement: 'bottom',
+    onOpenChange: setIsOpen,
+    middleware,
+    whileElementsMounted: autoUpdate,
+    strategy: 'fixed',
+  });
+
+  const hover = useHover(context, {
+    handleClose: safePolygon(),
+  });
+  const dismiss = useDismiss(context);
+
+  const { getReferenceProps, getFloatingProps } = useInteractions([dismiss, hover]);
 
   const onAnnotationEdit = useCallback(() => {
     setIsEditing(true);
@@ -59,25 +75,6 @@ export function AnnotationMarker({ annotation, timeZone, width }: Props) {
       panelCtx.onAnnotationDelete(annotation.id);
     }
   }, [annotation, panelCtx]);
-
-  const onMouseEnter = useCallback(() => {
-    if (popoverRenderTimeout.current) {
-      clearTimeout(popoverRenderTimeout.current);
-    }
-    setIsOpen(true);
-  }, [setIsOpen]);
-
-  const onPopoverMouseEnter = useCallback(() => {
-    if (popoverRenderTimeout.current) {
-      clearTimeout(popoverRenderTimeout.current);
-    }
-  }, []);
-
-  const onMouseLeave = useCallback(() => {
-    popoverRenderTimeout.current = setTimeout(() => {
-      setIsOpen(false);
-    }, 100);
-  }, [setIsOpen]);
 
   const timeFormatter = useCallback(
     (value: number) => {
@@ -96,8 +93,8 @@ export function AnnotationMarker({ annotation, timeZone, width }: Props) {
         timeFormatter={timeFormatter}
         onEdit={onAnnotationEdit}
         onDelete={onAnnotationDelete}
-        canEdit={canEditAnnotations!(annotation.dashboardUID)}
-        canDelete={canDeleteAnnotations!(annotation.dashboardUID)}
+        canEdit={canEditAnnotations ? canEditAnnotations(annotation.dashboardUID) : false}
+        canDelete={canDeleteAnnotations ? canDeleteAnnotations(annotation.dashboardUID) : false}
       />
     );
   }, [canEditAnnotations, canDeleteAnnotations, onAnnotationDelete, onAnnotationEdit, timeFormatter, annotation]);
@@ -123,24 +120,17 @@ export function AnnotationMarker({ annotation, timeZone, width }: Props) {
   return (
     <>
       <div
-        ref={setMarkerRef}
-        onMouseEnter={onMouseEnter}
-        onMouseLeave={onMouseLeave}
+        ref={refs.setReference}
         className={!isRegionAnnotation ? styles.markerWrapper : undefined}
+        data-testid={selectors.pages.Dashboard.Annotations.marker}
+        {...getReferenceProps()}
       >
         {marker}
       </div>
 
       {isOpen && (
         <Portal>
-          <div
-            ref={setTooltipRef}
-            style={popper.styles.popper}
-            {...popper.attributes.popper}
-            className={styles.tooltip}
-            onMouseEnter={onPopoverMouseEnter}
-            onMouseLeave={onMouseLeave}
-          >
+          <div className={styles.tooltip} ref={refs.setFloating} style={floatingStyles} {...getFloatingProps()}>
             {renderTooltip()}
           </div>
         </Portal>
@@ -153,9 +143,9 @@ export function AnnotationMarker({ annotation, timeZone, width }: Props) {
             onSave={() => setIsEditing(false)}
             timeFormatter={timeFormatter}
             annotation={annotation}
-            ref={setEditorRef}
-            style={editorPopper.styles.popper}
-            {...editorPopper.attributes.popper}
+            ref={refs.setFloating}
+            style={floatingStyles}
+            {...getFloatingProps()}
           />
         </Portal>
       )}
@@ -165,16 +155,13 @@ export function AnnotationMarker({ annotation, timeZone, width }: Props) {
 
 const getStyles = (theme: GrafanaTheme2) => {
   return {
-    markerWrapper: css`
-      label: markerWrapper;
-      padding: 0 4px 4px 4px;
-    `,
-    wrapper: css`
-      max-width: 400px;
-    `,
-    tooltip: css`
-      ${getTooltipContainerStyles(theme)};
-      padding: 0;
-    `,
+    markerWrapper: css({
+      label: 'markerWrapper',
+      padding: theme.spacing(0, 0.5, 0.5, 0.5),
+    }),
+    tooltip: css({
+      ...getTooltipContainerStyles(theme),
+      padding: 0,
+    }),
   };
 };

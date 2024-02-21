@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"xorm.io/core"
+	"xorm.io/xorm"
 
 	"github.com/grafana/grafana/pkg/services/sqlstore"
 	"github.com/grafana/grafana/pkg/services/sqlstore/migrator"
@@ -43,12 +44,20 @@ func (f *FakeDB) GetDialect() migrator.Dialect {
 	return nil
 }
 
+func (f *FakeDB) GetEngine() *xorm.Engine {
+	return nil
+}
+
 func (f *FakeDB) GetSqlxSession() *session.SessionDB {
 	return nil
 }
 
 func (f *FakeDB) Quote(value string) string {
 	return ""
+}
+
+func (f *FakeDB) RecursiveQueriesAreSupported() (bool, error) {
+	return false, nil
 }
 
 // TODO: service-specific methods not yet split out ; to be removed

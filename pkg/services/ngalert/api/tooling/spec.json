@@ -15,9 +15,9 @@
     "title": "Grafana Alerting API.",
     "version": "1.1.0"
   },
-  "basePath": "/api/v1",
+  "basePath": "/api",
   "paths": {
-    "/api/alertmanager/grafana/api/v2/alerts": {
+    "/alertmanager/grafana/api/v2/alerts": {
       "get": {
         "description": "get alertmanager alerts",
         "tags": [
@@ -78,7 +78,7 @@
         }
       }
     },
-    "/api/alertmanager/grafana/api/v2/alerts/groups": {
+    "/alertmanager/grafana/api/v2/alerts/groups": {
       "get": {
         "description": "get alertmanager alerts",
         "tags": [
@@ -139,7 +139,7 @@
         }
       }
     },
-    "/api/alertmanager/grafana/api/v2/silence/{SilenceId}": {
+    "/alertmanager/grafana/api/v2/silence/{SilenceId}": {
       "get": {
         "description": "get silence",
         "tags": [
@@ -199,7 +199,7 @@
         }
       }
     },
-    "/api/alertmanager/grafana/api/v2/silences": {
+    "/alertmanager/grafana/api/v2/silences": {
       "get": {
         "description": "get silences",
         "tags": [
@@ -247,7 +247,7 @@
           }
         ],
         "responses": {
-          "201": {
+          "202": {
             "description": "postSilencesOKBody",
             "schema": {
               "$ref": "#/definitions/postSilencesOKBody"
@@ -262,7 +262,7 @@
         }
       }
     },
-    "/api/alertmanager/grafana/api/v2/status": {
+    "/alertmanager/grafana/api/v2/status": {
       "get": {
         "description": "get alertmanager status and configuration",
         "tags": [
@@ -285,7 +285,7 @@
         }
       }
     },
-    "/api/alertmanager/grafana/config/api/v1/alerts": {
+    "/alertmanager/grafana/config/api/v1/alerts": {
       "get": {
         "description": "gets an Alerting config",
         "tags": [
@@ -359,7 +359,7 @@
         }
       }
     },
-    "/api/alertmanager/grafana/config/api/v1/receivers": {
+    "/alertmanager/grafana/config/api/v1/receivers": {
       "get": {
         "description": "Get a list of all receivers",
         "tags": [
@@ -373,7 +373,7 @@
         }
       }
     },
-    "/api/alertmanager/grafana/config/api/v1/receivers/test": {
+    "/alertmanager/grafana/config/api/v1/receivers/test": {
       "post": {
         "tags": [
           "alertmanager"
@@ -435,7 +435,116 @@
         }
       }
     },
-    "/api/alertmanager/{DatasourceUID}/api/v2/alerts": {
+    "/alertmanager/grafana/config/api/v1/templates/test": {
+      "post": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "alertmanager"
+        ],
+        "summary": "Test Grafana managed templates without saving them.",
+        "operationId": "RoutePostTestGrafanaTemplates",
+        "parameters": [
+          {
+            "name": "Body",
+            "in": "body",
+            "schema": {
+              "$ref": "#/definitions/TestTemplatesConfigBodyParams"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "TestTemplatesResults",
+            "schema": {
+              "$ref": "#/definitions/TestTemplatesResults"
+            }
+          },
+          "400": {
+            "description": "ValidationError",
+            "schema": {
+              "$ref": "#/definitions/ValidationError"
+            }
+          },
+          "403": {
+            "description": "PermissionDenied",
+            "schema": {
+              "$ref": "#/definitions/PermissionDenied"
+            }
+          },
+          "409": {
+            "description": "AlertManagerNotReady",
+            "schema": {
+              "$ref": "#/definitions/AlertManagerNotReady"
+            }
+          }
+        }
+      }
+    },
+    "/alertmanager/grafana/config/history": {
+      "get": {
+        "description": "gets Alerting configurations that were successfully applied in the past",
+        "tags": [
+          "alertmanager"
+        ],
+        "operationId": "RouteGetGrafanaAlertingConfigHistory",
+        "parameters": [
+          {
+            "type": "integer",
+            "format": "int64",
+            "description": "Limit response to n historic configurations.",
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/GettableHistoricUserConfigs"
+          }
+        }
+      }
+    },
+    "/alertmanager/grafana/config/history/{id}/_activate": {
+      "post": {
+        "description": "revert Alerting configuration to the historical configuration specified by the given id",
+        "tags": [
+          "alertmanager"
+        ],
+        "operationId": "RoutePostGrafanaAlertingConfigHistoryActivate",
+        "parameters": [
+          {
+            "type": "integer",
+            "format": "int64",
+            "description": "Id should be the id of the GettableHistoricUserConfig",
+            "name": "id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Ack",
+            "schema": {
+              "$ref": "#/definitions/Ack"
+            }
+          },
+          "400": {
+            "description": "ValidationError",
+            "schema": {
+              "$ref": "#/definitions/ValidationError"
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "schema": {
+              "$ref": "#/definitions/NotFound"
+            }
+          }
+        }
+      }
+    },
+    "/alertmanager/{DatasourceUID}/api/v2/alerts": {
       "get": {
         "description": "get alertmanager alerts",
         "tags": [
@@ -555,7 +664,7 @@
         }
       }
     },
-    "/api/alertmanager/{DatasourceUID}/api/v2/alerts/groups": {
+    "/alertmanager/{DatasourceUID}/api/v2/alerts/groups": {
       "get": {
         "description": "get alertmanager alerts",
         "tags": [
@@ -629,7 +738,7 @@
         }
       }
     },
-    "/api/alertmanager/{DatasourceUID}/api/v2/silence/{SilenceId}": {
+    "/alertmanager/{DatasourceUID}/api/v2/silence/{SilenceId}": {
       "get": {
         "description": "get silence",
         "tags": [
@@ -715,7 +824,7 @@
         }
       }
     },
-    "/api/alertmanager/{DatasourceUID}/api/v2/silences": {
+    "/alertmanager/{DatasourceUID}/api/v2/silences": {
       "get": {
         "description": "get silences",
         "tags": [
@@ -804,7 +913,7 @@
         }
       }
     },
-    "/api/alertmanager/{DatasourceUID}/api/v2/status": {
+    "/alertmanager/{DatasourceUID}/api/v2/status": {
       "get": {
         "description": "get alertmanager status and configuration",
         "tags": [
@@ -842,7 +951,7 @@
         }
       }
     },
-    "/api/alertmanager/{DatasourceUID}/config/api/v1/alerts": {
+    "/alertmanager/{DatasourceUID}/config/api/v1/alerts": {
       "get": {
         "description": "gets an Alerting config",
         "tags": [
@@ -959,7 +1068,7 @@
         }
       }
     },
-    "/api/prometheus/grafana/api/v1/alerts": {
+    "/prometheus/grafana/api/v1/alerts": {
       "get": {
         "description": "gets the current alerts",
         "tags": [
@@ -985,7 +1094,7 @@
         }
       }
     },
-    "/api/prometheus/grafana/api/v1/rules": {
+    "/prometheus/grafana/api/v1/rules": {
       "get": {
         "description": "gets the evaluation statuses of all rules",
         "tags": [
@@ -1024,7 +1133,7 @@
         }
       }
     },
-    "/api/prometheus/{DatasourceUID}/api/v1/alerts": {
+    "/prometheus/{DatasourceUID}/api/v1/alerts": {
       "get": {
         "description": "gets the current alerts",
         "tags": [
@@ -1056,7 +1165,7 @@
         }
       }
     },
-    "/api/prometheus/{DatasourceUID}/api/v1/rules": {
+    "/prometheus/{DatasourceUID}/api/v1/rules": {
       "get": {
         "description": "gets the evaluation statuses of all rules",
         "tags": [
@@ -1088,7 +1197,74 @@
         }
       }
     },
-    "/api/ruler/grafana/api/v1/rules": {
+    "/ruler/grafana/api/v1/export/rules": {
+      "get": {
+        "description": "List rules in provisioning format",
+        "consumes": [
+          "application/json",
+          "application/yaml"
+        ],
+        "tags": [
+          "ruler"
+        ],
+        "operationId": "RouteGetRulesForExport",
+        "parameters": [
+          {
+            "type": "boolean",
+            "default": false,
+            "description": "Whether to initiate a download of the file or not.",
+            "name": "download",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "default": "yaml",
+            "description": "Format of the downloaded file, either yaml or json. Accept header can also be used, but the query parameter will take precedence.",
+            "name": "format",
+            "in": "query"
+          },
+          {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "UIDs of folders from which to export rules",
+            "name": "folderUid",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "description": "Name of group of rules to export. Must be specified only together with a single folder UID",
+            "name": "group",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "description": "UID of alert rule to export. If specified, parameters folderUid and group must be empty.",
+            "name": "ruleUid",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "AlertingFileExport",
+            "schema": {
+              "$ref": "#/definitions/AlertingFileExport"
+            }
+          },
+          "403": {
+            "description": "ForbiddenError",
+            "schema": {
+              "$ref": "#/definitions/ForbiddenError"
+            }
+          },
+          "404": {
+            "description": " Not found."
+          }
+        }
+      }
+    },
+    "/ruler/grafana/api/v1/rules": {
       "get": {
         "description": "List rule groups",
         "produces": [
@@ -1117,11 +1293,17 @@
             "schema": {
               "$ref": "#/definitions/NamespaceConfigResponse"
             }
+          },
+          "403": {
+            "description": "ForbiddenError",
+            "schema": {
+              "$ref": "#/definitions/ForbiddenError"
+            }
           }
         }
       }
     },
-    "/api/ruler/grafana/api/v1/rules/{Namespace}": {
+    "/ruler/grafana/api/v1/rules/{Namespace}": {
       "get": {
         "description": "Get rule groups by namespace",
         "produces": [
@@ -1134,6 +1316,7 @@
         "parameters": [
           {
             "type": "string",
+            "description": "The UID of the rule folder",
             "name": "Namespace",
             "in": "path",
             "required": true
@@ -1144,6 +1327,12 @@
             "description": "NamespaceConfigResponse",
             "schema": {
               "$ref": "#/definitions/NamespaceConfigResponse"
+            }
+          },
+          "403": {
+            "description": "ForbiddenError",
+            "schema": {
+              "$ref": "#/definitions/ForbiddenError"
             }
           }
         }
@@ -1161,6 +1350,7 @@
         "parameters": [
           {
             "type": "string",
+            "description": "The UID of the rule folder",
             "name": "Namespace",
             "in": "path",
             "required": true
@@ -1175,9 +1365,15 @@
         ],
         "responses": {
           "202": {
-            "description": "Ack",
+            "description": "UpdateRuleGroupResponse",
             "schema": {
-              "$ref": "#/definitions/Ack"
+              "$ref": "#/definitions/UpdateRuleGroupResponse"
+            }
+          },
+          "403": {
+            "description": "ForbiddenError",
+            "schema": {
+              "$ref": "#/definitions/ForbiddenError"
             }
           }
         }
@@ -1191,6 +1387,7 @@
         "parameters": [
           {
             "type": "string",
+            "description": "The UID of the rule folder",
             "name": "Namespace",
             "in": "path",
             "required": true
@@ -1202,11 +1399,77 @@
             "schema": {
               "$ref": "#/definitions/Ack"
             }
+          },
+          "403": {
+            "description": "ForbiddenError",
+            "schema": {
+              "$ref": "#/definitions/ForbiddenError"
+            }
           }
         }
       }
     },
-    "/api/ruler/grafana/api/v1/rules/{Namespace}/{Groupname}": {
+    "/ruler/grafana/api/v1/rules/{Namespace}/export": {
+      "post": {
+        "description": "Converts submitted rule group to provisioning format",
+        "consumes": [
+          "application/json",
+          "application/yaml"
+        ],
+        "tags": [
+          "ruler"
+        ],
+        "operationId": "RoutePostRulesGroupForExport",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "The UID of the rule folder",
+            "name": "Namespace",
+            "in": "path",
+            "required": true
+          },
+          {
+            "name": "Body",
+            "in": "body",
+            "schema": {
+              "$ref": "#/definitions/PostableRuleGroupConfig"
+            }
+          },
+          {
+            "type": "boolean",
+            "default": false,
+            "description": "Whether to initiate a download of the file or not.",
+            "name": "download",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "default": "yaml",
+            "description": "Format of the downloaded file, either yaml or json. Accept header can also be used, but the query parameter will take precedence.",
+            "name": "format",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "AlertingFileExport",
+            "schema": {
+              "$ref": "#/definitions/AlertingFileExport"
+            }
+          },
+          "403": {
+            "description": "ForbiddenError",
+            "schema": {
+              "$ref": "#/definitions/ForbiddenError"
+            }
+          },
+          "404": {
+            "description": " Not found."
+          }
+        }
+      }
+    },
+    "/ruler/grafana/api/v1/rules/{Namespace}/{Groupname}": {
       "get": {
         "description": "Get rule group",
         "produces": [
@@ -1219,6 +1482,7 @@
         "parameters": [
           {
             "type": "string",
+            "description": "The UID of the rule folder",
             "name": "Namespace",
             "in": "path",
             "required": true
@@ -1236,6 +1500,12 @@
             "schema": {
               "$ref": "#/definitions/RuleGroupConfigResponse"
             }
+          },
+          "403": {
+            "description": "ForbiddenError",
+            "schema": {
+              "$ref": "#/definitions/ForbiddenError"
+            }
           }
         }
       },
@@ -1248,6 +1518,7 @@
         "parameters": [
           {
             "type": "string",
+            "description": "The UID of the rule folder",
             "name": "Namespace",
             "in": "path",
             "required": true
@@ -1265,11 +1536,17 @@
             "schema": {
               "$ref": "#/definitions/Ack"
             }
+          },
+          "403": {
+            "description": "ForbiddenError",
+            "schema": {
+              "$ref": "#/definitions/ForbiddenError"
+            }
           }
         }
       }
     },
-    "/api/ruler/{DatasourceUID}/api/v1/rules": {
+    "/ruler/{DatasourceUID}/api/v1/rules": {
       "get": {
         "description": "List rule groups",
         "produces": [
@@ -1306,6 +1583,12 @@
               "$ref": "#/definitions/NamespaceConfigResponse"
             }
           },
+          "403": {
+            "description": "ForbiddenError",
+            "schema": {
+              "$ref": "#/definitions/ForbiddenError"
+            }
+          },
           "404": {
             "description": "NotFound",
             "schema": {
@@ -1315,7 +1598,7 @@
         }
       }
     },
-    "/api/ruler/{DatasourceUID}/api/v1/rules/{Namespace}": {
+    "/ruler/{DatasourceUID}/api/v1/rules/{Namespace}": {
       "get": {
         "description": "Get rule groups by namespace",
         "produces": [
@@ -1335,6 +1618,7 @@
           },
           {
             "type": "string",
+            "description": "The UID of the rule folder",
             "name": "Namespace",
             "in": "path",
             "required": true
@@ -1345,6 +1629,12 @@
             "description": "NamespaceConfigResponse",
             "schema": {
               "$ref": "#/definitions/NamespaceConfigResponse"
+            }
+          },
+          "403": {
+            "description": "ForbiddenError",
+            "schema": {
+              "$ref": "#/definitions/ForbiddenError"
             }
           },
           "404": {
@@ -1375,6 +1665,7 @@
           },
           {
             "type": "string",
+            "description": "The UID of the rule folder",
             "name": "Namespace",
             "in": "path",
             "required": true
@@ -1392,6 +1683,12 @@
             "description": "Ack",
             "schema": {
               "$ref": "#/definitions/Ack"
+            }
+          },
+          "403": {
+            "description": "ForbiddenError",
+            "schema": {
+              "$ref": "#/definitions/ForbiddenError"
             }
           },
           "404": {
@@ -1418,6 +1715,7 @@
           },
           {
             "type": "string",
+            "description": "The UID of the rule folder",
             "name": "Namespace",
             "in": "path",
             "required": true
@@ -1430,6 +1728,12 @@
               "$ref": "#/definitions/Ack"
             }
           },
+          "403": {
+            "description": "ForbiddenError",
+            "schema": {
+              "$ref": "#/definitions/ForbiddenError"
+            }
+          },
           "404": {
             "description": "NotFound",
             "schema": {
@@ -1439,7 +1743,7 @@
         }
       }
     },
-    "/api/ruler/{DatasourceUID}/api/v1/rules/{Namespace}/{Groupname}": {
+    "/ruler/{DatasourceUID}/api/v1/rules/{Namespace}/{Groupname}": {
       "get": {
         "description": "Get rule group",
         "produces": [
@@ -1459,6 +1763,7 @@
           },
           {
             "type": "string",
+            "description": "The UID of the rule folder",
             "name": "Namespace",
             "in": "path",
             "required": true
@@ -1475,6 +1780,12 @@
             "description": "RuleGroupConfigResponse",
             "schema": {
               "$ref": "#/definitions/RuleGroupConfigResponse"
+            }
+          },
+          "403": {
+            "description": "ForbiddenError",
+            "schema": {
+              "$ref": "#/definitions/ForbiddenError"
             }
           },
           "404": {
@@ -1501,6 +1812,7 @@
           },
           {
             "type": "string",
+            "description": "The UID of the rule folder",
             "name": "Namespace",
             "in": "path",
             "required": true
@@ -1519,6 +1831,12 @@
               "$ref": "#/definitions/Ack"
             }
           },
+          "403": {
+            "description": "ForbiddenError",
+            "schema": {
+              "$ref": "#/definitions/ForbiddenError"
+            }
+          },
           "404": {
             "description": "NotFound",
             "schema": {
@@ -1528,7 +1846,7 @@
         }
       }
     },
-    "/api/v1/eval": {
+    "/v1/eval": {
       "post": {
         "description": "Test rule",
         "consumes": [
@@ -1560,7 +1878,7 @@
         }
       }
     },
-    "/api/v1/ngalert": {
+    "/v1/ngalert": {
       "get": {
         "description": "Get the status of the alerting engine",
         "produces": [
@@ -1580,7 +1898,7 @@
         }
       }
     },
-    "/api/v1/ngalert/admin_config": {
+    "/v1/ngalert/admin_config": {
       "get": {
         "produces": [
           "application/json"
@@ -1669,7 +1987,7 @@
         }
       }
     },
-    "/api/v1/ngalert/alertmanagers": {
+    "/v1/ngalert/alertmanagers": {
       "get": {
         "produces": [
           "application/json"
@@ -1689,7 +2007,142 @@
         }
       }
     },
-    "/api/v1/provisioning/alert-rules": {
+    "/v1/notifications/receivers": {
+      "get": {
+        "tags": [
+          "notifications"
+        ],
+        "summary": "Get all receivers.",
+        "operationId": "RouteGetReceivers",
+        "parameters": [
+          {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "name": "names",
+            "in": "query"
+          },
+          {
+            "type": "integer",
+            "format": "int64",
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "type": "integer",
+            "format": "int64",
+            "name": "offset",
+            "in": "query"
+          },
+          {
+            "type": "boolean",
+            "name": "decrypt",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/GetReceiversResponse"
+          },
+          "403": {
+            "description": "PermissionDenied",
+            "schema": {
+              "$ref": "#/definitions/PermissionDenied"
+            }
+          }
+        }
+      }
+    },
+    "/v1/notifications/receivers/{Name}": {
+      "get": {
+        "tags": [
+          "notifications"
+        ],
+        "summary": "Get a receiver by name.",
+        "operationId": "RouteGetReceiver",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "name",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "boolean",
+            "name": "decrypt",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/GetReceiverResponse"
+          },
+          "404": {
+            "description": "NotFound",
+            "schema": {
+              "$ref": "#/definitions/NotFound"
+            }
+          }
+        }
+      }
+    },
+    "/v1/notifications/time-intervals": {
+      "get": {
+        "description": "Get all the time intervals",
+        "tags": [
+          "notifications"
+        ],
+        "operationId": "RouteNotificationsGetTimeIntervals",
+        "responses": {
+          "200": {
+            "$ref": "#/responses/GetAllIntervalsResponse"
+          },
+          "403": {
+            "description": "ForbiddenError",
+            "schema": {
+              "$ref": "#/definitions/ForbiddenError"
+            }
+          }
+        }
+      }
+    },
+    "/v1/notifications/time-intervals/{name}": {
+      "get": {
+        "tags": [
+          "notifications"
+        ],
+        "summary": "Get a time interval by name.",
+        "operationId": "RouteNotificationsGetTimeInterval",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "Time interval name",
+            "name": "name",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/GetIntervalsByNameResponse"
+          },
+          "403": {
+            "description": "ForbiddenError",
+            "schema": {
+              "$ref": "#/definitions/ForbiddenError"
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "schema": {
+              "$ref": "#/definitions/NotFound"
+            }
+          }
+        }
+      }
+    },
+    "/v1/provisioning/alert-rules": {
       "get": {
         "tags": [
           "provisioning",
@@ -1746,7 +2199,7 @@
         }
       }
     },
-    "/api/v1/provisioning/alert-rules/export": {
+    "/v1/provisioning/alert-rules/export": {
       "get": {
         "tags": [
           "provisioning",
@@ -1768,6 +2221,27 @@
             "description": "Format of the downloaded file, either yaml or json. Accept header can also be used, but the query parameter will take precedence.",
             "name": "format",
             "in": "query"
+          },
+          {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "UIDs of folders from which to export rules",
+            "name": "folderUid",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "description": "Name of group of rules to export. Must be specified only together with a single folder UID",
+            "name": "group",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "description": "UID of alert rule to export. If specified, parameters folderUid and group must be empty.",
+            "name": "ruleUid",
+            "in": "query"
           }
         ],
         "responses": {
@@ -1783,7 +2257,7 @@
         }
       }
     },
-    "/api/v1/provisioning/alert-rules/{UID}": {
+    "/v1/provisioning/alert-rules/{UID}": {
       "get": {
         "tags": [
           "provisioning",
@@ -1872,6 +2346,11 @@
             "name": "UID",
             "in": "path",
             "required": true
+          },
+          {
+            "type": "string",
+            "name": "X-Disable-Provenance",
+            "in": "header"
           }
         ],
         "responses": {
@@ -1881,7 +2360,7 @@
         }
       }
     },
-    "/api/v1/provisioning/alert-rules/{UID}/export": {
+    "/v1/provisioning/alert-rules/{UID}/export": {
       "get": {
         "produces": [
           "application/json",
@@ -1896,13 +2375,6 @@
         "operationId": "RouteGetAlertRuleExport",
         "parameters": [
           {
-            "type": "string",
-            "description": "Alert rule UID",
-            "name": "UID",
-            "in": "path",
-            "required": true
-          },
-          {
             "type": "boolean",
             "default": false,
             "description": "Whether to initiate a download of the file or not.",
@@ -1915,6 +2387,13 @@
             "description": "Format of the downloaded file, either yaml or json. Accept header can also be used, but the query parameter will take precedence.",
             "name": "format",
             "in": "query"
+          },
+          {
+            "type": "string",
+            "description": "Alert rule UID",
+            "name": "UID",
+            "in": "path",
+            "required": true
           }
         ],
         "responses": {
@@ -1930,7 +2409,7 @@
         }
       }
     },
-    "/api/v1/provisioning/contact-points": {
+    "/v1/provisioning/contact-points": {
       "get": {
         "tags": [
           "provisioning",
@@ -1972,6 +2451,11 @@
             "schema": {
               "$ref": "#/definitions/EmbeddedContactPoint"
             }
+          },
+          {
+            "type": "string",
+            "name": "X-Disable-Provenance",
+            "in": "header"
           }
         ],
         "responses": {
@@ -1990,7 +2474,60 @@
         }
       }
     },
-    "/api/v1/provisioning/contact-points/{UID}": {
+    "/v1/provisioning/contact-points/export": {
+      "get": {
+        "tags": [
+          "provisioning",
+          "stable"
+        ],
+        "summary": "Export all contact points in provisioning file format.",
+        "operationId": "RouteGetContactpointsExport",
+        "parameters": [
+          {
+            "type": "boolean",
+            "default": false,
+            "description": "Whether to initiate a download of the file or not.",
+            "name": "download",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "default": "yaml",
+            "description": "Format of the downloaded file, either yaml or json. Accept header can also be used, but the query parameter will take precedence.",
+            "name": "format",
+            "in": "query"
+          },
+          {
+            "type": "boolean",
+            "default": false,
+            "description": "Whether any contained secure settings should be decrypted or left redacted. Redacted settings will contain RedactedValue instead. Currently, only org admin can view decrypted secure settings.",
+            "name": "decrypt",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "description": "Filter by name",
+            "name": "name",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "AlertingFileExport",
+            "schema": {
+              "$ref": "#/definitions/AlertingFileExport"
+            }
+          },
+          "403": {
+            "description": "PermissionDenied",
+            "schema": {
+              "$ref": "#/definitions/PermissionDenied"
+            }
+          }
+        }
+      }
+    },
+    "/v1/provisioning/contact-points/{UID}": {
       "put": {
         "consumes": [
           "application/json"
@@ -2015,6 +2552,11 @@
             "schema": {
               "$ref": "#/definitions/EmbeddedContactPoint"
             }
+          },
+          {
+            "type": "string",
+            "name": "X-Disable-Provenance",
+            "in": "header"
           }
         ],
         "responses": {
@@ -2052,13 +2594,13 @@
           }
         ],
         "responses": {
-          "204": {
+          "202": {
             "description": " The contact point was deleted successfully."
           }
         }
       }
     },
-    "/api/v1/provisioning/folder/{FolderUID}/rule-groups/{Group}": {
+    "/v1/provisioning/folder/{FolderUID}/rule-groups/{Group}": {
       "get": {
         "tags": [
           "provisioning",
@@ -2105,6 +2647,11 @@
         "parameters": [
           {
             "type": "string",
+            "name": "X-Disable-Provenance",
+            "in": "header"
+          },
+          {
+            "type": "string",
             "name": "FolderUID",
             "in": "path",
             "required": true
@@ -2139,7 +2686,7 @@
         }
       }
     },
-    "/api/v1/provisioning/folder/{FolderUID}/rule-groups/{Group}/export": {
+    "/v1/provisioning/folder/{FolderUID}/rule-groups/{Group}/export": {
       "get": {
         "produces": [
           "application/json",
@@ -2154,18 +2701,6 @@
         "operationId": "RouteGetAlertRuleGroupExport",
         "parameters": [
           {
-            "type": "string",
-            "name": "FolderUID",
-            "in": "path",
-            "required": true
-          },
-          {
-            "type": "string",
-            "name": "Group",
-            "in": "path",
-            "required": true
-          },
-          {
             "type": "boolean",
             "default": false,
             "description": "Whether to initiate a download of the file or not.",
@@ -2178,6 +2713,18 @@
             "description": "Format of the downloaded file, either yaml or json. Accept header can also be used, but the query parameter will take precedence.",
             "name": "format",
             "in": "query"
+          },
+          {
+            "type": "string",
+            "name": "FolderUID",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "name": "Group",
+            "in": "path",
+            "required": true
           }
         ],
         "responses": {
@@ -2193,7 +2740,7 @@
         }
       }
     },
-    "/api/v1/provisioning/mute-timings": {
+    "/v1/provisioning/mute-timings": {
       "get": {
         "tags": [
           "provisioning",
@@ -2227,6 +2774,11 @@
             "schema": {
               "$ref": "#/definitions/MuteTimeInterval"
             }
+          },
+          {
+            "type": "string",
+            "name": "X-Disable-Provenance",
+            "in": "header"
           }
         ],
         "responses": {
@@ -2245,7 +2797,47 @@
         }
       }
     },
-    "/api/v1/provisioning/mute-timings/{name}": {
+    "/v1/provisioning/mute-timings/export": {
+      "get": {
+        "tags": [
+          "provisioning",
+          "stable"
+        ],
+        "summary": "Export all mute timings in provisioning format.",
+        "operationId": "RouteExportMuteTimings",
+        "parameters": [
+          {
+            "type": "boolean",
+            "default": false,
+            "description": "Whether to initiate a download of the file or not.",
+            "name": "download",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "default": "yaml",
+            "description": "Format of the downloaded file, either yaml or json. Accept header can also be used, but the query parameter will take precedence.",
+            "name": "format",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "AlertingFileExport",
+            "schema": {
+              "$ref": "#/definitions/AlertingFileExport"
+            }
+          },
+          "403": {
+            "description": "PermissionDenied",
+            "schema": {
+              "$ref": "#/definitions/PermissionDenied"
+            }
+          }
+        }
+      }
+    },
+    "/v1/provisioning/mute-timings/{name}": {
       "get": {
         "tags": [
           "provisioning",
@@ -2298,10 +2890,15 @@
             "schema": {
               "$ref": "#/definitions/MuteTimeInterval"
             }
+          },
+          {
+            "type": "string",
+            "name": "X-Disable-Provenance",
+            "in": "header"
           }
         ],
         "responses": {
-          "200": {
+          "202": {
             "description": "MuteTimeInterval",
             "schema": {
               "$ref": "#/definitions/MuteTimeInterval"
@@ -2334,11 +2931,64 @@
         "responses": {
           "204": {
             "description": " The mute timing was deleted successfully."
+          },
+          "409": {
+            "description": "GenericPublicError",
+            "schema": {
+              "$ref": "#/definitions/GenericPublicError"
+            }
           }
         }
       }
     },
-    "/api/v1/provisioning/policies": {
+    "/v1/provisioning/mute-timings/{name}/export": {
+      "get": {
+        "tags": [
+          "provisioning",
+          "stable"
+        ],
+        "summary": "Export a mute timing in provisioning format.",
+        "operationId": "RouteExportMuteTiming",
+        "parameters": [
+          {
+            "type": "boolean",
+            "default": false,
+            "description": "Whether to initiate a download of the file or not.",
+            "name": "download",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "default": "yaml",
+            "description": "Format of the downloaded file, either yaml or json. Accept header can also be used, but the query parameter will take precedence.",
+            "name": "format",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "description": "Mute timing name",
+            "name": "name",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "AlertingFileExport",
+            "schema": {
+              "$ref": "#/definitions/AlertingFileExport"
+            }
+          },
+          "403": {
+            "description": "PermissionDenied",
+            "schema": {
+              "$ref": "#/definitions/PermissionDenied"
+            }
+          }
+        }
+      }
+    },
+    "/v1/provisioning/policies": {
       "get": {
         "tags": [
           "provisioning",
@@ -2373,6 +3023,11 @@
             "schema": {
               "$ref": "#/definitions/Route"
             }
+          },
+          {
+            "type": "string",
+            "name": "X-Disable-Provenance",
+            "in": "header"
           }
         ],
         "responses": {
@@ -2410,7 +3065,31 @@
         }
       }
     },
-    "/api/v1/provisioning/templates": {
+    "/v1/provisioning/policies/export": {
+      "get": {
+        "tags": [
+          "provisioning",
+          "stable"
+        ],
+        "summary": "Export the notification policy tree in provisioning file format.",
+        "operationId": "RouteGetPolicyTreeExport",
+        "responses": {
+          "200": {
+            "description": "AlertingFileExport",
+            "schema": {
+              "$ref": "#/definitions/AlertingFileExport"
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "schema": {
+              "$ref": "#/definitions/NotFound"
+            }
+          }
+        }
+      }
+    },
+    "/v1/provisioning/templates": {
       "get": {
         "tags": [
           "provisioning",
@@ -2431,7 +3110,7 @@
         }
       }
     },
-    "/api/v1/provisioning/templates/{name}": {
+    "/v1/provisioning/templates/{name}": {
       "get": {
         "tags": [
           "provisioning",
@@ -2484,6 +3163,11 @@
             "schema": {
               "$ref": "#/definitions/NotificationTemplateContent"
             }
+          },
+          {
+            "type": "string",
+            "name": "X-Disable-Provenance",
+            "in": "header"
           }
         ],
         "responses": {
@@ -2524,7 +3208,7 @@
         }
       }
     },
-    "/api/v1/rule/backtest": {
+    "/v1/rule/backtest": {
       "post": {
         "description": "Test rule",
         "consumes": [
@@ -2556,7 +3240,7 @@
         }
       }
     },
-    "/api/v1/rule/test/grafana": {
+    "/v1/rule/test/grafana": {
       "post": {
         "description": "Test a rule against Grafana ruler",
         "consumes": [
@@ -2574,21 +3258,30 @@
             "name": "Body",
             "in": "body",
             "schema": {
-              "$ref": "#/definitions/TestRulePayload"
+              "$ref": "#/definitions/PostableExtendedRuleNodeExtended"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "TestRuleResponse",
+            "$ref": "#/responses/TestGrafanaRuleResponse"
+          },
+          "400": {
+            "description": "ValidationError",
             "schema": {
-              "$ref": "#/definitions/TestRuleResponse"
+              "$ref": "#/definitions/ValidationError"
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "schema": {
+              "$ref": "#/definitions/NotFound"
             }
           }
         }
       }
     },
-    "/api/v1/rule/test/{DatasourceUID}": {
+    "/v1/rule/test/{DatasourceUID}": {
       "post": {
         "description": "Test a rule against external data source ruler",
         "consumes": [
@@ -2633,7 +3326,7 @@
         }
       }
     },
-    "/api/v1/rules/history": {
+    "/v1/rules/history": {
       "get": {
         "produces": [
           "application/json"
@@ -2646,6 +3339,221 @@
         "responses": {
           "200": {
             "$ref": "#/responses/StateHistory"
+          }
+        }
+      }
+    },
+    "/v1/upgrade/channels": {
+      "post": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "upgrade"
+        ],
+        "summary": "Upgrade all legacy notification channels for the current organization.",
+        "operationId": "RoutePostUpgradeAllChannels",
+        "parameters": [
+          {
+            "type": "boolean",
+            "default": false,
+            "description": "If true, legacy alert and notification channel upgrades from previous runs will be skipped. Otherwise, they will be replaced.",
+            "name": "SkipExisting",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OrgMigrationSummary",
+            "schema": {
+              "$ref": "#/definitions/OrgMigrationSummary"
+            }
+          }
+        }
+      }
+    },
+    "/v1/upgrade/channels/{ChannelID}": {
+      "post": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "upgrade"
+        ],
+        "summary": "Upgrade a single legacy notification channel for the current organization.",
+        "operationId": "RoutePostUpgradeChannel",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "Channel ID of legacy notification channel.",
+            "name": "ChannelID",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OrgMigrationSummary",
+            "schema": {
+              "$ref": "#/definitions/OrgMigrationSummary"
+            }
+          }
+        }
+      }
+    },
+    "/v1/upgrade/dashboards": {
+      "post": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "upgrade"
+        ],
+        "summary": "Upgrade all legacy dashboard alerts for the current organization.",
+        "operationId": "RoutePostUpgradeAllDashboards",
+        "responses": {
+          "200": {
+            "description": "OrgMigrationSummary",
+            "schema": {
+              "$ref": "#/definitions/OrgMigrationSummary"
+            }
+          }
+        }
+      }
+    },
+    "/v1/upgrade/dashboards/{DashboardID}": {
+      "post": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "upgrade"
+        ],
+        "summary": "Upgrade all legacy dashboard alerts on a dashboard for the current organization.",
+        "operationId": "RoutePostUpgradeDashboard",
+        "parameters": [
+          {
+            "type": "boolean",
+            "default": false,
+            "description": "If true, legacy alert and notification channel upgrades from previous runs will be skipped. Otherwise, they will be replaced.",
+            "name": "SkipExisting",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "description": "Dashboard ID of dashboard alert.",
+            "name": "DashboardID",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OrgMigrationSummary",
+            "schema": {
+              "$ref": "#/definitions/OrgMigrationSummary"
+            }
+          }
+        }
+      }
+    },
+    "/v1/upgrade/dashboards/{DashboardID}/panels/{PanelID}": {
+      "post": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "upgrade"
+        ],
+        "summary": "Upgrade single legacy dashboard alert for the current organization.",
+        "operationId": "RoutePostUpgradeAlert",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "Dashboard ID of dashboard alert.",
+            "name": "DashboardID",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "Panel ID of dashboard alert.",
+            "name": "PanelID",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OrgMigrationSummary",
+            "schema": {
+              "$ref": "#/definitions/OrgMigrationSummary"
+            }
+          }
+        }
+      }
+    },
+    "/v1/upgrade/org": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "upgrade"
+        ],
+        "summary": "Get existing alerting upgrade for the current organization.",
+        "operationId": "RouteGetOrgUpgrade",
+        "responses": {
+          "200": {
+            "description": "OrgMigrationState",
+            "schema": {
+              "$ref": "#/definitions/OrgMigrationState"
+            }
+          }
+        }
+      },
+      "post": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "upgrade"
+        ],
+        "summary": "Upgrade all legacy alerts for the current organization.",
+        "operationId": "RoutePostUpgradeOrg",
+        "parameters": [
+          {
+            "type": "boolean",
+            "default": false,
+            "description": "If true, legacy alert and notification channel upgrades from previous runs will be skipped. Otherwise, they will be replaced.",
+            "name": "SkipExisting",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OrgMigrationSummary",
+            "schema": {
+              "$ref": "#/definitions/OrgMigrationSummary"
+            }
+          }
+        }
+      },
+      "delete": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "upgrade"
+        ],
+        "summary": "Delete existing alerting upgrade for the current organization.",
+        "operationId": "RouteDeleteOrgUpgrade",
+        "responses": {
+          "200": {
+            "description": "Ack",
+            "schema": {
+              "$ref": "#/definitions/Ack"
+            }
           }
         }
       }
@@ -2744,6 +3652,20 @@
         }
       }
     },
+    "AlertPair": {
+      "type": "object",
+      "properties": {
+        "alertRule": {
+          "$ref": "#/definitions/AlertRuleUpgrade"
+        },
+        "error": {
+          "type": "string"
+        },
+        "legacyAlert": {
+          "$ref": "#/definitions/LegacyAlert"
+        }
+      }
+    },
     "AlertQuery": {
       "type": "object",
       "title": "AlertQuery represents a single query associated with an alert definition.",
@@ -2787,7 +3709,7 @@
           "type": "string"
         },
         "relativeTimeRange": {
-          "$ref": "#/definitions/RelativeTimeRange"
+          "$ref": "#/definitions/RelativeTimeRangeExport"
         }
       }
     },
@@ -2836,9 +3758,9 @@
         "execErrState": {
           "type": "string",
           "enum": [
+            "OK",
             "Alerting",
-            "Error",
-            "OK"
+            "Error"
           ]
         },
         "for": {
@@ -2928,6 +3850,23 @@
         }
       }
     },
+    "AlertRuleUpgrade": {
+      "type": "object",
+      "properties": {
+        "sendsTo": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "title": {
+          "type": "string"
+        },
+        "uid": {
+          "type": "string"
+        }
+      }
+    },
     "AlertingFileExport": {
       "type": "object",
       "title": "AlertingFileExport is the full provisioned file export.",
@@ -2936,14 +3875,31 @@
           "type": "integer",
           "format": "int64"
         },
+        "contactPoints": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ContactPointExport"
+          }
+        },
         "groups": {
           "type": "array",
           "items": {
             "$ref": "#/definitions/AlertRuleGroupExport"
           }
+        },
+        "muteTimes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MuteTimeIntervalExport"
+          }
+        },
+        "policies": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/NotificationPolicyExport"
+          }
         }
-      },
-      "$ref": "#/definitions/AlertingFileExport"
+      }
     },
     "AlertingRule": {
       "description": "adapted from cortex",
@@ -2955,9 +3911,13 @@
         "type",
         "state",
         "annotations",
-        "alerts"
+        "activeAt"
       ],
       "properties": {
+        "activeAt": {
+          "type": "string",
+          "format": "date-time"
+        },
         "alerts": {
           "type": "array",
           "items": {
@@ -2998,6 +3958,20 @@
           "description": "State can be \"pending\", \"firing\", \"inactive\".",
           "type": "string"
         },
+        "totals": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "totalsFiltered": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
         "type": {
           "$ref": "#/definitions/RuleType"
         }
@@ -3036,6 +4010,9 @@
           "type": "string"
         },
         "for": {
+          "type": "string"
+        },
+        "keep_firing_for": {
           "type": "string"
         },
         "labels": {
@@ -3130,6 +4107,9 @@
         },
         "username": {
           "type": "string"
+        },
+        "username_file": {
+          "type": "string"
         }
       }
     },
@@ -3168,16 +4148,114 @@
         }
       }
     },
+    "ContactPair": {
+      "type": "object",
+      "properties": {
+        "contactPoint": {
+          "$ref": "#/definitions/ContactPointUpgrade"
+        },
+        "error": {
+          "type": "string"
+        },
+        "legacyChannel": {
+          "$ref": "#/definitions/LegacyChannel"
+        }
+      }
+    },
+    "ContactPointExport": {
+      "type": "object",
+      "title": "ContactPointExport is the provisioned file export of alerting.ContactPointV1.",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "orgId": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "receivers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ReceiverExport"
+          }
+        }
+      }
+    },
+    "ContactPointUpgrade": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "routeMatchers": {
+          "$ref": "#/definitions/ObjectMatchers"
+        },
+        "type": {
+          "type": "string"
+        }
+      }
+    },
     "ContactPoints": {
       "type": "array",
       "items": {
         "$ref": "#/definitions/EmbeddedContactPoint"
       }
     },
+    "CounterResetHint": {
+      "description": "or alternatively that we are dealing with a gauge histogram, where counter resets do not apply.",
+      "type": "integer",
+      "format": "uint8",
+      "title": "CounterResetHint contains the known information about a counter reset,"
+    },
+    "DashboardUpgrade": {
+      "type": "object",
+      "properties": {
+        "dashboardId": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "dashboardName": {
+          "type": "string"
+        },
+        "dashboardUid": {
+          "type": "string"
+        },
+        "error": {
+          "type": "string"
+        },
+        "folderName": {
+          "type": "string"
+        },
+        "folderUid": {
+          "type": "string"
+        },
+        "migratedAlerts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/AlertPair"
+          }
+        },
+        "newFolderName": {
+          "type": "string"
+        },
+        "newFolderUid": {
+          "type": "string"
+        },
+        "provisioned": {
+          "type": "boolean"
+        },
+        "warning": {
+          "type": "string"
+        }
+      }
+    },
     "DataLink": {
       "description": "DataLink define what",
       "type": "object",
       "properties": {
+        "internal": {
+          "$ref": "#/definitions/InternalDataLink"
+        },
         "targetBlank": {
           "type": "boolean"
         },
@@ -3197,6 +4275,9 @@
         "Error": {
           "description": "Error is a property to be set if the corresponding DataQuery has an error.",
           "type": "string"
+        },
+        "ErrorSource": {
+          "$ref": "#/definitions/ErrorSource"
         },
         "Frames": {
           "$ref": "#/definitions/Frames"
@@ -3361,9 +4442,50 @@
         "uid": {
           "description": "UID is the unique identifier of the contact point. The UID can be\nset by the user.",
           "type": "string",
+          "maxLength": 40,
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9\\-\\_]+$",
           "example": "my_external_reference"
         }
       }
+    },
+    "EnumFieldConfig": {
+      "description": "Enum field config\nVector values are used as lookup keys into the enum fields",
+      "type": "object",
+      "properties": {
+        "color": {
+          "description": "Color is the color value for a given index (empty is undefined)",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "description": {
+          "description": "Description of the enum state",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "icon": {
+          "description": "Icon supports setting an icon for a given index value",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "text": {
+          "description": "Value is the string display value for a given index",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "ErrorSource": {
+      "description": "ErrorSource type defines the source of the error",
+      "type": "string"
     },
     "ErrorType": {
       "type": "string",
@@ -3391,6 +4513,9 @@
     "EvalQueriesPayload": {
       "type": "object",
       "properties": {
+        "condition": {
+          "type": "string"
+        },
         "data": {
           "type": "array",
           "items": {
@@ -3405,6 +4530,9 @@
     },
     "EvalQueriesResponse": {
       "$ref": "#/definitions/EvalQueriesResponse"
+    },
+    "ExplorePanelsState": {
+      "description": "This is an object constructed with the keys as the values of the enum VisType and the value being a bag of properties"
     },
     "ExtendedReceiver": {
       "type": "object",
@@ -3485,7 +4613,7 @@
           "type": "string"
         },
         "displayNameFromDS": {
-          "description": "DisplayNameFromDS overrides Grafana default naming in a better way that allows users to override it easily.",
+          "description": "DisplayNameFromDS overrides Grafana default naming strategy.",
           "type": "string"
         },
         "filterable": {
@@ -3524,6 +4652,9 @@
         "thresholds": {
           "$ref": "#/definitions/ThresholdsConfig"
         },
+        "type": {
+          "$ref": "#/definitions/FieldTypeConfig"
+        },
         "unit": {
           "description": "Numeric Options",
           "type": "string"
@@ -3534,13 +4665,80 @@
         }
       }
     },
+    "FieldTypeConfig": {
+      "description": "FieldTypeConfig has type specific configs, only one should be active at a time",
+      "type": "object",
+      "properties": {
+        "enum": {
+          "$ref": "#/definitions/EnumFieldConfig"
+        }
+      }
+    },
+    "FloatHistogram": {
+      "description": "A FloatHistogram is needed by PromQL to handle operations that might result\nin fractional counts. Since the counts in a histogram are unlikely to be too\nlarge to be represented precisely by a float64, a FloatHistogram can also be\nused to represent a histogram with integer counts and thus serves as a more\ngeneralized representation.",
+      "type": "object",
+      "title": "FloatHistogram is similar to Histogram but uses float64 for all\ncounts. Additionally, bucket counts are absolute and not deltas.",
+      "properties": {
+        "Count": {
+          "description": "Total number of observations. Must be zero or positive.",
+          "type": "number",
+          "format": "double"
+        },
+        "CounterResetHint": {
+          "$ref": "#/definitions/CounterResetHint"
+        },
+        "PositiveBuckets": {
+          "description": "Observation counts in buckets. Each represents an absolute count and\nmust be zero or positive.",
+          "type": "array",
+          "items": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "PositiveSpans": {
+          "description": "Spans for positive and negative buckets (see Span below).",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Span"
+          }
+        },
+        "Schema": {
+          "description": "Currently valid schema numbers are -4 \u003c= n \u003c= 8.  They are all for\nbase-2 bucket schemas, where 1 is a bucket boundary in each case, and\nthen each power of two is divided into 2^n logarithmic buckets.  Or\nin other words, each bucket boundary is the previous boundary times\n2^(2^-n).",
+          "type": "integer",
+          "format": "int32"
+        },
+        "Sum": {
+          "description": "Sum of observations. This is also used as the stale marker.",
+          "type": "number",
+          "format": "double"
+        },
+        "ZeroCount": {
+          "description": "Observations falling into the zero bucket. Must be zero or positive.",
+          "type": "number",
+          "format": "double"
+        },
+        "ZeroThreshold": {
+          "description": "Width of the zero bucket.",
+          "type": "number",
+          "format": "double"
+        }
+      }
+    },
+    "ForbiddenError": {
+      "type": "object",
+      "properties": {
+        "body": {
+          "$ref": "#/definitions/PublicError"
+        }
+      }
+    },
     "Frame": {
       "description": "Each Field is well typed by its FieldType and supports optional Labels.\n\nA Frame is a general data container for Grafana. A Frame can be table data\nor time series data depending on its content and field types.",
       "type": "object",
       "title": "Frame is a columnar data structure where each column is a Field.",
       "properties": {
         "Fields": {
-          "description": "Fields are the columns of a frame.\nAll Fields must be of the same the length when marshalling the Frame for transmission.",
+          "description": "Fields are the columns of a frame.\nAll Fields must be of the same the length when marshalling the Frame for transmission.\nThere should be no `nil` entries in the Fields slice (making them pointers was a mistake).",
           "type": "array",
           "items": {
             "$ref": "#/definitions/Field"
@@ -3600,6 +4798,10 @@
           "description": "PathSeparator defines the separator pattern to decode a hierarchy. The default separator is '/'.",
           "type": "string"
         },
+        "preferredVisualisationPluginId": {
+          "description": "PreferredVisualizationPluginId sets the panel plugin id to use to render the data when using Explore. If\nthe plugin cannot be found will fall back to PreferredVisualization.",
+          "type": "string"
+        },
         "preferredVisualisationType": {
           "$ref": "#/definitions/VisType"
         },
@@ -3612,6 +4814,18 @@
         },
         "type": {
           "$ref": "#/definitions/FrameType"
+        },
+        "typeVersion": {
+          "$ref": "#/definitions/FrameTypeVersion"
+        },
+        "uniqueRowIdFields": {
+          "description": "Array of field indices which values create a unique id for each row. Ideally this should be globally unique ID\nbut that isn't guarantied. Should help with keeping track and deduplicating rows in visualizations, especially\nwith streaming data with frequent updates.",
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "example": "TraceID in Tempo, table name + primary key in SQL"
         }
       }
     },
@@ -3619,12 +4833,28 @@
       "description": "A FrameType string, when present in a frame's metadata, asserts that the\nframe's structure conforms to the FrameType's specification.\nThis property is currently optional, so FrameType may be FrameTypeUnknown even if the properties of\nthe Frame correspond to a defined FrameType.",
       "type": "string"
     },
+    "FrameTypeVersion": {
+      "type": "array",
+      "title": "FrameType is a 2 number version (Major / Minor).",
+      "items": {
+        "type": "integer",
+        "format": "uint64"
+      }
+    },
     "Frames": {
-      "description": "It is the main data container within a backend.DataResponse.",
+      "description": "It is the main data container within a backend.DataResponse.\nThere should be no `nil` entries in the Frames slice (making them pointers was a mistake).",
       "type": "array",
       "title": "Frames is a slice of Frame pointers.",
       "items": {
         "$ref": "#/definitions/Frame"
+      }
+    },
+    "GenericPublicError": {
+      "type": "object",
+      "properties": {
+        "body": {
+          "$ref": "#/definitions/PublicError"
+        }
       }
     },
     "GettableAlertmanagers": {
@@ -3699,6 +4929,12 @@
           "type": "array",
           "items": {
             "$ref": "#/definitions/GettableGrafanaReceiver"
+          }
+        },
+        "msteams_configs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MSTeamsConfig"
           }
         },
         "name": {
@@ -3788,6 +5024,9 @@
         "grafana_alert": {
           "$ref": "#/definitions/GettableGrafanaRule"
         },
+        "keep_firing_for": {
+          "type": "string"
+        },
         "labels": {
           "type": "object",
           "additionalProperties": {
@@ -3870,10 +5109,6 @@
         "is_paused": {
           "type": "boolean"
         },
-        "namespace_id": {
-          "type": "integer",
-          "format": "int64"
-        },
         "namespace_uid": {
           "type": "string"
         },
@@ -3908,6 +5143,34 @@
         "version": {
           "type": "integer",
           "format": "int64"
+        }
+      }
+    },
+    "GettableHistoricUserConfig": {
+      "type": "object",
+      "properties": {
+        "alertmanager_config": {
+          "$ref": "#/definitions/GettableApiAlertingConfig"
+        },
+        "id": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "last_applied": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "template_file_provenances": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/Provenance"
+          }
+        },
+        "template_files": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
         }
       }
     },
@@ -3969,6 +5232,23 @@
         },
         "versionInfo": {
           "$ref": "#/definitions/versionInfo"
+        }
+      }
+    },
+    "GettableTimeIntervals": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/definitions/Provenance"
+        },
+        "time_intervals": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/TimeIntervalItem"
+          }
         }
       }
     },
@@ -4098,11 +5378,19 @@
           "description": "FollowRedirects specifies whether the client should follow HTTP 3xx redirects.\nThe omitempty flag is not set, because it would be hidden from the\nmarshalled configuration when set to false.",
           "type": "boolean"
         },
+        "no_proxy": {
+          "description": "NoProxy contains addresses that should not use a proxy.",
+          "type": "string"
+        },
         "oauth2": {
           "$ref": "#/definitions/OAuth2"
         },
         "proxy_connect_header": {
           "$ref": "#/definitions/Header"
+        },
+        "proxy_from_environment": {
+          "description": "ProxyFromEnvironment makes use of net/http ProxyFromEnvironment function\nto determine proxies.",
+          "type": "boolean"
         },
         "proxy_url": {
           "$ref": "#/definitions/URL"
@@ -4173,6 +5461,31 @@
       "format": "int64",
       "title": "InspectType is a type for the Inspect property of a Notice."
     },
+    "InternalDataLink": {
+      "description": "InternalDataLink definition to allow Explore links to be constructed in the backend",
+      "type": "object",
+      "properties": {
+        "datasourceName": {
+          "type": "string"
+        },
+        "datasourceUid": {
+          "type": "string"
+        },
+        "panelsState": {
+          "$ref": "#/definitions/ExplorePanelsState"
+        },
+        "query": {},
+        "timeRange": {
+          "$ref": "#/definitions/TimeRange"
+        },
+        "transformations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/LinkTransformationConfig"
+          }
+        }
+      }
+    },
     "Json": {
       "type": "object"
     },
@@ -4214,11 +5527,83 @@
         "$ref": "#/definitions/Label"
       }
     },
+    "LegacyAlert": {
+      "type": "object",
+      "properties": {
+        "dashboardId": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "id": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "name": {
+          "type": "string"
+        },
+        "panelId": {
+          "type": "integer",
+          "format": "int64"
+        }
+      }
+    },
+    "LegacyChannel": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "name": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        }
+      }
+    },
+    "LinkTransformationConfig": {
+      "type": "object",
+      "properties": {
+        "expression": {
+          "type": "string"
+        },
+        "field": {
+          "type": "string"
+        },
+        "mapValue": {
+          "type": "string"
+        },
+        "type": {
+          "$ref": "#/definitions/SupportedTransformationTypes"
+        }
+      }
+    },
+    "MSTeamsConfig": {
+      "type": "object",
+      "properties": {
+        "http_config": {
+          "$ref": "#/definitions/HTTPClientConfig"
+        },
+        "send_resolved": {
+          "type": "boolean"
+        },
+        "text": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "webhook_url": {
+          "$ref": "#/definitions/SecretURL"
+        }
+      }
+    },
     "MatchRegexps": {
       "type": "object",
       "title": "MatchRegexps represents a map of Regexp.",
       "additionalProperties": {
-        "$ref": "#/definitions/Regexp"
+        "type": "string"
       }
     },
     "MatchType": {
@@ -4258,6 +5643,24 @@
       "properties": {
         "name": {
           "type": "string"
+        },
+        "time_intervals": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/TimeInterval"
+          }
+        }
+      }
+    },
+    "MuteTimeIntervalExport": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "orgId": {
+          "type": "integer",
+          "format": "int64"
         },
         "time_intervals": {
           "type": "array",
@@ -4309,6 +5712,65 @@
       "type": "integer",
       "format": "int64",
       "title": "NoticeSeverity is a type for the Severity property of a Notice."
+    },
+    "NotificationPolicyExport": {
+      "type": "object",
+      "title": "NotificationPolicyExport is the provisioned file export of alerting.NotificiationPolicyV1.",
+      "properties": {
+        "continue": {
+          "type": "boolean"
+        },
+        "group_by": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "group_interval": {
+          "type": "string"
+        },
+        "group_wait": {
+          "type": "string"
+        },
+        "match": {
+          "description": "Deprecated. Remove before v1.0 release.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "match_re": {
+          "$ref": "#/definitions/MatchRegexps"
+        },
+        "matchers": {
+          "$ref": "#/definitions/Matchers"
+        },
+        "mute_time_intervals": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "object_matchers": {
+          "$ref": "#/definitions/ObjectMatchers"
+        },
+        "orgId": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "receiver": {
+          "type": "string"
+        },
+        "repeat_interval": {
+          "type": "string"
+        },
+        "routes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/RouteExport"
+          }
+        }
+      }
     },
     "NotificationTemplate": {
       "type": "object",
@@ -4369,6 +5831,17 @@
             "type": "string"
           }
         },
+        "no_proxy": {
+          "description": "NoProxy contains addresses that should not use a proxy.",
+          "type": "string"
+        },
+        "proxy_connect_header": {
+          "$ref": "#/definitions/Header"
+        },
+        "proxy_from_environment": {
+          "description": "ProxyFromEnvironment makes use of net/http ProxyFromEnvironment function\nto determine proxies.",
+          "type": "boolean"
+        },
         "proxy_url": {
           "$ref": "#/definitions/URL"
         },
@@ -4383,9 +5856,18 @@
         }
       }
     },
+    "ObjectMatcher": {
+      "type": "array",
+      "title": "ObjectMatcher is a matcher that can be used to filter alerts.",
+      "items": {
+        "type": "string"
+      }
+    },
     "ObjectMatchers": {
-      "description": "ObjectMatchers is Matchers with a different Unmarshal and Marshal methods that accept matchers as objects\nthat have already been parsed.",
-      "$ref": "#/definitions/Matchers"
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ObjectMatcher"
+      }
     },
     "OpsGenieConfig": {
       "type": "object",
@@ -4463,6 +5945,50 @@
         },
         "username": {
           "type": "string"
+        }
+      }
+    },
+    "OrgMigrationState": {
+      "type": "object",
+      "properties": {
+        "migratedChannels": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ContactPair"
+          }
+        },
+        "migratedDashboards": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/DashboardUpgrade"
+          }
+        },
+        "orgId": {
+          "type": "integer",
+          "format": "int64"
+        }
+      }
+    },
+    "OrgMigrationSummary": {
+      "type": "object",
+      "properties": {
+        "hasErrors": {
+          "type": "boolean"
+        },
+        "newAlerts": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "newChannels": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "newDashboards": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "removed": {
+          "type": "boolean"
         }
       }
     },
@@ -4566,9 +6092,13 @@
       "type": "object"
     },
     "Point": {
+      "description": "If H is not nil, then this is a histogram point and only (T, H) is valid.\nIf H is nil, then only (T, V) is valid.",
       "type": "object",
       "title": "Point represents a single data point for a given timestamp.",
       "properties": {
+        "H": {
+          "$ref": "#/definitions/FloatHistogram"
+        },
         "T": {
           "type": "integer",
           "format": "int64"
@@ -4634,6 +6164,12 @@
           "type": "array",
           "items": {
             "$ref": "#/definitions/PostableGrafanaReceiver"
+          }
+        },
+        "msteams_configs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MSTeamsConfig"
           }
         },
         "name": {
@@ -4723,6 +6259,9 @@
         "grafana_alert": {
           "$ref": "#/definitions/PostableGrafanaRule"
         },
+        "keep_firing_for": {
+          "type": "string"
+        },
         "labels": {
           "type": "object",
           "additionalProperties": {
@@ -4731,6 +6270,29 @@
         },
         "record": {
           "type": "string"
+        }
+      }
+    },
+    "PostableExtendedRuleNodeExtended": {
+      "type": "object",
+      "required": [
+        "rule"
+      ],
+      "properties": {
+        "folderTitle": {
+          "type": "string",
+          "example": "project_x"
+        },
+        "folderUid": {
+          "type": "string",
+          "example": "okrd3I0Vz"
+        },
+        "rule": {
+          "$ref": "#/definitions/PostableExtendedRuleNode"
+        },
+        "ruleGroup": {
+          "type": "string",
+          "example": "eval_group_1"
         }
       }
     },
@@ -4840,6 +6402,20 @@
         }
       }
     },
+    "PostableTimeIntervals": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "time_intervals": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/TimeIntervalItem"
+          }
+        }
+      }
+    },
     "PostableUserConfig": {
       "type": "object",
       "properties": {
@@ -4938,9 +6514,9 @@
         "execErrState": {
           "type": "string",
           "enum": [
+            "OK",
             "Alerting",
-            "Error",
-            "OK"
+            "Error"
           ]
         },
         "folderUID": {
@@ -4995,7 +6571,10 @@
           "example": "Always firing"
         },
         "uid": {
-          "type": "string"
+          "type": "string",
+          "maxLength": 40,
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9-_]+$"
         },
         "updated": {
           "type": "string",
@@ -5010,9 +6589,51 @@
         "$ref": "#/definitions/ProvisionedAlertRule"
       }
     },
+    "ProxyConfig": {
+      "type": "object",
+      "properties": {
+        "no_proxy": {
+          "description": "NoProxy contains addresses that should not use a proxy.",
+          "type": "string"
+        },
+        "proxy_connect_header": {
+          "$ref": "#/definitions/Header"
+        },
+        "proxy_from_environment": {
+          "description": "ProxyFromEnvironment makes use of net/http ProxyFromEnvironment function\nto determine proxies.",
+          "type": "boolean"
+        },
+        "proxy_url": {
+          "$ref": "#/definitions/URL"
+        }
+      }
+    },
+    "PublicError": {
+      "description": "PublicError is derived from Error and only contains information\navailable to the end user.",
+      "type": "object",
+      "properties": {
+        "extra": {
+          "type": "object",
+          "additionalProperties": {}
+        },
+        "message": {
+          "type": "string"
+        },
+        "messageId": {
+          "type": "string"
+        },
+        "statusCode": {
+          "type": "integer",
+          "format": "int64"
+        }
+      }
+    },
     "PushoverConfig": {
       "type": "object",
       "properties": {
+        "device": {
+          "type": "string"
+        },
         "expire": {
           "type": "string"
         },
@@ -5044,6 +6665,9 @@
           "$ref": "#/definitions/Secret"
         },
         "token_file": {
+          "type": "string"
+        },
+        "ttl": {
           "type": "string"
         },
         "url": {
@@ -5088,7 +6712,7 @@
           "type": "string"
         },
         "displayNameFromDS": {
-          "description": "DisplayNameFromDS overrides Grafana default naming in a better way that allows users to override it easily.",
+          "description": "DisplayNameFromDS overrides Grafana default naming strategy.",
           "type": "string"
         },
         "filterable": {
@@ -5127,6 +6751,9 @@
         "thresholds": {
           "$ref": "#/definitions/ThresholdsConfig"
         },
+        "type": {
+          "$ref": "#/definitions/FieldTypeConfig"
+        },
         "unit": {
           "description": "Numeric Options",
           "type": "string"
@@ -5158,6 +6785,12 @@
           "type": "array",
           "items": {
             "$ref": "#/definitions/EmailConfig"
+          }
+        },
+        "msteams_configs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MSTeamsConfig"
           }
         },
         "name": {
@@ -5226,10 +6859,23 @@
         }
       }
     },
-    "Regexp": {
-      "description": "A Regexp is safe for concurrent use by multiple goroutines,\nexcept for configuration methods, such as Longest.",
+    "ReceiverExport": {
       "type": "object",
-      "title": "Regexp is the representation of a compiled regular expression."
+      "title": "ReceiverExport is the provisioned file export of alerting.ReceiverV1.",
+      "properties": {
+        "disableResolveMessage": {
+          "type": "boolean"
+        },
+        "settings": {
+          "$ref": "#/definitions/RawMessage"
+        },
+        "type": {
+          "type": "string"
+        },
+        "uid": {
+          "type": "string"
+        }
+      }
     },
     "RelativeTimeRange": {
       "description": "RelativeTimeRange is the per query start and end time\nfor requests.",
@@ -5240,6 +6886,19 @@
         },
         "to": {
           "$ref": "#/definitions/Duration"
+        }
+      }
+    },
+    "RelativeTimeRangeExport": {
+      "type": "object",
+      "properties": {
+        "from": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "to": {
+          "type": "integer",
+          "format": "int64"
         }
       }
     },
@@ -5317,6 +6976,61 @@
         }
       }
     },
+    "RouteExport": {
+      "description": "RouteExport is the provisioned file export of definitions.Route. This is needed to hide fields that aren't useable in\nprovisioning file format. An alternative would be to define a custom MarshalJSON and MarshalYAML that excludes them.",
+      "type": "object",
+      "properties": {
+        "continue": {
+          "type": "boolean"
+        },
+        "group_by": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "group_interval": {
+          "type": "string"
+        },
+        "group_wait": {
+          "type": "string"
+        },
+        "match": {
+          "description": "Deprecated. Remove before v1.0 release.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "match_re": {
+          "$ref": "#/definitions/MatchRegexps"
+        },
+        "matchers": {
+          "$ref": "#/definitions/Matchers"
+        },
+        "mute_time_intervals": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "object_matchers": {
+          "$ref": "#/definitions/ObjectMatchers"
+        },
+        "receiver": {
+          "type": "string"
+        },
+        "repeat_interval": {
+          "type": "string"
+        },
+        "routes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/RouteExport"
+          }
+        }
+      }
+    },
     "Rule": {
       "description": "adapted from cortex",
       "type": "object",
@@ -5366,6 +7080,13 @@
           "items": {
             "$ref": "#/definitions/RuleGroup"
           }
+        },
+        "totals": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "format": "int64"
+          }
         }
       }
     },
@@ -5401,6 +7122,13 @@
           "type": "array",
           "items": {
             "$ref": "#/definitions/AlertingRule"
+          }
+        },
+        "totals": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       }
@@ -5494,6 +7222,9 @@
       "type": "object",
       "title": "Sample is a single sample belonging to a metric.",
       "properties": {
+        "H": {
+          "$ref": "#/definitions/FloatHistogram"
+        },
         "Metric": {
           "$ref": "#/definitions/Labels"
         },
@@ -5686,6 +7417,22 @@
     "SmtpNotEnabled": {
       "$ref": "#/definitions/ResponseDetails"
     },
+    "Span": {
+      "type": "object",
+      "title": "A Span defines a continuous sequence of buckets.",
+      "properties": {
+        "Length": {
+          "description": "Length of the span.",
+          "type": "integer",
+          "format": "uint32"
+        },
+        "Offset": {
+          "description": "Gap to previous span (always positive), or starting index for the 1st\nspan (which can be negative).",
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
     "Status": {
       "type": "integer",
       "format": "int64"
@@ -5693,12 +7440,23 @@
     "Success": {
       "$ref": "#/definitions/ResponseDetails"
     },
+    "SupportedTransformationTypes": {
+      "type": "string"
+    },
     "TLSConfig": {
       "type": "object",
       "title": "TLSConfig configures the options for TLS connections.",
       "properties": {
+        "ca": {
+          "description": "Text of the CA cert to use for the targets.",
+          "type": "string"
+        },
         "ca_file": {
           "description": "The CA cert to use for the targets.",
+          "type": "string"
+        },
+        "cert": {
+          "description": "Text of the client cert file for the targets.",
           "type": "string"
         },
         "cert_file": {
@@ -5708,6 +7466,9 @@
         "insecure_skip_verify": {
           "description": "Disable target certificate validation.",
           "type": "boolean"
+        },
+        "key": {
+          "$ref": "#/definitions/Secret"
         },
         "key_file": {
           "description": "The client key file for the targets.",
@@ -5757,6 +7518,9 @@
         },
         "token": {
           "$ref": "#/definitions/Secret"
+        },
+        "token_file": {
+          "type": "string"
         }
       }
     },
@@ -5857,6 +7621,77 @@
         }
       }
     },
+    "TestTemplatesConfigBodyParams": {
+      "type": "object",
+      "properties": {
+        "alerts": {
+          "description": "Alerts to use as data when testing the template.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/postableAlert"
+          }
+        },
+        "name": {
+          "description": "Name of the template file.",
+          "type": "string"
+        },
+        "template": {
+          "description": "Template string to test.",
+          "type": "string"
+        }
+      }
+    },
+    "TestTemplatesErrorResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "description": "Kind of template error that occurred.",
+          "type": "string",
+          "enum": [
+            "invalid_template",
+            "execution_error"
+          ]
+        },
+        "message": {
+          "description": "Error message.",
+          "type": "string"
+        },
+        "name": {
+          "description": "Name of the associated template for this error. Will be empty if the Kind is \"invalid_template\".",
+          "type": "string"
+        }
+      }
+    },
+    "TestTemplatesResult": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "description": "Name of the associated template definition for this result.",
+          "type": "string"
+        },
+        "text": {
+          "description": "Interpolated value of the template.",
+          "type": "string"
+        }
+      }
+    },
+    "TestTemplatesResults": {
+      "type": "object",
+      "properties": {
+        "errors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/TestTemplatesErrorResult"
+          }
+        },
+        "results": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/TestTemplatesResult"
+          }
+        }
+      }
+    },
     "Threshold": {
       "description": "Threshold a single step on the threshold list",
       "type": "object",
@@ -5931,23 +7766,71 @@
         }
       }
     },
-    "TimeRange": {
-      "description": "For example, 4:00PM to End of the day would Begin at 1020 and End at 1440.",
+    "TimeIntervalItem": {
       "type": "object",
-      "title": "TimeRange represents a range of minutes within a 1440 minute day, exclusive of the End minute. A day consists of 1440 minutes.",
       "properties": {
-        "EndMinute": {
-          "type": "integer",
-          "format": "int64"
+        "days_of_month": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         },
-        "StartMinute": {
-          "type": "integer",
-          "format": "int64"
+        "location": {
+          "type": "string"
+        },
+        "months": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "times": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/TimeIntervalTimeRange"
+          }
+        },
+        "weekdays": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "years": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "TimeIntervalTimeRange": {
+      "type": "object",
+      "properties": {
+        "end_time": {
+          "type": "string"
+        },
+        "start_time": {
+          "type": "string"
+        }
+      }
+    },
+    "TimeRange": {
+      "description": "Redefining this to avoid an import cycle",
+      "type": "object",
+      "properties": {
+        "from": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "to": {
+          "type": "string",
+          "format": "date-time"
         }
       }
     },
     "URL": {
-      "description": "The general form represented is:\n\n[scheme:][//[userinfo@]host][/]path[?query][#fragment]\n\nURLs that do not start with a slash after the scheme are interpreted as:\n\nscheme:opaque[?query][#fragment]\n\nNote that the Path field is stored in decoded form: /%47%6f%2f becomes /Go/.\nA consequence is that it is impossible to tell which slashes in the Path were\nslashes in the raw URL and which were %2f. This distinction is rarely important,\nbut when it is, the code should use RawPath, an optional field which only gets\nset if the default encoding is different from Path.\n\nURL's String method uses the EscapedPath method to obtain the path. See the\nEscapedPath method for more details.",
+      "description": "The general form represented is:\n\n[scheme:][//[userinfo@]host][/]path[?query][#fragment]\n\nURLs that do not start with a slash after the scheme are interpreted as:\n\nscheme:opaque[?query][#fragment]\n\nNote that the Path field is stored in decoded form: /%47%6f%2f becomes /Go/.\nA consequence is that it is impossible to tell which slashes in the Path were\nslashes in the raw URL and which were %2f. This distinction is rarely important,\nbut when it is, the code should use the EscapedPath method, which preserves\nthe original encoding of Path.\n\nThe RawPath field is an optional field which is only set when the default\nencoding of Path is different from the escaped path. See the EscapedPath method\nfor more details.\n\nURL's String method uses the EscapedPath method to obtain the path.",
       "type": "object",
       "title": "A URL represents a parsed URL (technically, a URI reference).",
       "properties": {
@@ -5983,6 +7866,32 @@
         },
         "User": {
           "$ref": "#/definitions/Userinfo"
+        }
+      }
+    },
+    "UpdateRuleGroupResponse": {
+      "type": "object",
+      "properties": {
+        "created": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "deleted": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "message": {
+          "type": "string"
+        },
+        "updated": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       }
     },
@@ -6099,7 +8008,10 @@
           "type": "boolean"
         },
         "url": {
-          "$ref": "#/definitions/URL"
+          "$ref": "#/definitions/SecretURL"
+        },
+        "url_file": {
+          "type": "string"
         }
       }
     },
@@ -6160,7 +8072,6 @@
       }
     },
     "alertGroup": {
-      "description": "AlertGroup alert group",
       "type": "object",
       "required": [
         "alerts",
@@ -6185,6 +8096,7 @@
       "$ref": "#/definitions/alertGroup"
     },
     "alertGroups": {
+      "description": "AlertGroups alert groups",
       "type": "array",
       "items": {
         "$ref": "#/definitions/alertGroup"
@@ -6347,7 +8259,6 @@
       "$ref": "#/definitions/gettableAlert"
     },
     "gettableAlerts": {
-      "description": "GettableAlerts gettable alerts",
       "type": "array",
       "items": {
         "$ref": "#/definitions/gettableAlert"
@@ -6355,7 +8266,6 @@
       "$ref": "#/definitions/gettableAlerts"
     },
     "gettableSilence": {
-      "description": "GettableSilence gettable silence",
       "type": "object",
       "required": [
         "comment",
@@ -6405,7 +8315,6 @@
       "$ref": "#/definitions/gettableSilence"
     },
     "gettableSilences": {
-      "description": "GettableSilences gettable silences",
       "type": "array",
       "items": {
         "$ref": "#/definitions/gettableSilence"
@@ -6711,6 +8620,60 @@
     }
   },
   "responses": {
+    "GetAllIntervalsResponse": {
+      "description": "",
+      "schema": {
+        "type": "array",
+        "items": {
+          "$ref": "#/definitions/GettableTimeIntervals"
+        }
+      }
+    },
+    "GetIntervalsByNameResponse": {
+      "description": "",
+      "schema": {
+        "$ref": "#/definitions/GettableTimeIntervals"
+      }
+    },
+    "GetReceiverResponse": {
+      "description": "",
+      "schema": {
+        "$ref": "#/definitions/GettableApiReceiver"
+      }
+    },
+    "GetReceiversResponse": {
+      "description": "",
+      "schema": {
+        "type": "array",
+        "items": {
+          "$ref": "#/definitions/GettableApiReceiver"
+        }
+      }
+    },
+    "GettableHistoricUserConfigs": {
+      "description": "",
+      "schema": {
+        "type": "array",
+        "items": {
+          "$ref": "#/definitions/GettableHistoricUserConfig"
+        }
+      }
+    },
+    "StateHistory": {
+      "description": "",
+      "schema": {
+        "$ref": "#/definitions/Frame"
+      }
+    },
+    "TestGrafanaRuleResponse": {
+      "description": "",
+      "schema": {
+        "type": "array",
+        "items": {
+          "$ref": "#/definitions/postableAlert"
+        }
+      }
+    },
     "receiversResponse": {
       "description": "",
       "schema": {

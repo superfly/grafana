@@ -23,12 +23,9 @@ func SetupDisabledTestService(tb testing.TB, store secrets.Store) *SecretsServic
 	return setupTestService(tb, store, featuremgmt.WithFeatures(featuremgmt.FlagDisableEnvelopeEncryption))
 }
 
-func setupTestService(tb testing.TB, store secrets.Store, features *featuremgmt.FeatureManager) *SecretsService {
+func setupTestService(tb testing.TB, store secrets.Store, features featuremgmt.FeatureToggles) *SecretsService {
 	tb.Helper()
 	defaultKey := "SdlklWklckeLS"
-	if len(setting.SecretKey) > 0 {
-		defaultKey = setting.SecretKey
-	}
 	raw, err := ini.Load([]byte(`
 		[security]
 		secret_key = ` + defaultKey + `
@@ -39,19 +36,18 @@ func setupTestService(tb testing.TB, store secrets.Store, features *featuremgmt.
 	require.NoError(tb, err)
 
 	cfg := &setting.Cfg{Raw: raw}
-	settings := &setting.OSSImpl{Cfg: cfg}
 
 	encProvider := encryptionprovider.Provider{}
 	usageStats := &usagestats.UsageStatsMock{}
 
-	encryption, err := encryptionservice.ProvideEncryptionService(encProvider, usageStats, settings)
+	encryption, err := encryptionservice.ProvideEncryptionService(encProvider, usageStats, cfg)
 	require.NoError(tb, err)
 
 	secretsService, err := ProvideSecretsService(
 		store,
-		osskmsproviders.ProvideService(encryption, settings, features),
+		osskmsproviders.ProvideService(encryption, cfg, features),
 		encryption,
-		settings,
+		cfg,
 		features,
 		&usagestats.UsageStatsMock{T: tb},
 	)

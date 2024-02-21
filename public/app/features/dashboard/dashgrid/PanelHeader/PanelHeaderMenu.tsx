@@ -1,9 +1,8 @@
-import classnames from 'classnames';
-import React, { PureComponent } from 'react';
+import React from 'react';
 
 import { PanelMenuItem } from '@grafana/data';
-
-import { PanelHeaderMenuItem } from './PanelHeaderMenuItem';
+import { selectors } from '@grafana/e2e-selectors';
+import { Menu } from '@grafana/ui';
 
 export interface Props {
   items: PanelMenuItem[];
@@ -12,37 +11,34 @@ export interface Props {
   className?: string;
 }
 
-export class PanelHeaderMenu extends PureComponent<Props> {
-  renderItems = (menu: PanelMenuItem[], isSubMenu = false) => {
-    return (
-      <ul
-        className={classnames('dropdown-menu', 'dropdown-menu--menu', 'panel-menu', this.props.itemsClassName)}
-        style={this.props.style}
-        role={isSubMenu ? '' : 'menu'}
-      >
-        {menu.map((menuItem, idx: number) => {
+export function PanelHeaderMenu({ items }: Props) {
+  const renderItems = (items: PanelMenuItem[]) => {
+    return items.map((item) => {
+      switch (item.type) {
+        case 'divider':
+          return <Menu.Divider key={item.text} />;
+        case 'group':
           return (
-            <PanelHeaderMenuItem
-              key={`${menuItem.text}${idx}`}
-              type={menuItem.type}
-              text={menuItem.text}
-              iconClassName={menuItem.iconClassName}
-              onClick={menuItem.onClick}
-              shortcut={menuItem.shortcut}
-            >
-              {menuItem.subMenu && this.renderItems(menuItem.subMenu, true)}
-            </PanelHeaderMenuItem>
+            <Menu.Group key={item.text} label={item.text}>
+              {item.subMenu ? renderItems(item.subMenu) : undefined}
+            </Menu.Group>
           );
-        })}
-      </ul>
-    );
+        default:
+          return (
+            <Menu.Item
+              key={item.text}
+              label={item.text}
+              icon={item.iconClassName}
+              childItems={item.subMenu ? renderItems(item.subMenu) : undefined}
+              url={item.href}
+              onClick={item.onClick}
+              shortcut={item.shortcut}
+              testId={selectors.components.Panels.Panel.menuItems(item.text)}
+            />
+          );
+      }
+    });
   };
 
-  render() {
-    return (
-      <div className={classnames('panel-menu-container', 'dropdown', 'open', this.props.className)}>
-        {this.renderItems(this.props.items)}
-      </div>
-    );
-  }
+  return <Menu>{renderItems(items)}</Menu>;
 }

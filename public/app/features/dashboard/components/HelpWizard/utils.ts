@@ -14,9 +14,8 @@ import {
 } from '@grafana/data';
 import { config } from '@grafana/runtime';
 import { PanelModel } from 'app/features/dashboard/state';
+import { Randomize, randomizeData } from 'app/features/dashboard-scene/inspect/HelpWizard/randomizer';
 import { GrafanaQueryType } from 'app/plugins/datasource/grafana/types';
-
-import { Randomize, randomizeData } from './randomizer';
 
 export function getPanelDataFrames(data?: PanelData): DataFrameJSON[] {
   const frames: DataFrameJSON[] = [];
@@ -182,7 +181,7 @@ function getTransformsRow(saveModel: any): string {
     return '';
   }
   return `<tr>
-      <th>Transforms (${saveModel.transformations.length})</th>
+      <th>Transform</th>
       <td>${saveModel.transformations.map((t: DataTransformerConfig) => t.id).join(', ')}</td>
   </tr>`;
 }

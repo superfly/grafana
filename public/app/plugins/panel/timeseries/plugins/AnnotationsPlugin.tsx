@@ -11,9 +11,15 @@ interface AnnotationsPluginProps {
   config: UPlotConfigBuilder;
   annotations: DataFrame[];
   timeZone: TimeZone;
+  disableCanvasRendering?: boolean;
 }
 
-export const AnnotationsPlugin: React.FC<AnnotationsPluginProps> = ({ annotations, timeZone, config }) => {
+export const AnnotationsPlugin = ({
+  annotations,
+  timeZone,
+  config,
+  disableCanvasRendering = false,
+}: AnnotationsPluginProps) => {
   const theme = useTheme2();
   const plotInstance = useRef<uPlot>();
 
@@ -28,6 +34,11 @@ export const AnnotationsPlugin: React.FC<AnnotationsPluginProps> = ({ annotation
     }
 
     annotationsRef.current = views;
+
+    return () => {
+      // clear on unmount
+      annotationsRef.current = [];
+    };
   }, [annotations]);
 
   useLayoutEffect(() => {
@@ -64,35 +75,38 @@ export const AnnotationsPlugin: React.FC<AnnotationsPluginProps> = ({ annotation
         ctx.closePath();
       };
 
-      for (let i = 0; i < annotationsRef.current.length; i++) {
-        const annotationsView = annotationsRef.current[i];
-        for (let j = 0; j < annotationsView.length; j++) {
-          const annotation = annotationsView.get(j);
+      if (!disableCanvasRendering) {
+        for (let i = 0; i < annotationsRef.current.length; i++) {
+          const annotationsView = annotationsRef.current[i];
+          for (let j = 0; j < annotationsView.length; j++) {
+            const annotation = annotationsView.get(j);
 
-          if (!annotation.time) {
-            continue;
-          }
+            if (!annotation.time) {
+              continue;
+            }
 
-          let x0 = u.valToPos(annotation.time, 'x', true);
-          const color = theme.visualization.getColorByName(annotation.color);
+            let x0 = u.valToPos(annotation.time, 'x', true);
+            const color = theme.visualization.getColorByName(annotation.color);
 
-          renderLine(x0, color);
+            renderLine(x0, color);
 
-          if (annotation.isRegion && annotation.timeEnd) {
-            let x1 = u.valToPos(annotation.timeEnd, 'x', true);
+            if (annotation.isRegion && annotation.timeEnd) {
+              let x1 = u.valToPos(annotation.timeEnd, 'x', true);
 
-            renderLine(x1, color);
+              renderLine(x1, color);
 
-            ctx.fillStyle = colorManipulator.alpha(color, 0.1);
-            ctx.rect(x0, u.bbox.top, x1 - x0, u.bbox.height);
-            ctx.fill();
+              ctx.fillStyle = colorManipulator.alpha(color, 0.1);
+              ctx.rect(x0, u.bbox.top, x1 - x0, u.bbox.height);
+              ctx.fill();
+            }
           }
         }
       }
+
       ctx.restore();
       return;
     });
-  }, [config, theme]);
+  }, [config, theme, disableCanvasRendering]);
 
   const mapAnnotationToXYCoords = useCallback((frame: DataFrame, dataFrameFieldIndex: DataFrameFieldIndex) => {
     const view = new DataFrameView<AnnotationsDataFrameViewDTO>(frame);

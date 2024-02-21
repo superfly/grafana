@@ -2,7 +2,6 @@ import React from 'react';
 import uPlot from 'uplot';
 
 import {
-  ArrayVector,
   DataFrame,
   DashboardCursorSync,
   DataHoverPayload,
@@ -22,8 +21,11 @@ import {
   getFieldConfigWithMinMax,
   ThresholdsMode,
   TimeRange,
+  cacheFieldDisplayNames,
 } from '@grafana/data';
 import { maybeSortFrame } from '@grafana/data/src/transformations/transformers/joinDataFrames';
+import { applyNullInsertThreshold } from '@grafana/data/src/transformations/transformers/nulls/nullInsertThreshold';
+import { nullToValue } from '@grafana/data/src/transformations/transformers/nulls/nullToValue';
 import {
   VizLegendOptions,
   AxisPlacement,
@@ -32,6 +34,7 @@ import {
   VisibilityMode,
   TimelineValueAlignment,
   HideableFieldConfig,
+  MappingType,
 } from '@grafana/schema';
 import {
   FIXED_UNIT,
@@ -40,8 +43,6 @@ import {
   UPlotConfigPrepFn,
   VizLegendItem,
 } from '@grafana/ui';
-import { applyNullInsertThreshold } from '@grafana/ui/src/components/GraphNG/nullInsertThreshold';
-import { nullToValue } from '@grafana/ui/src/components/GraphNG/nullToValue';
 import { PlotTooltipInterpolator } from '@grafana/ui/src/components/uPlot/types';
 import { preparePlotData2, getStackingGroups } from '@grafana/ui/src/components/uPlot/utils';
 
@@ -60,7 +61,10 @@ interface UPlotConfigOptions {
   showValue: VisibilityMode;
   alignValue?: TimelineValueAlignment;
   mergeValues?: boolean;
-  getValueColor: (frameIdx: number, fieldIdx: number, value: any) => string;
+  getValueColor: (frameIdx: number, fieldIdx: number, value: unknown) => string;
+  // Identifies the shared key for uPlot cursor sync
+  eventsScope?: string;
+  hoverMulti: boolean;
 }
 
 /**
@@ -102,6 +106,8 @@ export const preparePlotConfigBuilder: UPlotConfigPrepFn<UPlotConfigOptions> = (
   alignValue,
   mergeValues,
   getValueColor,
+  eventsScope = '__global_',
+  hoverMulti,
 }) => {
   const builder = new UPlotConfigBuilder(timeZones[0]);
 
@@ -113,7 +119,15 @@ export const preparePlotConfigBuilder: UPlotConfigPrepFn<UPlotConfigOptions> = (
     return !(mode && field.display && mode.startsWith('continuous-'));
   };
 
-  const getValueColorFn = (seriesIdx: number, value: any) => {
+  const hasMappedNull = (field: Field) => {
+    return (
+      field.config.mappings?.some(
+        (mapping) => mapping.type === MappingType.SpecialValue && mapping.options.match === 'null'
+      ) || false
+    );
+  };
+
+  const getValueColorFn = (seriesIdx: number, value: unknown) => {
     const field = frame.fields[seriesIdx];
 
     if (
@@ -131,6 +145,7 @@ export const preparePlotConfigBuilder: UPlotConfigPrepFn<UPlotConfigOptions> = (
     mode: mode!,
     numSeries: frame.fields.length - 1,
     isDiscrete: (seriesIdx) => isDiscrete(frame.fields[seriesIdx]),
+    hasMappedNull: (seriesIdx) => hasMappedNull(frame.fields[seriesIdx]),
     mergeValues,
     rowHeight: rowHeight,
     colWidth: colWidth,
@@ -153,6 +168,7 @@ export const preparePlotConfigBuilder: UPlotConfigPrepFn<UPlotConfigOptions> = (
       hoveredDataIdx = null;
       shouldChangeHover = true;
     },
+    hoverMulti,
   };
 
   let shouldChangeHover = false;
@@ -168,9 +184,11 @@ export const preparePlotConfigBuilder: UPlotConfigPrepFn<UPlotConfigOptions> = (
     data: frame,
   };
 
+  const hoverEvent = new DataHoverEvent(payload).setTags(['uplot']);
+  const clearEvent = new DataHoverClearEvent().setTags(['uplot']);
+
   builder.addHook('init', coreConfig.init);
   builder.addHook('drawClear', coreConfig.drawClear);
-  builder.addHook('setCursor', coreConfig.setCursor);
 
   // in TooltipPlugin, this gets invoked and the result is bound to a setCursor hook
   // which fires after the above setCursor hook, so can take advantage of hoveringOver
@@ -274,7 +292,7 @@ export const preparePlotConfigBuilder: UPlotConfigPrepFn<UPlotConfigOptions> = (
     let cursor: Partial<uPlot.Cursor> = {};
 
     cursor.sync = {
-      key: '__global_',
+      key: eventsScope,
       filters: {
         pub: (type: string, src: uPlot, x: number, y: number, w: number, h: number, dataIdx: number) => {
           if (sync && sync() === DashboardCursorSync.Off) {
@@ -282,14 +300,12 @@ export const preparePlotConfigBuilder: UPlotConfigPrepFn<UPlotConfigOptions> = (
           }
           payload.rowIndex = dataIdx;
           if (x < 0 && y < 0) {
-            payload.point[xScaleUnit] = null;
-            payload.point[FIXED_UNIT] = null;
-            eventBus.publish(new DataHoverClearEvent());
+            eventBus.publish(clearEvent);
           } else {
             payload.point[xScaleUnit] = src.posToVal(x, xScaleKey);
             payload.point.panelRelY = y > 0 ? y / h : 1; // used for old graph panel to position tooltip
             payload.down = undefined;
-            eventBus.publish(new DataHoverEvent(payload));
+            eventBus.publish(hoverEvent);
           }
           return true;
         },
@@ -371,7 +387,7 @@ export function mergeThresholdValues(field: Field, theme: GrafanaTheme2): Field 
     textToColor.set(items[i].label, items[i].color!);
   }
 
-  let input = field.values.toArray();
+  let input = field.values;
   const vals = new Array<String | undefined>(field.values.length);
   if (thresholds.mode === ThresholdsMode.Percentage) {
     const { min, max } = getFieldConfigWithMinMax(field);
@@ -403,10 +419,10 @@ export function mergeThresholdValues(field: Field, theme: GrafanaTheme2): Field 
       },
     },
     type: FieldType.string,
-    values: new ArrayVector(vals),
-    display: (value: string) => ({
-      text: value,
-      color: textToColor.get(value),
+    values: vals,
+    display: (value) => ({
+      text: String(value),
+      color: textToColor.get(String(value)),
       numeric: NaN,
     }),
   };
@@ -422,6 +438,9 @@ export function prepareTimelineFields(
   if (!series?.length) {
     return { warn: 'No data in response' };
   }
+
+  cacheFieldDisplayNames(series);
+
   let hasTimeseries = false;
   const frames: DataFrame[] = [];
 
@@ -445,12 +464,16 @@ export function prepareTimelineFields(
 
     const fields: Field[] = [];
     for (let field of nullToValue(nulledFrame).fields) {
+      if (field.config.custom?.hideFrom?.viz) {
+        continue;
+      }
       switch (field.type) {
         case FieldType.time:
           isTimeseries = true;
           hasTimeseries = true;
           fields.push(field);
           break;
+        case FieldType.enum:
         case FieldType.number:
           if (mergeValues && field.config.color?.mode === FieldColorModeId.Thresholds) {
             const f = mergeThresholdValues(field, theme);
@@ -509,9 +532,10 @@ export function getThresholdItems(fieldConfig: FieldConfig, theme: GrafanaTheme2
   }
 
   const steps = thresholds.steps;
-  const disp = getValueFormat(thresholds.mode === ThresholdsMode.Percentage ? 'percent' : fieldConfig.unit ?? '');
+  const getDisplay = getValueFormat(thresholds.mode === ThresholdsMode.Percentage ? 'percent' : fieldConfig.unit ?? '');
 
-  const fmt = (v: number) => formattedValueToString(disp(v));
+  // `undefined` value for decimals will use `auto`
+  const format = (value: number) => formattedValueToString(getDisplay(value, fieldConfig.decimals ?? undefined));
 
   for (let i = 0; i < steps.length; i++) {
     let step = steps[i];
@@ -527,7 +551,7 @@ export function getThresholdItems(fieldConfig: FieldConfig, theme: GrafanaTheme2
     }
 
     items.push({
-      label: `${pre}${fmt(value)}${suf}`,
+      label: `${pre}${format(value)}${suf}`,
       color: theme.visualization.getColorByName(step.color),
       yAxis: 1,
     });
@@ -559,6 +583,7 @@ export function getFieldLegendItem(fields: Field[], theme: GrafanaTheme2): VizLe
   const thresholds = fieldConfig.thresholds;
 
   // If thresholds are enabled show each step in the legend
+  // This ignores the hide from legend since the range is valid
   if (colorMode === FieldColorModeId.Thresholds && thresholds?.steps && thresholds.steps.length > 1) {
     return getThresholdItems(fieldConfig, theme);
   }
@@ -568,15 +593,17 @@ export function getFieldLegendItem(fields: Field[], theme: GrafanaTheme2): VizLe
     return undefined; // eventually a color bar
   }
 
-  let stateColors: Map<string, string | undefined> = new Map();
+  const stateColors: Map<string, string | undefined> = new Map();
 
   fields.forEach((field) => {
-    field.values.toArray().forEach((v) => {
-      let state = field.display!(v);
-      if (state.color) {
-        stateColors.set(state.text, state.color!);
-      }
-    });
+    if (!field.config.custom?.hideFrom?.legend) {
+      field.values.forEach((v) => {
+        let state = field.display!(v);
+        if (state.color) {
+          stateColors.set(state.text, state.color!);
+        }
+      });
+    }
   });
 
   stateColors.forEach((color, label) => {
@@ -612,13 +639,13 @@ export function findNextStateIndex(field: Field, datapointIdx: number) {
     return null;
   }
 
-  const startValue = field.values.get(datapointIdx);
+  const startValue = field.values[datapointIdx];
 
   while (end === undefined) {
     if (rightPointer >= field.values.length) {
       return null;
     }
-    const rightValue = field.values.get(rightPointer);
+    const rightValue = field.values[rightPointer];
 
     if (rightValue === undefined || rightValue === startValue) {
       rightPointer++;
@@ -674,19 +701,19 @@ export function fmtDuration(milliSeconds: number): string {
     yr > 0
       ? yr + 'y ' + (mo > 0 ? mo + 'mo ' : '') + (wk > 0 ? wk + 'w ' : '') + (d > 0 ? d + 'd ' : '')
       : mo > 0
-      ? mo + 'mo ' + (wk > 0 ? wk + 'w ' : '') + (d > 0 ? d + 'd ' : '')
-      : wk > 0
-      ? wk + 'w ' + (d > 0 ? d + 'd ' : '')
-      : d > 0
-      ? d + 'd ' + (h > 0 ? h + 'h ' : '')
-      : h > 0
-      ? h + 'h ' + (m > 0 ? m + 'm ' : '')
-      : m > 0
-      ? m + 'm ' + (s > 0 ? s + 's ' : '')
-      : s > 0
-      ? s + 's ' + (ms > 0 ? ms + 'ms ' : '')
-      : ms > 0
-      ? ms + 'ms '
-      : '0'
+        ? mo + 'mo ' + (wk > 0 ? wk + 'w ' : '') + (d > 0 ? d + 'd ' : '')
+        : wk > 0
+          ? wk + 'w ' + (d > 0 ? d + 'd ' : '')
+          : d > 0
+            ? d + 'd ' + (h > 0 ? h + 'h ' : '')
+            : h > 0
+              ? h + 'h ' + (m > 0 ? m + 'm ' : '')
+              : m > 0
+                ? m + 'm ' + (s > 0 ? s + 's ' : '')
+                : s > 0
+                  ? s + 's ' + (ms > 0 ? ms + 'ms ' : '')
+                  : ms > 0
+                    ? ms + 'ms '
+                    : '0'
   ).trim();
 }

@@ -1,6 +1,6 @@
 import React, { ReactNode } from 'react';
 
-import { CoreApp, QueryEditorProps } from '@grafana/data';
+import { QueryEditorProps } from '@grafana/data';
 
 import { LokiDatasource } from '../datasource';
 import { shouldRefreshLabels } from '../languageUtils';
@@ -29,7 +29,7 @@ export class LokiQueryField extends React.PureComponent<LokiQueryFieldProps, Lok
 
   async componentDidMount() {
     this._isMounted = true;
-    await this.props.datasource.languageProvider.start();
+    await this.props.datasource.languageProvider.start(this.props.range);
     if (this._isMounted) {
       this.setState({ labelsLoaded: true });
     }
@@ -47,7 +47,7 @@ export class LokiQueryField extends React.PureComponent<LokiQueryFieldProps, Lok
     const refreshLabels = shouldRefreshLabels(range, prevProps.range);
     // We want to refresh labels when range changes (we round up intervals to a minute)
     if (refreshLabels) {
-      languageProvider.fetchLabels();
+      languageProvider.fetchLabels({ timeRange: range });
     }
   }
 
@@ -65,7 +65,7 @@ export class LokiQueryField extends React.PureComponent<LokiQueryFieldProps, Lok
   };
 
   render() {
-    const { ExtraFieldElement, query, app, datasource, history, onRunQuery } = this.props;
+    const { ExtraFieldElement, query, datasource, history, onRunQuery, range } = this.props;
     const placeholder = this.props.placeholder ?? 'Enter a Loki query (run with Shift+Enter)';
 
     return (
@@ -74,15 +74,15 @@ export class LokiQueryField extends React.PureComponent<LokiQueryFieldProps, Lok
           className="gf-form-inline gf-form-inline--xs-view-flex-column flex-grow-1"
           data-testid={this.props['data-testid']}
         >
-          <div className="gf-form gf-form--grow flex-shrink-1 min-width-15">
+          <div className="gf-form--grow flex-shrink-1 min-width-15">
             <MonacoQueryFieldWrapper
-              runQueryOnBlur={app !== CoreApp.Explore}
               datasource={datasource}
               history={history ?? []}
               onChange={this.onChangeQuery}
               onRunQuery={onRunQuery}
               initialValue={query.expr ?? ''}
               placeholder={placeholder}
+              timeRange={range}
             />
           </div>
         </div>

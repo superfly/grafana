@@ -21,7 +21,7 @@ type SendEmailCommand struct {
 	SingleEmail   bool
 	Template      string
 	Subject       string
-	Data          map[string]interface{}
+	Data          map[string]any
 	Info          string
 	ReplyTo       []string
 	EmbeddedFiles []string
@@ -49,6 +49,11 @@ type SendResetPasswordEmailCommand struct {
 }
 
 type ValidateResetPasswordCodeQuery struct {
-	Code   string
-	Result *user.User
+	Code string
+}
+
+type SendVerifyEmailCommand struct {
+	User  *user.User
+	Code  string
+	Email string
 }

@@ -48,7 +48,7 @@ func NewPluginSecretsKVStore(
 		secretsService:                 secretsService,
 		log:                            logger,
 		kvstore:                        kvstore,
-		backwardsCompatibilityDisabled: features.IsEnabled(featuremgmt.FlagDisableSecretsCompatibility),
+		backwardsCompatibilityDisabled: features.IsEnabledGlobally(featuremgmt.FlagDisableSecretsCompatibility),
 		fallbackStore:                  fallback,
 	}
 }
@@ -243,7 +243,7 @@ func GetNamespacedKVStore(kv kvstore.KVStore) *kvstore.NamespacedKVStore {
 func IsPluginStartupErrorFatal(ctx context.Context, kvstore *kvstore.NamespacedKVStore) (bool, error) {
 	_, exists, err := kvstore.Get(ctx, QuitOnPluginStartupFailureKey)
 	if err != nil {
-		return false, errors.New(fmt.Sprint("error retrieving key ", QuitOnPluginStartupFailureKey, " from kvstore. error: ", err.Error()))
+		return false, fmt.Errorf("error retrieving key %s from kvstore. error: %w", QuitOnPluginStartupFailureKey, err)
 	}
 	return exists, nil
 }

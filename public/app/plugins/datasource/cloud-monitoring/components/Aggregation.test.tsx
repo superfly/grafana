@@ -1,23 +1,22 @@
 import { render, screen } from '@testing-library/react';
 import React from 'react';
 import { openMenu } from 'react-select-event';
-import { TemplateSrvStub } from 'test/specs/helpers';
 
-import { ValueTypes, MetricKind } from '../types';
+import { MetricKind, ValueTypes } from '../types/query';
+import { MetricDescriptor } from '../types/types';
 
 import { Aggregation, Props } from './Aggregation';
 
 const props: Props = {
   onChange: () => {},
-  // @ts-ignore
-  templateSrv: new TemplateSrvStub(),
   metricDescriptor: {
     valueType: '',
     metricKind: '',
-  } as any,
+  } as unknown as MetricDescriptor,
   crossSeriesReducer: '',
   groupBys: [],
   templateVariableOptions: [],
+  refId: 'A',
 };
 
 describe('Aggregation', () => {
@@ -33,7 +32,7 @@ describe('Aggregation', () => {
         metricDescriptor: {
           valueType: ValueTypes.DOUBLE,
           metricKind: MetricKind.GAUGE,
-        } as any,
+        } as MetricDescriptor,
       };
 
       it('should not have the reduce values', () => {
@@ -51,7 +50,7 @@ describe('Aggregation', () => {
         metricDescriptor: {
           valueType: ValueTypes.MONEY,
           metricKind: MetricKind.CUMULATIVE,
-        } as any,
+        } as MetricDescriptor,
       };
 
       it('should have the reduce values', () => {

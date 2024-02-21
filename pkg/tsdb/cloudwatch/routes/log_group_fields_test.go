@@ -1,23 +1,24 @@
 package routes
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+
 	"github.com/grafana/grafana/pkg/tsdb/cloudwatch/mocks"
 	"github.com/grafana/grafana/pkg/tsdb/cloudwatch/models"
 	"github.com/grafana/grafana/pkg/tsdb/cloudwatch/models/resources"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 )
 
 func TestLogGroupFieldsRoute(t *testing.T) {
-	mockFeatures := mocks.MockFeatures{}
-	reqCtxFunc := func(pluginCtx backend.PluginContext, region string) (reqCtx models.RequestContext, err error) {
-		return models.RequestContext{Features: &mockFeatures}, err
+	reqCtxFunc := func(_ context.Context, pluginCtx backend.PluginContext, region string) (reqCtx models.RequestContext, err error) {
+		return models.RequestContext{}, err
 	}
 	t.Run("returns 400 if an invalid LogGroupFieldsRequest is used", func(t *testing.T) {
 		rr := httptest.NewRecorder()
@@ -30,8 +31,8 @@ func TestLogGroupFieldsRoute(t *testing.T) {
 
 	t.Run("returns 500 if GetLogGroupFields method fails", func(t *testing.T) {
 		mockLogsService := mocks.LogsService{}
-		mockLogsService.On("GetLogGroupFields", mock.Anything).Return([]resources.ResourceResponse[resources.LogGroupField]{}, fmt.Errorf("error from api"))
-		newLogGroupsService = func(pluginCtx backend.PluginContext, reqCtxFactory models.RequestContextFactoryFunc, region string) (models.LogGroupsProvider, error) {
+		mockLogsService.On("GetLogGroupFieldsWithContext", mock.Anything).Return([]resources.ResourceResponse[resources.LogGroupField]{}, fmt.Errorf("error from api"))
+		newLogGroupsService = func(_ context.Context, pluginCtx backend.PluginContext, reqCtxFactory models.RequestContextFactoryFunc, region string) (models.LogGroupsProvider, error) {
 			return &mockLogsService, nil
 		}
 
@@ -46,7 +47,7 @@ func TestLogGroupFieldsRoute(t *testing.T) {
 
 	t.Run("returns valid json response if everything is ok", func(t *testing.T) {
 		mockLogsService := mocks.LogsService{}
-		mockLogsService.On("GetLogGroupFields", mock.Anything).Return([]resources.ResourceResponse[resources.LogGroupField]{
+		mockLogsService.On("GetLogGroupFieldsWithContext", mock.Anything).Return([]resources.ResourceResponse[resources.LogGroupField]{
 			{
 				AccountId: new(string),
 				Value: resources.LogGroupField{
@@ -62,7 +63,7 @@ func TestLogGroupFieldsRoute(t *testing.T) {
 				},
 			},
 		}, nil)
-		newLogGroupsService = func(pluginCtx backend.PluginContext, reqCtxFactory models.RequestContextFactoryFunc, region string) (models.LogGroupsProvider, error) {
+		newLogGroupsService = func(_ context.Context, pluginCtx backend.PluginContext, reqCtxFactory models.RequestContextFactoryFunc, region string) (models.LogGroupsProvider, error) {
 			return &mockLogsService, nil
 		}
 

@@ -1,5 +1,5 @@
 import { DataSourcePluginMeta, PluginType } from '@grafana/data';
-import { config, featureEnabled } from '@grafana/runtime';
+import { featureEnabled } from '@grafana/runtime';
 import { DataSourcePluginCategory } from 'app/types';
 
 export function buildCategories(plugins: DataSourcePluginMeta[]): DataSourcePluginCategory[] {
@@ -197,6 +197,18 @@ function getEnterprisePhantomPlugins(): DataSourcePluginMeta[] {
       name: 'Azure Devops',
       imgUrl: 'public/img/plugins/azure-devops.png',
     }),
+    getPhantomPlugin({
+      id: 'grafana-sumologic-datasource',
+      description: 'SumoLogic integration and datasource',
+      name: 'SumoLogic',
+      imgUrl: 'public/img/plugins/sumo.svg',
+    }),
+    getPhantomPlugin({
+      id: 'grafana-pagerduty-datasource',
+      description: 'PagerDuty datasource',
+      name: 'PagerDuty',
+      imgUrl: 'public/img/plugins/pagerduty.svg',
+    }),
   ];
 }
 
@@ -244,8 +256,9 @@ function getPhantomPlugin(options: GetPhantomPluginOptions): DataSourcePluginMet
       author: { name: 'Grafana Labs' },
       links: [
         {
-          url: config.pluginCatalogURL + options.id,
+          url: '/plugins/' + options.id,
           name: 'Install now',
+          target: '_self',
         },
       ],
       screenshots: [],

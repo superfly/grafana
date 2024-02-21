@@ -13,12 +13,19 @@ import (
 
 	"github.com/grafana/grafana/pkg/infra/db"
 	"github.com/grafana/grafana/pkg/services/stats/statsimpl"
+	"github.com/grafana/grafana/pkg/setting"
+	"github.com/grafana/grafana/pkg/tests/testsuite"
 	"github.com/grafana/grafana/pkg/util"
 )
 
+// run tests with cleanup
+func TestMain(m *testing.M) {
+	testsuite.Run(m)
+}
+
 func TestConcurrentUsersMetrics(t *testing.T) {
 	sqlStore, cfg := db.InitTestDBwithCfg(t)
-	statsService := statsimpl.ProvideService(sqlStore)
+	statsService := statsimpl.ProvideService(&setting.Cfg{}, sqlStore)
 	s := createService(t, cfg, sqlStore, statsService)
 
 	createConcurrentTokens(t, sqlStore)
@@ -36,7 +43,7 @@ func TestConcurrentUsersMetrics(t *testing.T) {
 
 func TestConcurrentUsersStats(t *testing.T) {
 	sqlStore, cfg := db.InitTestDBwithCfg(t)
-	statsService := statsimpl.ProvideService(sqlStore)
+	statsService := statsimpl.ProvideService(&setting.Cfg{}, sqlStore)
 	s := createService(t, cfg, sqlStore, statsService)
 
 	createConcurrentTokens(t, sqlStore)

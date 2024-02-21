@@ -12,6 +12,7 @@ import (
 	"github.com/grafana/grafana/pkg/api/response"
 	"github.com/grafana/grafana/pkg/api/routing"
 	"github.com/grafana/grafana/pkg/middleware"
+	"github.com/grafana/grafana/pkg/middleware/requestmeta"
 	contextmodel "github.com/grafana/grafana/pkg/services/contexthandler/model"
 	apimodels "github.com/grafana/grafana/pkg/services/ngalert/api/tooling/definitions"
 	"github.com/grafana/grafana/pkg/services/ngalert/metrics"
@@ -53,7 +54,7 @@ func (f *TestingApiHandler) RouteTestRuleConfig(ctx *contextmodel.ReqContext) re
 }
 func (f *TestingApiHandler) RouteTestRuleGrafanaConfig(ctx *contextmodel.ReqContext) response.Response {
 	// Parse Request Body
-	conf := apimodels.TestRulePayload{}
+	conf := apimodels.PostableExtendedRuleNodeExtended{}
 	if err := web.Bind(ctx.Req, &conf); err != nil {
 		return response.Error(http.StatusBadRequest, "bad request data", err)
 	}
@@ -64,41 +65,49 @@ func (api *API) RegisterTestingApiEndpoints(srv TestingApi, m *metrics.API) {
 	api.RouteRegister.Group("", func(group routing.RouteRegister) {
 		group.Post(
 			toMacaronPath("/api/v1/rule/backtest"),
+			requestmeta.SetOwner(requestmeta.TeamAlerting),
+			requestmeta.SetSLOGroup(requestmeta.SLOGroupHighSlow),
 			api.authorize(http.MethodPost, "/api/v1/rule/backtest"),
 			metrics.Instrument(
 				http.MethodPost,
 				"/api/v1/rule/backtest",
-				srv.BacktestConfig,
+				api.Hooks.Wrap(srv.BacktestConfig),
 				m,
 			),
 		)
 		group.Post(
 			toMacaronPath("/api/v1/eval"),
+			requestmeta.SetOwner(requestmeta.TeamAlerting),
+			requestmeta.SetSLOGroup(requestmeta.SLOGroupHighSlow),
 			api.authorize(http.MethodPost, "/api/v1/eval"),
 			metrics.Instrument(
 				http.MethodPost,
 				"/api/v1/eval",
-				srv.RouteEvalQueries,
+				api.Hooks.Wrap(srv.RouteEvalQueries),
 				m,
 			),
 		)
 		group.Post(
 			toMacaronPath("/api/v1/rule/test/{DatasourceUID}"),
+			requestmeta.SetOwner(requestmeta.TeamAlerting),
+			requestmeta.SetSLOGroup(requestmeta.SLOGroupHighSlow),
 			api.authorize(http.MethodPost, "/api/v1/rule/test/{DatasourceUID}"),
 			metrics.Instrument(
 				http.MethodPost,
 				"/api/v1/rule/test/{DatasourceUID}",
-				srv.RouteTestRuleConfig,
+				api.Hooks.Wrap(srv.RouteTestRuleConfig),
 				m,
 			),
 		)
 		group.Post(
 			toMacaronPath("/api/v1/rule/test/grafana"),
+			requestmeta.SetOwner(requestmeta.TeamAlerting),
+			requestmeta.SetSLOGroup(requestmeta.SLOGroupHighSlow),
 			api.authorize(http.MethodPost, "/api/v1/rule/test/grafana"),
 			metrics.Instrument(
 				http.MethodPost,
 				"/api/v1/rule/test/grafana",
-				srv.RouteTestRuleGrafanaConfig,
+				api.Hooks.Wrap(srv.RouteTestRuleGrafanaConfig),
 				m,
 			),
 		)

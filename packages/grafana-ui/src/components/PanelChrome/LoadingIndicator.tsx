@@ -18,7 +18,7 @@ export type LoadingIndicatorProps = {
 /**
  * @internal
  */
-export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({ onCancel, loading }) => {
+export const LoadingIndicator = ({ onCancel, loading }: LoadingIndicatorProps) => {
   const styles = useStyles2(getStyles);
 
   if (!loading) {
@@ -32,7 +32,7 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({ onCancel, lo
         name="sync"
         size="sm"
         onClick={onCancel}
-        aria-label={selectors.components.LoadingIndicator.icon}
+        data-testid={selectors.components.LoadingIndicator.icon}
       />
     </Tooltip>
   );

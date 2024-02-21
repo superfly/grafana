@@ -1,13 +1,23 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 
 import { AppEvents } from '@grafana/data';
-import { locationService } from '@grafana/runtime';
+import { config, locationService } from '@grafana/runtime';
 import { Button, HorizontalGroup, ConfirmModal } from '@grafana/ui';
 import appEvents from 'app/core/app_events';
+import configCore from 'app/core/config';
 import { useQueryParams } from 'app/core/hooks/useQueryParams';
+import { removePluginFromNavTree } from 'app/core/reducers/navBarTree';
+import { useDispatch } from 'app/types';
 
-import { useInstallStatus, useUninstallStatus, useInstall, useUninstall } from '../../state/hooks';
+import {
+  useInstallStatus,
+  useUninstallStatus,
+  useInstall,
+  useUninstall,
+  useUnsetInstall,
+  useFetchDetailsLazy,
+} from '../../state/hooks';
 import { trackPluginInstalled, trackPluginUninstalled } from '../../tracking';
 import { CatalogPlugin, PluginStatus, PluginTabIds, Version } from '../../types';
 
@@ -15,15 +25,26 @@ type InstallControlsButtonProps = {
   plugin: CatalogPlugin;
   pluginStatus: PluginStatus;
   latestCompatibleVersion?: Version;
+  hasInstallWarning?: boolean;
+  setNeedReload?: (needReload: boolean) => void;
 };
 
-export function InstallControlsButton({ plugin, pluginStatus, latestCompatibleVersion }: InstallControlsButtonProps) {
+export function InstallControlsButton({
+  plugin,
+  pluginStatus,
+  latestCompatibleVersion,
+  hasInstallWarning,
+  setNeedReload,
+}: InstallControlsButtonProps) {
+  const dispatch = useDispatch();
   const [queryParams] = useQueryParams();
   const location = useLocation();
   const { isInstalling, error: errorInstalling } = useInstallStatus();
   const { isUninstalling, error: errorUninstalling } = useUninstallStatus();
   const install = useInstall();
   const uninstall = useUninstall();
+  const unsetInstall = useUnsetInstall();
+  const fetchDetails = useFetchDetailsLazy();
   const [isConfirmModalVisible, setIsConfirmModalVisible] = useState(false);
   const showConfirmModal = () => setIsConfirmModalVisible(true);
   const hideConfirmModal = () => setIsConfirmModalVisible(false);
@@ -34,11 +55,29 @@ export function InstallControlsButton({ plugin, pluginStatus, latestCompatibleVe
     path: location.pathname,
   };
 
+  useEffect(() => {
+    return () => {
+      // Remove possible installation errors
+      unsetInstall();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const onInstall = async () => {
     trackPluginInstalled(trackingProps);
-    await install(plugin.id, latestCompatibleVersion?.version);
-    if (!errorInstalling) {
-      appEvents.emit(AppEvents.alertSuccess, [`Installed ${plugin.name}`]);
+    const result = await install(plugin.id, latestCompatibleVersion?.version);
+    if (!errorInstalling && !('error' in result)) {
+      let successMessage = `Installed ${plugin.name}`;
+      if (config.pluginAdminExternalManageEnabled && configCore.featureToggles.managedPluginsInstall) {
+        successMessage = 'Install requested, this may take a few minutes.';
+      }
+
+      appEvents.emit(AppEvents.alertSuccess, [successMessage]);
+      if (plugin.type === 'app') {
+        setNeedReload?.(true);
+      }
+
+      await fetchDetails(plugin.id);
     }
   };
 
@@ -53,7 +92,17 @@ export function InstallControlsButton({ plugin, pluginStatus, latestCompatibleVe
       if (isViewingAppConfigPage) {
         locationService.replace(`${location.pathname}?page=${PluginTabIds.OVERVIEW}`);
       }
-      appEvents.emit(AppEvents.alertSuccess, [`Uninstalled ${plugin.name}`]);
+
+      let successMessage = `Uninstalled ${plugin.name}`;
+      if (config.pluginAdminExternalManageEnabled && configCore.featureToggles.managedPluginsInstall) {
+        successMessage = 'Uninstall requested, this may take a few minutes.';
+      }
+
+      appEvents.emit(AppEvents.alertSuccess, [successMessage]);
+      if (plugin.type === 'app') {
+        dispatch(removePluginFromNavTree({ pluginID: plugin.id }));
+        setNeedReload?.(false);
+      }
     }
   };
 
@@ -65,6 +114,11 @@ export function InstallControlsButton({ plugin, pluginStatus, latestCompatibleVe
   };
 
   if (pluginStatus === PluginStatus.UNINSTALL) {
+    const disableUninstall =
+      config.pluginAdminExternalManageEnabled && configCore.featureToggles.managedPluginsInstall
+        ? plugin.isUninstallingFromInstance
+        : isUninstalling;
+
     return (
       <>
         <ConfirmModal
@@ -77,7 +131,7 @@ export function InstallControlsButton({ plugin, pluginStatus, latestCompatibleVe
           onDismiss={hideConfirmModal}
         />
         <HorizontalGroup align="flex-start" width="auto" height="auto">
-          <Button variant="destructive" disabled={isUninstalling} onClick={showConfirmModal}>
+          <Button variant="destructive" disabled={disableUninstall} onClick={showConfirmModal}>
             {uninstallBtnText}
           </Button>
         </HorizontalGroup>
@@ -85,10 +139,20 @@ export function InstallControlsButton({ plugin, pluginStatus, latestCompatibleVe
     );
   }
 
+  if (!plugin.isPublished || hasInstallWarning) {
+    // Cannot be updated or installed
+    return null;
+  }
+
   if (pluginStatus === PluginStatus.UPDATE) {
+    const disableUpdate =
+      config.pluginAdminExternalManageEnabled && configCore.featureToggles.managedPluginsInstall
+        ? plugin.isUpdatingFromInstance
+        : isInstalling;
+
     return (
       <HorizontalGroup align="flex-start" width="auto" height="auto">
-        <Button disabled={isInstalling} onClick={onUpdate}>
+        <Button disabled={disableUpdate} onClick={onUpdate}>
           {isInstalling ? 'Updating' : 'Update'}
         </Button>
         <Button variant="destructive" disabled={isUninstalling} onClick={onUninstall}>
@@ -97,9 +161,9 @@ export function InstallControlsButton({ plugin, pluginStatus, latestCompatibleVe
       </HorizontalGroup>
     );
   }
-
+  const shouldDisable = isInstalling || errorInstalling || (!config.angularSupportEnabled && plugin.angularDetected);
   return (
-    <Button disabled={isInstalling} onClick={onInstall}>
+    <Button disabled={shouldDisable} onClick={onInstall}>
       {isInstalling ? 'Installing' : 'Install'}
     </Button>
   );

@@ -16,6 +16,7 @@ jest.mock('app/core/core', () => ({
 }));
 
 const setup = (propOverrides: Partial<Props>) => {
+  const changePageMock = jest.fn();
   const changeQueryMock = jest.fn();
   const fetchACOptionsMock = jest.fn();
   const fetchServiceAccountsMock = jest.fn();
@@ -23,9 +24,6 @@ const setup = (propOverrides: Partial<Props>) => {
   const updateServiceAccountMock = jest.fn();
   const changeStateFilterMock = jest.fn();
   const createServiceAccountTokenMock = jest.fn();
-  const getApiKeysMigrationStatusMock = jest.fn();
-  const getApiKeysMigrationInfoMock = jest.fn();
-  const closeApiKeysMigrationInfoMock = jest.fn();
   const props: Props = {
     isLoading: false,
     page: 0,
@@ -36,8 +34,7 @@ const setup = (propOverrides: Partial<Props>) => {
     showPaging: false,
     totalPages: 1,
     serviceAccounts: [],
-    apiKeysMigrated: false,
-    showApiKeysMigrationInfo: false,
+    changePage: changePageMock,
     changeQuery: changeQueryMock,
     fetchACOptions: fetchACOptionsMock,
     fetchServiceAccounts: fetchServiceAccountsMock,
@@ -45,9 +42,6 @@ const setup = (propOverrides: Partial<Props>) => {
     updateServiceAccount: updateServiceAccountMock,
     changeStateFilter: changeStateFilterMock,
     createServiceAccountToken: createServiceAccountTokenMock,
-    getApiKeysMigrationStatus: getApiKeysMigrationStatusMock,
-    getApiKeysMigrationInfo: getApiKeysMigrationInfoMock,
-    closeApiKeysMigrationInfo: closeApiKeysMigrationInfoMock,
   };
 
   Object.assign(props, propOverrides);
@@ -143,7 +137,7 @@ describe('ServiceAccountsListPage tests', () => {
 
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: /Disable/ }));
-    await user.click(screen.getByLabelText(/Confirm Modal Danger Button/));
+    await user.click(screen.getByRole('button', { name: 'Disable service account' }));
 
     expect(updateServiceAccountMock).toHaveBeenCalledWith({
       ...getDefaultServiceAccount(),
@@ -160,7 +154,7 @@ describe('ServiceAccountsListPage tests', () => {
 
     const user = userEvent.setup();
     await user.click(screen.getByLabelText(/Delete service account/));
-    await user.click(screen.getByLabelText(/Confirm Modal Danger Button/));
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
 
     expect(deleteServiceAccountMock).toHaveBeenCalledWith(42);
   });

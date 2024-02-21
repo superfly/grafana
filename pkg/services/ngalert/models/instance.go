@@ -14,6 +14,7 @@ type AlertInstance struct {
 	CurrentStateSince time.Time
 	CurrentStateEnd   time.Time
 	LastEvalTime      time.Time
+	ResultFingerprint string
 }
 
 type AlertInstanceKey struct {
@@ -52,8 +53,6 @@ func (i InstanceStateType) IsValid() bool {
 type ListAlertInstancesQuery struct {
 	RuleUID   string
 	RuleOrgID int64 `json:"-"`
-
-	Result []*AlertInstance
 }
 
 // ValidateAlertInstance validates that the alert instance contains an alert rule id,

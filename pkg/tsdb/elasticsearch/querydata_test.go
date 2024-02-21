@@ -9,9 +9,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/Masterminds/semver"
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 
+	"github.com/grafana/grafana/pkg/infra/log"
+	"github.com/grafana/grafana/pkg/infra/tracing"
 	es "github.com/grafana/grafana/pkg/tsdb/elasticsearch/client"
 )
 
@@ -37,16 +38,21 @@ func (rt *queryDataTestRoundTripper) RoundTrip(req *http.Request) (*http.Respons
 }
 
 // we setup a fake datasource-info
-func newFlowTestDsInfo(body []byte, statusCode int, reuestCallback func(req *http.Request) error) *es.DatasourceInfo {
+func newFlowTestDsInfo(body []byte, statusCode int, requestCallback func(req *http.Request) error) *es.DatasourceInfo {
 	client := http.Client{
-		Transport: &queryDataTestRoundTripper{body: body, statusCode: statusCode, requestCallback: reuestCallback},
+		Transport: &queryDataTestRoundTripper{body: body, statusCode: statusCode, requestCallback: requestCallback},
 	}
+
+	configuredFields := es.ConfiguredFields{
+		TimeField:       "testtime",
+		LogMessageField: "line",
+		LogLevelField:   "lvl",
+	}
+
 	return &es.DatasourceInfo{
-		ESVersion:                  semver.MustParse("8.5.0"),
 		Interval:                   "Daily",
 		Database:                   "[testdb-]YYYY.MM.DD",
-		TimeField:                  "testtime",
-		TimeInterval:               "1s",
+		ConfiguredFields:           configuredFields,
 		URL:                        "http://localhost:9200",
 		HTTPClient:                 &client,
 		MaxConcurrentShardRequests: 42,
@@ -132,7 +138,7 @@ func queryDataTestWithResponseCode(queriesBytes []byte, responseStatusCode int, 
 		return nil
 	})
 
-	result, err := queryData(context.Background(), queries, dsInfo)
+	result, err := queryData(context.Background(), queries, dsInfo, log.New("test.logger"), tracing.InitializeTracerForTest())
 	if err != nil {
 		return queryDataTestResult{}, err
 	}

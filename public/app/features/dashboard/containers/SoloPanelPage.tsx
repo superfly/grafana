@@ -76,7 +76,12 @@ export class SoloPanelPage extends Component<Props, State> {
         return;
       }
 
+      if (panel) {
+        dashboard.exitViewPanel(panel);
+      }
+
       this.setState({ panel });
+      dashboard.initViewPanel(panel);
     }
   }
 
@@ -123,9 +128,10 @@ export const SoloPanel = ({ dashboard, notFound, panel, panelId, timezone }: Sol
               dashboard={dashboard}
               panel={panel}
               isEditing={false}
-              isViewing={false}
+              isViewing={true}
               lazy={false}
               timezone={timezone}
+              hideMenu={true}
             />
           );
         }}

@@ -1,34 +1,52 @@
-import { waitFor, screen, within, waitForElementToBeRemoved } from '@testing-library/react';
+import { screen, waitFor, waitForElementToBeRemoved, within } from '@testing-library/react';
 import userEvent, { PointerEventsCheckLevel } from '@testing-library/user-event';
 import React from 'react';
 import { renderRuleEditor, ui } from 'test/helpers/alertingRuleEditor';
 import { clickSelectOption } from 'test/helpers/selectOptionInTest';
-import { byRole, byText } from 'testing-library-selector';
+import { byText } from 'testing-library-selector';
 
 import { setDataSourceSrv } from '@grafana/runtime';
 import { contextSrv } from 'app/core/services/context_srv';
+import { AccessControlAction } from 'app/types';
 import { PromApplication } from 'app/types/unified-alerting-dto';
 
 import { searchFolders } from '../../manage-dashboards/state/actions';
 
 import { discoverFeatures } from './api/buildInfo';
 import { fetchRulerRules, fetchRulerRulesGroup, fetchRulerRulesNamespace, setRulerRuleGroup } from './api/ruler';
-import { ExpressionEditorProps } from './components/rule-editor/ExpressionEditor';
-import { disableRBAC, mockDataSource, MockDataSourceSrv } from './mocks';
+import { RecordingRuleEditorProps } from './components/rule-editor/RecordingRuleEditor';
+import { grantUserPermissions, mockDataSource, MockDataSourceSrv } from './mocks';
 import { fetchRulerRulesIfNotFetchedYet } from './state/actions';
 import * as config from './utils/config';
 
-jest.mock('./components/rule-editor/ExpressionEditor', () => ({
-  // eslint-disable-next-line react/display-name
-  ExpressionEditor: ({ value, onChange }: ExpressionEditorProps) => (
-    <input value={value} data-testid="expr" onChange={(e) => onChange(e.target.value)} />
-  ),
+jest.mock('./components/rule-editor/RecordingRuleEditor', () => ({
+  RecordingRuleEditor: ({ queries, onChangeQuery }: Pick<RecordingRuleEditorProps, 'queries' | 'onChangeQuery'>) => {
+    const onChange = (expr: string) => {
+      const query = queries[0];
+
+      const merged = {
+        ...query,
+        expr,
+        model: {
+          ...query.model,
+          expr,
+        },
+      };
+
+      onChangeQuery([merged]);
+    };
+
+    return <input data-testid="expr" onChange={(e) => onChange(e.target.value)} />;
+  },
+}));
+
+jest.mock('app/core/components/AppChrome/AppChromeUpdate', () => ({
+  AppChromeUpdate: ({ actions }: { actions: React.ReactNode }) => <div>{actions}</div>,
 }));
 
 jest.mock('./api/buildInfo');
 jest.mock('./api/ruler');
 jest.mock('../../../../app/features/manage-dashboards/state/actions');
-
 // there's no angular scope in test and things go terribly wrong when trying to render the query editor row.
 // lets just skip it
 jest.mock('app/features/query/components/QueryEditorRow', () => ({
@@ -37,6 +55,26 @@ jest.mock('app/features/query/components/QueryEditorRow', () => ({
 }));
 
 jest.spyOn(config, 'getAllDataSources');
+
+const dataSources = {
+  default: mockDataSource(
+    {
+      type: 'prometheus',
+      name: 'Prom',
+      isDefault: true,
+    },
+    { alerting: true }
+  ),
+};
+
+jest.mock('@grafana/runtime', () => ({
+  ...jest.requireActual('@grafana/runtime'),
+  getDataSourceSrv: jest.fn(() => ({
+    getInstanceSettings: () => dataSources.default,
+    get: () => dataSources.default,
+    getList: () => Object.values(dataSources),
+  })),
+}));
 
 jest.setTimeout(60 * 1000);
 
@@ -60,21 +98,22 @@ describe('RuleEditor recording rules', () => {
     jest.clearAllMocks();
     contextSrv.isEditor = true;
     contextSrv.hasEditPermissionInFolders = true;
+    grantUserPermissions([
+      AccessControlAction.AlertingRuleRead,
+      AccessControlAction.AlertingRuleUpdate,
+      AccessControlAction.AlertingRuleDelete,
+      AccessControlAction.AlertingRuleCreate,
+      AccessControlAction.DataSourcesRead,
+      AccessControlAction.DataSourcesWrite,
+      AccessControlAction.DataSourcesCreate,
+      AccessControlAction.FoldersWrite,
+      AccessControlAction.FoldersRead,
+      AccessControlAction.AlertingRuleExternalRead,
+      AccessControlAction.AlertingRuleExternalWrite,
+    ]);
   });
 
-  disableRBAC();
   it('can create a new cloud recording rule', async () => {
-    const dataSources = {
-      default: mockDataSource(
-        {
-          type: 'prometheus',
-          name: 'Prom',
-          isDefault: true,
-        },
-        { alerting: true }
-      ),
-    };
-
     setDataSourceSrv(new MockDataSourceSrv(dataSources));
     mocks.getAllDataSources.mockReturnValue(Object.values(dataSources));
     mocks.api.setRulerRuleGroup.mockResolvedValue();
@@ -106,15 +145,14 @@ describe('RuleEditor recording rules', () => {
       },
     });
 
-    renderRuleEditor();
+    renderRuleEditor(undefined, true);
     await waitForElementToBeRemoved(screen.getAllByTestId('Spinner'));
     await userEvent.type(await ui.inputs.name.find(), 'my great new recording rule');
-    await userEvent.click(await ui.buttons.lotexRecordingRule.get());
 
     const dataSourceSelect = ui.inputs.dataSource.get();
-    await userEvent.click(byRole('combobox').get(dataSourceSelect));
+    await userEvent.click(dataSourceSelect);
 
-    await clickSelectOption(dataSourceSelect, 'Prom (default)');
+    await userEvent.click(screen.getByText('Prom'));
     await clickSelectOption(ui.inputs.namespace.get(), 'namespace2');
     await clickSelectOption(ui.inputs.group.get(), 'group2');
 
@@ -127,7 +165,7 @@ describe('RuleEditor recording rules', () => {
     await userEvent.type(getLabelInput(ui.inputs.labelValue(1).get()), 'the a-team{enter}');
 
     // try to save, find out that recording rule name is invalid
-    await userEvent.click(ui.buttons.save.get());
+    await userEvent.click(ui.buttons.saveAndExit.get());
     await waitFor(() =>
       expect(
         byText(
@@ -142,7 +180,7 @@ describe('RuleEditor recording rules', () => {
     await userEvent.type(await ui.inputs.name.find(), 'my:great:new:recording:rule');
 
     // save and check what was sent to backend
-    await userEvent.click(ui.buttons.save.get());
+    await userEvent.click(ui.buttons.saveAndExit.get());
     await waitFor(() => expect(mocks.api.setRulerRuleGroup).toHaveBeenCalled());
     expect(mocks.api.setRulerRuleGroup).toHaveBeenCalledWith(
       { dataSourceName: 'Prom', apiVersion: 'legacy' },

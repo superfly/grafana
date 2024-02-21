@@ -1,5 +1,6 @@
 import { DataQueryRequest, DataQueryResponse, dateMath } from '@grafana/data';
 import { setDataSourceSrv } from '@grafana/runtime';
+import { DatasourceSrv } from 'app/features/plugins/datasource_srv';
 
 import { CloudWatchQuery } from '../types';
 
@@ -29,7 +30,7 @@ describe('addDataLinksToLogsResponse', () => {
       ],
     };
 
-    const mockOptions: any = {
+    const mockOptions = {
       targets: [
         {
           refId: 'A',
@@ -39,7 +40,8 @@ describe('addDataLinksToLogsResponse', () => {
           region: 'us-east-1',
         },
       ],
-    };
+      range: { ...time, raw: time },
+    } as DataQueryRequest<CloudWatchQuery>;
 
     setDataSourceSrv({
       async get() {
@@ -47,12 +49,11 @@ describe('addDataLinksToLogsResponse', () => {
           name: 'Xray',
         };
       },
-    } as any);
+    } as DatasourceSrv);
 
     await addDataLinksToLogsResponse(
       mockResponse,
       mockOptions,
-      { ...time, raw: time },
       (s) => s ?? '',
       (v) => [v] ?? [],
       (r) => r,
@@ -124,12 +125,12 @@ describe('addDataLinksToLogsResponse', () => {
           region: 'us-east-1',
         } as CloudWatchQuery,
       ],
+      range: { ...time, raw: time },
     } as DataQueryRequest<CloudWatchQuery>;
 
     await addDataLinksToLogsResponse(
       mockResponse,
       mockOptions,
-      { ...time, raw: time },
       (s) => s ?? '',
       (v) => [v] ?? [],
       (r) => r
@@ -181,12 +182,12 @@ describe('addDataLinksToLogsResponse', () => {
           region: 'us-east-1',
         } as CloudWatchQuery,
       ],
+      range: { ...time, raw: time },
     } as DataQueryRequest<CloudWatchQuery>;
 
     await addDataLinksToLogsResponse(
       mockResponse,
       mockOptions,
-      { ...time, raw: time },
       (s) => s ?? '',
       (v) => [v] ?? [],
       (r) => r

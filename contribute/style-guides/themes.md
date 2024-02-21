@@ -29,11 +29,12 @@ function Foo(props: FooProps) {
   const styles = useStyles2(getStyles);
   // Use styles with className
 }
-```
 
-const getStyles = (theme: GrafanaTheme2) => css({
-padding: theme.spacing(1,2)
-});
+const getStyles = (theme: GrafanaTheme2) =>
+  css({
+    padding: theme.spacing(1, 2),
+  });
+```
 
 #### Get the theme object
 
@@ -125,7 +126,7 @@ For font family, font sizes and line heights use the variables under `theme.typo
 #### Using `ThemeContext` directly
 
 ```tsx
-import { ThemeContext } from '@grafana/ui';
+import { ThemeContext } from '@grafana/data';
 
 <ThemeContext.Consumer>{(theme) => <Foo theme={theme} />}</ThemeContext.Consumer>;
 ```

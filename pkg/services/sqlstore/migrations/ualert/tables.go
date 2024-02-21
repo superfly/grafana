@@ -24,6 +24,7 @@ func AddTablesMigrations(mg *migrator.Migrator) {
 	mg.AddMigration("add last_applied column to alert_configuration_history", migrator.NewAddColumnMigration(migrator.Table{Name: "alert_configuration_history"}, &migrator.Column{
 		Name: "last_applied", Type: migrator.DB_Int, Nullable: false, Default: "0",
 	}))
+	// End of migration log, add new migrations above this line.
 }
 
 // historicalTableMigrations contains those migrations that existed prior to creating the improved messaging around migration immutability.
@@ -188,6 +189,10 @@ func alertInstanceMigration(mg *migrator.Migrator) {
 		migrator.NewAddColumnMigration(alertInstance, &migrator.Column{
 			Name: "current_reason", Type: migrator.DB_NVarchar, Length: DefaultFieldMaxLength, Nullable: true,
 		}))
+
+	mg.AddMigration("add result_fingerprint column to alert_instance", migrator.NewAddColumnMigration(alertInstance, &migrator.Column{
+		Name: "result_fingerprint", Type: migrator.DB_NVarchar, Length: 16, Nullable: true,
+	}))
 }
 
 func addAlertRuleMigrations(mg *migrator.Migrator, defaultIntervalSeconds int64) {
@@ -287,9 +292,14 @@ func addAlertRuleMigrations(mg *migrator.Migrator, defaultIntervalSeconds int64)
 			Name:     "is_paused",
 			Type:     migrator.DB_Bool,
 			Nullable: false,
-			Default:  "false",
+			Default:  "0",
 		},
 	))
+
+	// This migration fixes a bug where "false" for the default value created a column with default "true" in PostgreSQL databases
+	mg.AddMigration("fix is_paused column for alert_rule table", migrator.NewRawSQLMigration("").
+		Postgres(`ALTER TABLE alert_rule ALTER COLUMN is_paused SET DEFAULT false;
+UPDATE alert_rule SET is_paused = false;`))
 }
 
 func addAlertRuleVersionMigrations(mg *migrator.Migrator) {
@@ -351,9 +361,14 @@ func addAlertRuleVersionMigrations(mg *migrator.Migrator) {
 			Name:     "is_paused",
 			Type:     migrator.DB_Bool,
 			Nullable: false,
-			Default:  "false",
+			Default:  "0",
 		},
 	))
+
+	// This migration fixes a bug where "false" for the default value created a column with default "true" in PostgreSQL databases
+	mg.AddMigration("fix is_paused column for alert_rule_version table", migrator.NewRawSQLMigration("").
+		Postgres(`ALTER TABLE alert_rule_version ALTER COLUMN is_paused SET DEFAULT false;
+UPDATE alert_rule_version SET is_paused = false;`))
 }
 
 func addAlertmanagerConfigMigrations(mg *migrator.Migrator) {
@@ -481,9 +496,6 @@ func addAlertImageMigrations(mg *migrator.Migrator) {
 }
 
 func extractAlertmanagerConfigurationHistoryMigration(mg *migrator.Migrator) {
-	if !mg.Cfg.UnifiedAlerting.IsEnabled() {
-		return
-	}
 	// Since it's not always consistent as to what state the org ID indexes are in, just drop them all and rebuild from scratch.
 	// This is not expensive since this table is guaranteed to have a small number of rows.
 	mg.AddMigration("drop non-unique orgID index on alert_configuration", migrator.NewDropIndexMigration(migrator.Table{Name: "alert_configuration"}, &migrator.Index{Cols: []string{"org_id"}}))

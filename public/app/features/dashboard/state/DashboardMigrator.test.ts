@@ -3,6 +3,7 @@ import { each, map } from 'lodash';
 import { DataLinkBuiltInVars, MappingType } from '@grafana/data';
 import { getPanelPlugin } from '@grafana/data/test/__mocks__/pluginMocks';
 import { setDataSourceSrv } from '@grafana/runtime';
+import { FieldConfigSource } from '@grafana/schema';
 import { config } from 'app/core/config';
 import { GRID_CELL_HEIGHT, GRID_CELL_VMARGIN } from 'app/core/constants';
 import { mockDataSource, MockDataSourceSrv } from 'app/features/alerting/unified/mocks';
@@ -11,6 +12,8 @@ import { MIXED_DATASOURCE_NAME } from 'app/plugins/datasource/mixed/MixedDataSou
 import { VariableHide } from '../../variables/types';
 import { DashboardModel } from '../state/DashboardModel';
 import { PanelModel } from '../state/PanelModel';
+
+import { DASHBOARD_SCHEMA_VERSION } from './DashboardMigrator';
 
 jest.mock('app/core/services/context_srv', () => ({}));
 
@@ -43,11 +46,12 @@ setDataSourceSrv(new MockDataSourceSrv(dataSources));
 
 describe('DashboardModel', () => {
   describe('when creating dashboard with old schema', () => {
-    let model: any;
+    let model: DashboardModel;
     let graph: any;
     let singlestat: any;
     let table: any;
     let singlestatGauge: any;
+    const panelIdWithRepeatId = 500;
 
     config.panels = {
       stat: getPanelPlugin({ id: 'stat' }).meta,
@@ -57,17 +61,18 @@ describe('DashboardModel', () => {
     beforeEach(() => {
       model = new DashboardModel({
         services: {
-          filter: { time: { from: 'now-1d', to: 'now' }, list: [{}] },
+          filter: { time: { from: 'now-1d', to: 'now' }, list: [{ name: 'server' }] },
         },
         pulldowns: [
           { type: 'filtering', enable: true },
           { type: 'annotations', enable: true, annotations: [{ name: 'old' }] },
         ],
+        style: 'dark',
         panels: [
           {
             type: 'graph',
-            legend: { show: true },
             // @ts-expect-error
+            legend: { show: true },
             aliasYAxis: { test: 2 },
             y_formats: ['kbyte', 'ms'],
             grid: {
@@ -87,8 +92,8 @@ describe('DashboardModel', () => {
           },
           {
             type: 'singlestat',
-            legend: true,
             // @ts-expect-error
+            legend: true,
             thresholds: '10,20,30',
             colors: ['#FF0000', 'green', 'orange'],
             aliasYAxis: { test: 2 },
@@ -114,6 +119,30 @@ describe('DashboardModel', () => {
             styles: [{ thresholds: ['10', '20', '30'] }, { thresholds: ['100', '200', '300'] }],
             targets: [{ refId: 'A' }, {}],
           },
+          // Old left-over repeated panel
+          {
+            type: 'table',
+            id: panelIdWithRepeatId,
+            // @ts-expect-error
+            repeatPanelId: 1,
+          },
+          // Collapsed row with left-over repeated panels
+          {
+            type: 'row',
+            panels: [
+              {
+                id: 501,
+                type: 'table',
+                repeat: 'server',
+              },
+              // Old left-over repeated panel
+              {
+                id: 502,
+                // @ts-expect-error
+                repeatedPanelId: 501,
+              },
+            ],
+          },
         ],
       });
 
@@ -128,12 +157,16 @@ describe('DashboardModel', () => {
     });
 
     it('should have panel id', () => {
-      expect(graph.id).toBe(1);
+      expect(graph.id).toBe(503);
+    });
+
+    it('should not have style', () => {
+      expect(model.style).toBe(undefined);
     });
 
     it('should move time and filtering list', () => {
       expect(model.time.from).toBe('now-1d');
-      expect(model.templating.list[0].allFormat).toBe('glob');
+      expect(model.templating.list[0].name).toBe('server');
     });
 
     it('graphite panel should change name too graph', () => {
@@ -197,7 +230,7 @@ describe('DashboardModel', () => {
     });
 
     it('dashboard schema version should be set to latest', () => {
-      expect(model.schemaVersion).toBe(38);
+      expect(model.schemaVersion).toBe(DASHBOARD_SCHEMA_VERSION);
     });
 
     it('graph thresholds should be migrated', () => {
@@ -229,6 +262,10 @@ describe('DashboardModel', () => {
       expect(graph.thresholds[0].value).toBe(100);
       expect(graph.thresholds[1].value).toBe(200);
       expect(graph.thresholds[2].value).toBe(400);
+    });
+
+    it('Shoud ignore repeated panels', () => {
+      expect(model.getPanelById(panelIdWithRepeatId)).toBe(null);
     });
   });
 
@@ -480,7 +517,7 @@ describe('DashboardModel', () => {
   });
 
   describe('when migrating panel links', () => {
-    let model: any;
+    let model: DashboardModel;
 
     beforeEach(() => {
       model = new DashboardModel({
@@ -527,24 +564,26 @@ describe('DashboardModel', () => {
     });
 
     it('should add keepTime as variable', () => {
-      expect(model.panels[0].links[0].url).toBe(`http://mylink.com?$${DataLinkBuiltInVars.keepTime}`);
+      expect(model.panels[0].links?.[0].url).toBe(`http://mylink.com?$${DataLinkBuiltInVars.keepTime}`);
     });
 
     it('should add params to url', () => {
-      expect(model.panels[0].links[1].url).toBe('http://mylink.com?existingParam&customParam');
+      expect(model.panels[0].links?.[1].url).toBe('http://mylink.com?existingParam&customParam');
     });
 
     it('should add includeVars to url', () => {
-      expect(model.panels[0].links[2].url).toBe(`http://mylink.com?existingParam&$${DataLinkBuiltInVars.includeVars}`);
+      expect(model.panels[0].links?.[2].url).toBe(
+        `http://mylink.com?existingParam&$${DataLinkBuiltInVars.includeVars}`
+      );
     });
 
     it('should slugify dashboard name', () => {
-      expect(model.panels[0].links[3].url).toBe(`dashboard/db/my-other-dashboard`);
+      expect(model.panels[0].links?.[3].url).toBe(`dashboard/db/my-other-dashboard`);
     });
   });
 
   describe('when migrating variables', () => {
-    let model: any;
+    let model: DashboardModel;
     beforeEach(() => {
       model = new DashboardModel({
         panels: [
@@ -611,7 +650,7 @@ describe('DashboardModel', () => {
   });
 
   describe('when migrating labels from DataFrame to Field', () => {
-    let model: any;
+    let model: DashboardModel;
     beforeEach(() => {
       model = new DashboardModel({
         panels: [
@@ -664,16 +703,16 @@ describe('DashboardModel', () => {
       model = new DashboardModel({
         templating: {
           list: [
+            // @ts-expect-error
             {
-              // @ts-expect-error
               multi: false,
               current: {
                 value: ['value'],
                 text: ['text'],
               },
             },
+            // @ts-expect-error
             {
-              // @ts-expect-error
               multi: true,
               current: {
                 value: ['value'],
@@ -723,8 +762,8 @@ describe('DashboardModel', () => {
             },
             {
               type: 'query',
-              // @ts-expect-error
               current: {
+                // @ts-expect-error
                 tags: [
                   {
                     selected: true,
@@ -809,7 +848,6 @@ describe('DashboardModel', () => {
               '# Angular Text Panel\n# $constant\n\nFor markdown syntax help: [commonmark.org/help](https://commonmark.org/help/)\n\n## $text\n\n',
             mode: 'markdown',
           },
-          // @ts-expect-error
           {
             id: 3,
             type: 'text2',
@@ -820,7 +858,6 @@ describe('DashboardModel', () => {
                 '# React Text Panel from scratch\n# $constant\n\nFor markdown syntax help: [commonmark.org/help](https://commonmark.org/help/)\n\n## $text',
             },
           },
-          // @ts-expect-error
           {
             id: 4,
             type: 'text2',
@@ -857,7 +894,7 @@ describe('DashboardModel', () => {
     });
 
     it('should migrate panels with new Text Panel id', () => {
-      const reactPanel: any = model.panels[1];
+      const reactPanel = model.panels[1];
       expect(reactPanel.id).toEqual(3);
       expect(reactPanel.type).toEqual('text');
       expect(reactPanel.title).toEqual('React Text Panel from scratch');
@@ -868,7 +905,7 @@ describe('DashboardModel', () => {
     });
 
     it('should clean up old angular options for panels with new Text Panel id', () => {
-      const reactPanel: any = model.panels[2];
+      const reactPanel = model.panels[2];
       expect(reactPanel.id).toEqual(4);
       expect(reactPanel.type).toEqual('text');
       expect(reactPanel.title).toEqual('React Text Panel from Angular Panel');
@@ -885,58 +922,55 @@ describe('DashboardModel', () => {
 
     beforeEach(() => {
       model = new DashboardModel({
+        editable: true,
+        graphTooltip: 0,
+        schemaVersion: 10,
         templating: {
           list: [
             {
+              name: 'server1',
               type: 'query',
               hide: VariableHide.dontHide,
               datasource: null,
-              // @ts-expect-error
-              allFormat: '',
             },
             {
+              name: 'server2',
               type: 'query',
               hide: VariableHide.hideLabel,
               datasource: null,
-              // @ts-expect-error
-              allFormat: '',
             },
             {
+              name: 'server3',
               type: 'query',
               hide: VariableHide.hideVariable,
               datasource: null,
-              // @ts-expect-error
-              allFormat: '',
             },
             {
+              name: 'server4',
               type: 'constant',
               hide: VariableHide.dontHide,
               query: 'default value',
-              // @ts-expect-error
               current: { selected: true, text: 'A', value: 'B' },
               options: [{ selected: true, text: 'A', value: 'B' }],
               datasource: null,
-              allFormat: '',
             },
             {
+              name: 'server5',
               type: 'constant',
               hide: VariableHide.hideLabel,
               query: 'default value',
-              // @ts-expect-error
               current: { selected: true, text: 'A', value: 'B' },
               options: [{ selected: true, text: 'A', value: 'B' }],
               datasource: null,
-              allFormat: '',
             },
             {
+              name: 'server6',
               type: 'constant',
               hide: VariableHide.hideVariable,
               query: 'default value',
-              // @ts-expect-error
               current: { selected: true, text: 'A', value: 'B' },
               options: [{ selected: true, text: 'A', value: 'B' }],
               datasource: null,
-              allFormat: '',
             },
           ],
         },
@@ -955,34 +989,34 @@ describe('DashboardModel', () => {
 
     it('should migrate visible constant variables to textbox variables', () => {
       expect(model.templating.list[3]).toEqual({
+        name: 'server4',
         type: 'textbox',
         hide: VariableHide.dontHide,
         query: 'default value',
         current: { selected: true, text: 'default value', value: 'default value' },
         options: [{ selected: true, text: 'default value', value: 'default value' }],
         datasource: null,
-        allFormat: '',
       });
       expect(model.templating.list[4]).toEqual({
+        name: 'server5',
         type: 'textbox',
         hide: VariableHide.hideLabel,
         query: 'default value',
         current: { selected: true, text: 'default value', value: 'default value' },
         options: [{ selected: true, text: 'default value', value: 'default value' }],
         datasource: null,
-        allFormat: '',
       });
     });
 
     it('should change current and options for hidden constant variables', () => {
       expect(model.templating.list[5]).toEqual({
+        name: 'server6',
         type: 'constant',
         hide: VariableHide.hideVariable,
         query: 'default value',
         current: { selected: true, text: 'default value', value: 'default value' },
         options: [{ selected: true, text: 'default value', value: 'default value' }],
         datasource: null,
-        allFormat: '',
       });
     });
   });
@@ -992,98 +1026,89 @@ describe('DashboardModel', () => {
 
     beforeEach(() => {
       model = new DashboardModel({
+        editable: true,
+        graphTooltip: 0,
+        schemaVersion: 20,
         templating: {
           list: [
             {
               type: 'query',
               name: 'variable_with_never_refresh_with_options',
-              // @ts-expect-error
               options: [{ text: 'A', value: 'A' }],
               refresh: 0,
             },
             {
               type: 'query',
               name: 'variable_with_never_refresh_without_options',
-              // @ts-expect-error
               options: [],
               refresh: 0,
             },
             {
               type: 'query',
               name: 'variable_with_dashboard_refresh_with_options',
-              // @ts-expect-error
               options: [{ text: 'A', value: 'A' }],
               refresh: 1,
             },
             {
               type: 'query',
               name: 'variable_with_dashboard_refresh_without_options',
-              // @ts-expect-error
               options: [],
               refresh: 1,
             },
             {
               type: 'query',
               name: 'variable_with_timerange_refresh_with_options',
-              // @ts-expect-error
               options: [{ text: 'A', value: 'A' }],
               refresh: 2,
             },
             {
               type: 'query',
               name: 'variable_with_timerange_refresh_without_options',
-              // @ts-expect-error
               options: [],
               refresh: 2,
             },
             {
               type: 'query',
               name: 'variable_with_no_refresh_with_options',
-              // @ts-expect-error
               options: [{ text: 'A', value: 'A' }],
             },
             {
               type: 'query',
               name: 'variable_with_no_refresh_without_options',
-              // @ts-expect-error
               options: [],
             },
             {
               type: 'query',
               name: 'variable_with_unknown_refresh_with_options',
-              // @ts-expect-error
               options: [{ text: 'A', value: 'A' }],
+              // @ts-expect-error
               refresh: 2001,
             },
             {
               type: 'query',
               name: 'variable_with_unknown_refresh_without_options',
-              // @ts-expect-error
               options: [],
+              // @ts-expect-error
               refresh: 2001,
             },
             {
               type: 'custom',
               name: 'custom',
-              // @ts-expect-error
               options: [{ text: 'custom', value: 'custom' }],
             },
             {
               type: 'textbox',
               name: 'textbox',
-              // @ts-expect-error
               options: [{ text: 'Hello', value: 'World' }],
             },
             {
               type: 'datasource',
               name: 'datasource',
-              // @ts-expect-error
               options: [{ text: 'ds', value: 'ds' }], // fake example doesn't exist
             },
             {
               type: 'interval',
               name: 'interval',
-              // @ts-expect-error
               options: [{ text: '1m', value: '1m' }],
             },
           ],
@@ -1161,7 +1186,6 @@ describe('DashboardModel', () => {
                   steps: [
                     {
                       color: 'green',
-                      // @ts-expect-error
                       value: null,
                     },
                     {
@@ -1333,8 +1357,8 @@ describe('DashboardModel', () => {
         panels: [
           {
             type: 'singlestat',
-            legend: true,
             // @ts-expect-error
+            legend: true,
             thresholds: '10,20,30',
             colors: ['#FF0000', 'green', 'orange'],
             aliasYAxis: { test: 2 },
@@ -1395,8 +1419,8 @@ describe('DashboardModel', () => {
         panels: [
           {
             type: 'singlestat',
-            legend: true,
             // @ts-expect-error
+            legend: true,
             thresholds: '10,20,30',
             colors: ['#FF0000', 'green', 'orange'],
             aliasYAxis: { test: 2 },
@@ -1542,7 +1566,7 @@ describe('DashboardModel', () => {
   });
 
   describe('migrating legacy CloudWatch queries', () => {
-    let model: any;
+    let model: DashboardModel;
     let panelTargets: any;
 
     beforeEach(() => {
@@ -1573,7 +1597,6 @@ describe('DashboardModel', () => {
           ],
         },
         panels: [
-          // @ts-expect-error
           {
             gridPos: {
               h: 8,
@@ -1696,7 +1719,6 @@ describe('DashboardModel', () => {
               title: 'DynamoDB',
               type: 'row',
               panels: [
-                // @ts-expect-error
                 {
                   gridPos: {
                     h: 8,
@@ -1751,7 +1773,6 @@ describe('DashboardModel', () => {
                   title: 'Panel Title',
                   type: 'timeseries',
                 },
-                // @ts-expect-error
                 {
                   gridPos: {
                     h: 8,
@@ -1961,8 +1982,8 @@ describe('DashboardModel', () => {
   describe('when migrating time series axis visibility', () => {
     test('preserves x axis visibility', () => {
       const model = new DashboardModel({
+        schemaVersion: 25,
         panels: [
-          // @ts-expect-error
           {
             type: 'timeseries',
             fieldConfig: {
@@ -2006,7 +2027,6 @@ describe('DashboardModel', () => {
             {
               type: 'query',
               name: 'var',
-              // @ts-expect-error
               options: [{ text: 'A', value: 'A' }],
               refresh: 0,
               datasource: null,
@@ -2015,8 +2035,8 @@ describe('DashboardModel', () => {
         },
         annotations: {
           list: [
+            // @ts-expect-error
             {
-              // @ts-expect-error
               datasource: null,
             },
             {
@@ -2184,7 +2204,6 @@ describe('when migrating table cell display mode to cell options', () => {
   beforeEach(() => {
     model = new DashboardModel({
       panels: [
-        // @ts-expect-error
         {
           id: 1,
           type: 'table',
@@ -2196,10 +2215,8 @@ describe('when migrating table cell display mode to cell options', () => {
                 inspect: false,
               },
             },
-            overrides: [],
-          },
+          } as unknown as FieldConfigSource, // missing overrides on purpose
         },
-        // @ts-expect-error
         {
           id: 2,
           type: 'table',
@@ -2214,7 +2231,6 @@ describe('when migrating table cell display mode to cell options', () => {
             overrides: [],
           },
         },
-        // @ts-expect-error
         {
           id: 3,
           type: 'table',
@@ -2229,7 +2245,6 @@ describe('when migrating table cell display mode to cell options', () => {
             overrides: [],
           },
         },
-        // @ts-expect-error
         {
           id: 4,
           type: 'table',
@@ -2244,7 +2259,6 @@ describe('when migrating table cell display mode to cell options', () => {
             overrides: [],
           },
         },
-        // @ts-expect-error
         {
           id: 5,
           type: 'table',
@@ -2259,7 +2273,6 @@ describe('when migrating table cell display mode to cell options', () => {
             overrides: [],
           },
         },
-        // @ts-expect-error
         {
           id: 6,
           type: 'table',
@@ -2327,7 +2340,6 @@ describe('when migrating table cell display mode to cell options', () => {
             ],
           },
         },
-        // @ts-expect-error
         {
           id: 7,
           type: 'table',

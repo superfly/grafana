@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/grafana/grafana-plugin-sdk-go/data"
-	"github.com/prometheus/prometheus/pkg/labels"
+	"github.com/prometheus/prometheus/model/labels"
 	"github.com/prometheus/prometheus/promql"
 	"github.com/prometheus/prometheus/promql/parser"
 
@@ -35,7 +35,7 @@ type queryData struct {
 type scalar promql.Scalar
 
 func (s *scalar) UnmarshalJSON(b []byte) error {
-	var xs []interface{}
+	var xs []any
 	if err := json.Unmarshal(b, &xs); err != nil {
 		return err
 	}
@@ -113,7 +113,7 @@ func instantQueryResults(resp instantQueryResponse) (eval.Results, error) {
 	}
 }
 
-func instantQueryResultsExtractor(r *response.NormalResponse) (interface{}, error) {
+func instantQueryResultsExtractor(r *response.NormalResponse) (any, error) {
 	contentType := r.Header().Get("Content-Type")
 	if !strings.Contains(contentType, "json") {
 		return nil, fmt.Errorf("unexpected content type from upstream. expected JSON, got %v", contentType)

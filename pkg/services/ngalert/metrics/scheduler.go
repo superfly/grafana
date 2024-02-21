@@ -7,13 +7,22 @@ import (
 	"github.com/grafana/grafana/pkg/util/ticker"
 )
 
+const (
+	AlertRuleActiveLabelValue = "active"
+	AlertRulePausedLabelValue = "paused"
+)
+
 type Scheduler struct {
 	Registerer                          prometheus.Registerer
 	BehindSeconds                       prometheus.Gauge
 	EvalTotal                           *prometheus.CounterVec
 	EvalFailures                        *prometheus.CounterVec
 	EvalDuration                        *prometheus.HistogramVec
+	ProcessDuration                     *prometheus.HistogramVec
+	SendDuration                        *prometheus.HistogramVec
+	SimpleNotificationRules             *prometheus.GaugeVec
 	GroupRules                          *prometheus.GaugeVec
+	Groups                              *prometheus.GaugeVec
 	SchedulePeriodicDuration            prometheus.Histogram
 	SchedulableAlertRules               prometheus.Gauge
 	SchedulableAlertRulesHash           prometheus.Gauge
@@ -58,8 +67,37 @@ func NewSchedulerMetrics(r prometheus.Registerer) *Scheduler {
 				Namespace: Namespace,
 				Subsystem: Subsystem,
 				Name:      "rule_evaluation_duration_seconds",
-				Help:      "The duration for a rule to execute.",
-				Buckets:   []float64{.005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10, 25, 50, 100},
+				Help:      "The time to evaluate a rule.",
+				Buckets:   []float64{.01, .1, .5, 1, 5, 10, 15, 30, 60, 120, 180, 240, 300},
+			},
+			[]string{"org"},
+		),
+		ProcessDuration: promauto.With(r).NewHistogramVec(
+			prometheus.HistogramOpts{
+				Namespace: Namespace,
+				Subsystem: Subsystem,
+				Name:      "rule_process_evaluation_duration_seconds",
+				Help:      "The time to process the evaluation results for a rule.",
+				Buckets:   []float64{.01, .1, .5, 1, 5, 10, 15, 30, 60, 120, 180, 240, 300},
+			},
+			[]string{"org"},
+		),
+		SendDuration: promauto.With(r).NewHistogramVec(
+			prometheus.HistogramOpts{
+				Namespace: Namespace,
+				Subsystem: Subsystem,
+				Name:      "rule_send_alerts_duration_seconds",
+				Help:      "The time to send the alerts to Alertmanager.",
+				Buckets:   []float64{.01, .1, .5, 1, 5, 10, 15, 30, 60, 120, 180, 240, 300},
+			},
+			[]string{"org"},
+		),
+		SimpleNotificationRules: promauto.With(r).NewGaugeVec(
+			prometheus.GaugeOpts{
+				Namespace: Namespace,
+				Subsystem: Subsystem,
+				Name:      "simple_routing_rules",
+				Help:      "The number of alert rules using simplified routing.",
 			},
 			[]string{"org"},
 		),
@@ -69,7 +107,16 @@ func NewSchedulerMetrics(r prometheus.Registerer) *Scheduler {
 				Namespace: Namespace,
 				Subsystem: Subsystem,
 				Name:      "rule_group_rules",
-				Help:      "The number of rules.",
+				Help:      "The number of alert rules that are scheduled, both active and paused.",
+			},
+			[]string{"org", "state"},
+		),
+		Groups: promauto.With(r).NewGaugeVec(
+			prometheus.GaugeOpts{
+				Namespace: Namespace,
+				Subsystem: Subsystem,
+				Name:      "rule_groups",
+				Help:      "The number of alert rule groups",
 			},
 			[]string{"org"},
 		),
