@@ -153,7 +153,7 @@ type ReduceMapper interface {
 
 // mapSeries creates a series where all points are mapped using the provided map function ReduceMapper.MapInput
 func mapSeries(s Series, mapper ReduceMapper) Series {
-	newSeries := NewSeries(s.GetName(), s.GetLabels(), 0)
+	newSeries := NewSeries(s.GetName(), s.Frame.RefID, s.GetLabels(), 0)
 	for i := 0; i < s.Len(); i++ {
 		f := s.GetValue(i)
 		f = mapper.MapInput(f)

@@ -293,7 +293,7 @@ func (gr *ResampleCommand) Execute(ctx context.Context, now time.Time, vars math
 		}
 		switch v := val.(type) {
 		case mathexp.Series:
-			num, err := v.Resample(gr.Window, gr.Downsampler, gr.Upsampler, timeRange.From, timeRange.To)
+			num, err := v.Resample(gr.refID, gr.Window, gr.Downsampler, gr.Upsampler, timeRange.From, timeRange.To)
 			if err != nil {
 				return newRes, err
 			}

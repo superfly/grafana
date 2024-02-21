@@ -220,7 +220,7 @@ func perFloat(e *State, val Value, floatF func(x float64) float64) (Value, error
 		newVal = NewScalar(e.RefID, &nF)
 	case parse.TypeSeriesSet:
 		resSeries := val.(Series)
-		newSeries := NewSeries(resSeries.GetName(), resSeries.GetLabels(), resSeries.Len())
+		newSeries := NewSeries(resSeries.GetName(), e.RefID, resSeries.GetLabels(), resSeries.Len())
 		for i := 0; i < resSeries.Len(); i++ {
 			t, f := resSeries.GetPoint(i)
 			nF := math.NaN()
@@ -255,7 +255,7 @@ func perNullableFloat(e *State, val Value, floatF func(x *float64) *float64) (Va
 		newVal = NewScalar(e.RefID, floatF(f))
 	case parse.TypeSeriesSet:
 		resSeries := val.(Series)
-		newSeries := NewSeries(resSeries.GetName(), resSeries.GetLabels(), resSeries.Len())
+		newSeries := NewSeries(resSeries.GetName(), e.RefID, resSeries.GetLabels(), resSeries.Len())
 		for i := 0; i < resSeries.Len(); i++ {
 			t, f := resSeries.GetPoint(i)
 			newSeries.SetPoint(i, t, floatF(f))
