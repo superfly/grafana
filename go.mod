@@ -521,4 +521,4 @@ replace github.com/prometheus/alertmanager => github.com/grafana/prometheus-aler
 
 exclude github.com/mattn/go-sqlite3 v2.0.3+incompatible
 
-replace github.com/grafana/alerting => github.com/wjordan/grafana-alerting v0.0.0-20230213202413-73b2c3ce6cf0
+replace github.com/grafana/alerting => github.com/wjordan/grafana-alerting v0.0.0-20240221201508-8baf5f125bd4
