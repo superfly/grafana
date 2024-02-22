@@ -20,6 +20,7 @@ COPY packages packages
 COPY plugins-bundled plugins-bundled
 COPY public public
 
+RUN apk add g++ make py3-pip
 RUN yarn install --immutable
 
 COPY tsconfig.json .eslintrc .editorconfig .browserslistrc .prettierrc.js ./
