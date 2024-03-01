@@ -244,6 +244,20 @@ func (moa *MultiOrgAlertmanager) getLatestConfigs(ctx context.Context) (map[int6
 	return result, nil
 }
 
+func (moa *MultiOrgAlertmanager) getAdminConfigs() (map[int64]*models.AdminConfiguration, error) {
+	configs, err := moa.configStore.GetAdminConfigurations()
+	if err != nil {
+		return nil, err
+	}
+
+	result := make(map[int64]*models.AdminConfiguration, len(configs))
+	for _, config := range configs {
+		result[config.OrgID] = config
+	}
+
+	return result, nil
+}
+
 // SyncAlertmanagersForOrgs syncs configuration of the Alertmanager required by each organization.
 func (moa *MultiOrgAlertmanager) SyncAlertmanagersForOrgs(ctx context.Context, orgIDs []int64) {
 	orgsFound := make(map[int64]struct{}, len(orgIDs))
@@ -252,8 +266,19 @@ func (moa *MultiOrgAlertmanager) SyncAlertmanagersForOrgs(ctx context.Context, o
 		moa.logger.Error("Failed to load Alertmanager configurations", "error", err)
 		return
 	}
+	adminConfigs, err := moa.getAdminConfigs()
+	if err != nil {
+		moa.logger.Error("Failed to load Alertmanager admin configurations", "error", err)
+		return
+	}
+
 	moa.alertmanagersMtx.Lock()
 	for _, orgID := range orgIDs {
+		// Skip sync for orgs that don't have an Alertmanager admin configuration
+		_, adminCfgFound := adminConfigs[orgID]
+		if !adminCfgFound {
+			continue
+		}
 		if _, isDisabledOrg := moa.settings.UnifiedAlerting.DisabledOrgs[orgID]; isDisabledOrg {
 			moa.logger.Debug("Skipping syncing Alertmanager for disabled org", "org", orgID)
 			continue

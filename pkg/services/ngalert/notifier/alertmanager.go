@@ -42,6 +42,7 @@ var silenceMaintenanceInterval = 15 * time.Minute
 type AlertingStore interface {
 	store.AlertingStore
 	store.ImageStore
+	store.AdminConfigurationStore
 }
 
 type alertmanager struct {

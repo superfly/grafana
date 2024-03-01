@@ -495,6 +495,7 @@ func (st DBstore) GetAlertRulesKeysForScheduling(ctx context.Context) ([]ngmodel
 		alertRulesSql := sess.Table("alert_rule").Select("org_id, uid, version")
 		var disabledOrgs []int64
 
+		alertRulesSql.Join("INNER", "ngalert_configuration", "alert_rule.org_id=ngalert_configuration.org_id")
 		for orgID := range st.Cfg.DisabledOrgs {
 			disabledOrgs = append(disabledOrgs, orgID)
 		}
@@ -533,6 +534,8 @@ func (st DBstore) GetAlertRulesForScheduling(ctx context.Context, query *ngmodel
 		if len(query.RuleGroups) > 0 {
 			alertRulesSql.In("rule_group", query.RuleGroups)
 		}
+
+		alertRulesSql.Join("INNER", "ngalert_configuration", "alert_rule.org_id=ngalert_configuration.org_id")
 
 		rule := new(ngmodels.AlertRule)
 		rows, err := alertRulesSql.Rows(rule)
