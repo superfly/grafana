@@ -44,6 +44,7 @@ type AlertingStore interface {
 	store.AlertingStore
 	store.ImageStore
 	autogenRuleStore
+	store.AdminConfigurationStore
 }
 
 type alertmanager struct {
