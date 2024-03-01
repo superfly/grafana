@@ -37,6 +37,7 @@ type AlertingStore interface {
 	store.AlertingStore
 	store.ImageStore
 	autogenRuleStore
+	store.AdminConfigurationStore
 }
 
 type stateStore interface {

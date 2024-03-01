@@ -534,9 +534,10 @@ func (st DBstore) GetNamespaceByUID(ctx context.Context, uid string, orgID int64
 func (st DBstore) GetAlertRulesKeysForScheduling(ctx context.Context) ([]ngmodels.AlertRuleKeyWithVersion, error) {
 	var result []ngmodels.AlertRuleKeyWithVersion
 	err := st.SQLStore.WithDbSession(ctx, func(sess *db.Session) error {
-		alertRulesSql := sess.Table("alert_rule").Select("org_id, uid, version")
+		alertRulesSql := sess.Table("alert_rule").Select("alert_rule.org_id, uid, version")
 		var disabledOrgs []int64
 
+		alertRulesSql.Join("INNER", "ngalert_configuration", "alert_rule.org_id=ngalert_configuration.org_id")
 		for orgID := range st.Cfg.DisabledOrgs {
 			disabledOrgs = append(disabledOrgs, orgID)
 		}
@@ -565,7 +566,7 @@ func (st DBstore) GetAlertRulesForScheduling(ctx context.Context, query *ngmodel
 
 		alertRulesSql := sess.Table("alert_rule")
 		if len(disabledOrgs) > 0 {
-			alertRulesSql.NotIn("org_id", disabledOrgs)
+			alertRulesSql.NotIn("alert_rule.org_id", disabledOrgs)
 		}
 
 		var groupsMap map[string]struct{}
@@ -576,6 +577,8 @@ func (st DBstore) GetAlertRulesForScheduling(ctx context.Context, query *ngmodel
 				groupsMap[group] = struct{}{}
 			}
 		}
+
+		alertRulesSql.Join("INNER", "ngalert_configuration", "alert_rule.org_id=ngalert_configuration.org_id")
 
 		rule := new(ngmodels.AlertRule)
 		rows, err := alertRulesSql.Rows(rule)
