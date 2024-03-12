@@ -3,7 +3,7 @@ import memoizeOne from 'memoize-one';
 import { PanelPlugin } from '@grafana/data';
 import { getConfig } from 'app/core/config';
 import { contextSrv } from 'app/core/services/context_srv';
-import { getRulesPermissions } from 'app/features/alerting/unified/utils/access-control';
+import {getRulesPermissions, provisioningPermissions} from 'app/features/alerting/unified/utils/access-control';
 import { GRAFANA_RULES_SOURCE_NAME } from 'app/features/alerting/unified/utils/datasource';
 
 import { PanelEditorTab, PanelEditorTabId } from '../types';
@@ -62,5 +62,7 @@ export function shouldShowAlertingTab(plugin: PanelPlugin) {
   const isGraph = plugin.meta.id === 'graph';
   const isTimeseries = plugin.meta.id === 'timeseries';
 
-  return (isAlertingAvailable && isGraph) || isTimeseries;
+  const hasProvisioningPermissions = contextSrv.hasPermission(provisioningPermissions.write);
+
+  return ((isAlertingAvailable && isGraph) || isTimeseries) && hasProvisioningPermissions;
 }
