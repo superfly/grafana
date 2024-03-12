@@ -247,7 +247,7 @@ build-docker-full: ## Build Docker image for development.
 	--build-arg WIRE_TAGS=$(WIRE_TAGS) \
 	--build-arg COMMIT_SHA=$$(git rev-parse HEAD) \
 	--build-arg BUILD_BRANCH=$$(git rev-parse --abbrev-ref HEAD) \
-	--tag wjordan/grafana$(TAG_SUFFIX):fly-metrics \
+	--tag flyio/grafana$(TAG_SUFFIX):$$(git rev-parse --abbrev-ref HEAD) \
 	$(DOCKER_BUILD_ARGS)
 
 build-docker-full-ubuntu: ## Build Docker image based on Ubuntu for development.
@@ -262,7 +262,7 @@ build-docker-full-ubuntu: ## Build Docker image based on Ubuntu for development.
 	--build-arg BUILD_BRANCH=$$(git rev-parse --abbrev-ref HEAD) \
 	--build-arg BASE_IMAGE=ubuntu:22.04 \
 	--build-arg GO_IMAGE=golang:1.21.5 \
-	--tag grafana/grafana$(TAG_SUFFIX):dev-ubuntu \
+	--tag flyio/grafana$(TAG_SUFFIX):$$(git rev-parse --abbrev-ref HEAD)-ubuntu \
 	$(DOCKER_BUILD_ARGS)
 
 ##@ Services
