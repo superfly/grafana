@@ -133,5 +133,5 @@ export function getCreateAlertInMenuAvailability() {
   const hasRuleUpdatePermissions = contextSrv.hasPermission(getRulesPermissions(GRAFANA_RULES_SOURCE_NAME).update);
   const isAlertingAvailableForRead = unifiedAlertingEnabled && hasRuleReadPermissions;
 
-  return isAlertingAvailableForRead && hasRuleUpdatePermissions;
+  return isAlertingAvailableForRead && hasRuleUpdatePermissions && contextSrv.hasPermission(provisioningPermissions.write);
 }
