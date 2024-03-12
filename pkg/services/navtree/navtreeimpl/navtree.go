@@ -432,6 +432,11 @@ func (s *ServiceImpl) buildLegacyAlertNavLinks(c *contextmodel.ReqContext) *navt
 
 func (s *ServiceImpl) buildAlertNavLinks(c *contextmodel.ReqContext) *navtree.NavLink {
 	hasAccess := ac.HasAccess(s.accessControl, c)
+
+	if !hasAccess(ac.EvalPermission(ac.ActionAlertingProvisioningWrite)) {
+		return nil
+	}
+
 	var alertChildNavs []*navtree.NavLink
 
 	if hasAccess(ac.EvalAny(ac.EvalPermission(ac.ActionAlertingRuleRead), ac.EvalPermission(ac.ActionAlertingRuleExternalRead))) {
