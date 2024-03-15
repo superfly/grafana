@@ -1,44 +1,30 @@
 <mjml>
-  <!-- global variables -->
-  <mj-include path="./partials/_globals.mjml" />
-  <!-- css styling -->
-  <mj-include path="./partials/layout/theme.css" type="css" css-inline="inline" />
   <mj-head>
-    <!-- ⬇ Don't forget to specify an email subject below! ⬇ -->
     <mj-title>
       {{ Subject .Subject .TemplateData "{{ .Title }}" }}
     </mj-title>
-    <mj-include path="./partials/layout/head.mjml" />
-    <!-- Summary of the email contents, this will go in the email preview -->
     <mj-include path="./partials/alerting/summary.mjml" />
   </mj-head>
   <mj-body>
-    <mj-section>
-      <mj-include path="./partials/layout/header.mjml" />
-    </mj-section>
-
-    <!-- This is our grouping header, it says what grouping labels have been applied to this email -->
     <mj-include path="./partials/alerting/grouping_labels.mjml" />
 
     <!-- custom email message -->
     <mj-raw>
       {{ if .Message }}
     </mj-raw>
-    <mj-wrapper css-class="background" padding="0">
-      <mj-section padding="0">
-        <mj-column>
-          <mj-text align="left">
-            <mj-raw>
-              {{ range $line := (splitList "\n" .Message) }}
-            </mj-raw>
-            {{ $line }}<br />
-            <mj-raw>
-              {{ end }}
-            </mj-raw>
-          </mj-text>
-        </mj-column>
-      </mj-section>
-    </mj-wrapper>
+    <mj-section>
+      <mj-column>
+        <mj-text>
+          <mj-raw>
+            {{ range $line := (splitList "\n" .Message) }}
+          </mj-raw>
+          {{ $line }}<br />
+          <mj-raw>
+            {{ end }}
+          </mj-raw>
+        </mj-text>
+      </mj-column>
+    </mj-section>
 
     <!-- end custom email message -->
     <mj-raw>
@@ -119,7 +105,7 @@
       {{ end }}
     </mj-raw>
 
-    <mj-section padding-top="10px">
+    <mj-section>
       <mj-include path="./partials/layout/footer.mjml" />
     </mj-section>
   </mj-body>
