@@ -1,0 +1,46 @@
+<mj-raw>{{ if .CommonAnnotations.description }}</mj-raw>
+<mj-section><mj-column><mj-text>
+<mj-raw>{{ range $line := (splitList "\n" .CommonAnnotations.description) }}</mj-raw>
+{{ $line }}<br />
+<mj-raw>{{ end }}</mj-raw>
+</mj-text></mj-column></mj-section>
+<mj-raw>{{ end }}</mj-raw>
+
+<mj-raw>{{ if .Alerts.Firing  }}</mj-raw>
+<mj-text><h3>🔥 {{ .Alerts.Firing | len }} firing instances</h3></mj-text>
+
+<mj-raw>{{ range .Alerts.Firing }}</mj-raw>
+<mj-include path="./instance.mjml" />
+<mj-raw>{{ end }}{{ end }}</mj-raw>
+
+<mj-raw>{{ if .Alerts.Resolved }}</mj-raw>
+<mj-text><h3>✅ {{ .Alerts.Resolved | len }} resolved instances</h3></mj-text>
+<mj-raw>{{ range .Alerts.Resolved }}</mj-raw>
+<mj-include path="./instance.mjml" />
+<mj-raw>{{ end }}{{ end }}</mj-raw>
+
+<!-- actions -->
+<mj-section>
+  <mj-raw>{{ if .SilenceURL }}</mj-raw>
+  <mj-column><mj-button href="{{ .SilenceURL }}">Silence</mj-button></mj-column>
+  <mj-raw>{{ end }}</mj-raw>
+
+  <mj-raw>{{ if .Annotations.runbook_url }}</mj-raw>
+  <mj-column><mj-button href="{{ .Annotations.runbook_url }}">View runbook</mj-button>
+  </mj-column>
+  <mj-raw>{{ end }}</mj-raw>
+
+  <mj-raw>{{ if .PanelURL }}</mj-raw>
+  <mj-column><mj-button href="{{ .PanelURL }}">View panel</mj-button></mj-column>
+  <mj-raw>{{ else if .DashboardURL }}</mj-raw>
+  <mj-column><mj-button href="{{ .DashboardURL }}">View dashboard</mj-button></mj-column>
+  <mj-raw>{{ end }}</mj-raw>
+</mj-section>
+
+<mj-raw>{{ if .ImageURL }}</mj-raw>
+<mj-section><mj-column><mj-image href="{{ .ImageURL }}" src="{{ .ImageURL }}"/></mj-column></mj-section>
+<mj-raw>{{ end }}</mj-raw>
+
+<mj-raw>{{ if .EmbeddedImage }}</mj-raw>
+<mj-section><mj-column><mj-image src="cid:{{ .EmbeddedImage }}"/></mj-column></mj-section>
+<mj-raw>{{ end }}</mj-raw>

@@ -1,27 +1,11 @@
 <mj-section>
   <mj-column>
-    <!-- we show this only when we're using the default grouping (grafana_folder, alertname) -->
-    <mj-raw>
-      {{ if eq (.GroupLabels.SortedPairs.Names | join ",") "alertname,grafana_folder" }}
-    </mj-raw>
-    <mj-text>
-      <h2>{{ .GroupLabels.grafana_folder }} &rsaquo; {{ .GroupLabels.alertname }}</h2>
-    </mj-text>
-    <mj-raw>
-      {{ else if gt (len .GroupLabels.SortedPairs) 0 }}
-    </mj-raw>
-    <!-- non-default grouping labels are just printed verbatim, if we are grouping at all -->
-    <mj-text>
-      <mj-raw>
-        {{ range .GroupLabels.SortedPairs }}
-      </mj-raw>
-      {{ .Name }}={{ .Value }}
-      <mj-raw>
-        {{ end }}
-      </mj-raw>
-    </mj-text>
-    <mj-raw>
-      {{ end }}
-    </mj-raw>
+    <mj-raw>{{ if eq .GroupLabels.alertname "DatasourceError" }}</mj-raw>
+    <mj-text><h2>Query Error &mdash; {{ .CommonLabels.datasource_uid}}</h2></mj-text>
+    <mj-raw>{{ else if eq .GroupLabels.alertname "DatasourceNoData" }}</mj-raw>
+    <mj-text><h2>No Data &mdash; {{ .CommonLabels.datasource_uid}}</h2></mj-text>
+    <mj-raw>{{ else }}</mj-raw>
+    <mj-text><h2>{{ .GroupLabels.app }} &mdash; {{ .GroupLabels.alertname}}</h2></mj-text>
+    <mj-raw>{{ end }}</mj-raw>
   </mj-column>
 </mj-section>
