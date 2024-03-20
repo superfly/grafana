@@ -1,0 +1,17 @@
+<mj-section>
+  <mj-raw>{{ if .Labels.alertname | regexMatch "Datasource(Error|NoData)" }}</mj-raw>
+  <mj-column><mj-text><strong>{{ .Labels.rulename }}</strong></mj-text></mj-column>
+  <mj-column><mj-text><strong>{{ .Annotations.Error }}</strong></mj-text></mj-column>
+  <mj-raw>{{ if gt (len .GeneratorURL) 0 }}</mj-raw>
+  <mj-column><mj-button href="{{ .GeneratorURL }}">View alert</mj-button></mj-column>
+  <mj-raw>{{ end }}{{ else }}</mj-raw>
+
+  <mj-column><mj-table>
+  <mj-raw>{{ range $k, $v := .Values }}</mj-raw>
+  <tr><td><strong>{{ $k }}</strong></td><td>{{ $v }}</td></tr>
+  <mj-raw>{{ end }}</mj-raw>
+  </mj-table></mj-column>
+
+  <mj-raw>{{ end }}</mj-raw>
+  <mj-column><mj-text>[{{ ago .StartsAt }}]</mj-text></mj-column>
+</mj-section>
