@@ -63,7 +63,7 @@ require (
 	github.com/grafana/cuetsy v0.1.11 // @grafana/grafana-as-code
 	github.com/grafana/grafana-aws-sdk v0.23.1 // @grafana/aws-datasources
 	github.com/grafana/grafana-azure-sdk-go v1.12.0 // @grafana/partner-datasources
-	github.com/grafana/grafana-plugin-sdk-go v0.211.0 // @grafana/plugins-platform-backend
+	github.com/grafana/grafana-plugin-sdk-go v0.212.0 // @grafana/plugins-platform-backend
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0 // @grafana/backend-platform
 	github.com/hashicorp/go-hclog v1.6.2 // @grafana/plugins-platform-backend
 	github.com/hashicorp/go-plugin v1.6.0 // @grafana/plugins-platform-backend
@@ -520,3 +520,5 @@ replace xorm.io/xorm => ./pkg/util/xorm
 replace github.com/prometheus/alertmanager => github.com/grafana/prometheus-alertmanager v0.25.1-0.20240208102907-e82436ce63e6
 
 exclude github.com/mattn/go-sqlite3 v2.0.3+incompatible
+
+replace github.com/grafana/alerting => github.com/wjordan/grafana-alerting v0.0.0-20240221201508-8baf5f125bd4

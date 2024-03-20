@@ -135,6 +135,15 @@ export class GrafanaBootConfig implements GrafanaConfig {
     minInterval: '',
     alertStateHistoryBackend: undefined,
     alertStateHistoryPrimary: undefined,
+    externalAlertingEnabled: false, //true,
+    defaultGroup: 'test', //'',
+    defaultFolder: null,
+    defaultNoDataState: 'OK', //'NoData',
+    defaultExecErrState: 'Error',
+    defaultEvaluateEvery: '1m',
+    defaultEvaluateFor: '0s', //'5m',
+    defaultAnnotationKeys: ['summary'], //, 'description', 'runbookURL'],
+    defaultLabelKeys: ['']
   };
   applicationInsightsConnectionString?: string;
   applicationInsightsEndpointUrl?: string;

@@ -83,6 +83,15 @@ type FrontendSettingsUnifiedAlertingDTO struct {
 	MinInterval              string `json:"minInterval"`
 	AlertStateHistoryBackend string `json:"alertStateHistoryBackend,omitempty"`
 	AlertStateHistoryPrimary string `json:"alertStateHistoryPrimary,omitempty"`
+	ExternalAlertingEnabled bool                   `json:"defaultExternalEnabled"`
+	DefaultGroup            string                 `json:"DefaultGroup"`
+	DefaultFolder           map[string]interface{} `json:"defaultFolder"`
+	DefaultNoDataState      string                 `json:"defaultNoDataState"`
+	DefaultExecErrState     string                 `json:"hs.Cfg.UnifiedAlerting.DefaultExecutionErrorState"`
+	DefaultEvaluateEvery    string                 `json:"defaultEvaluateEvery"`
+	DefaultEvaluateFor      string                 `json:"defaultEvaluateFor"`
+	DefaultAnnotationKeys   []string               `json:"defaultAnnotationKeys"`
+	DefaultLabelKeys        []string               `json:"defaultLabelKeys"`
 }
 
 // Enterprise-only

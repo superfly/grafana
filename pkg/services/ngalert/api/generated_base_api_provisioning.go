@@ -138,7 +138,7 @@ func (f *ProvisioningApiHandler) RouteGetTemplates(ctx *contextmodel.ReqContext)
 }
 func (f *ProvisioningApiHandler) RoutePostAlertRule(ctx *contextmodel.ReqContext) response.Response {
 	// Parse Request Body
-	conf := apimodels.ProvisionedAlertRule{}
+	conf := apimodels.ProvisionedAlertRule{Provenance: "api"}
 	if err := web.Bind(ctx.Req, &conf); err != nil {
 		return response.Error(http.StatusBadRequest, "bad request data", err)
 	}
@@ -164,7 +164,7 @@ func (f *ProvisioningApiHandler) RoutePutAlertRule(ctx *contextmodel.ReqContext)
 	// Parse Path Parameters
 	uIDParam := web.Params(ctx.Req)[":UID"]
 	// Parse Request Body
-	conf := apimodels.ProvisionedAlertRule{}
+	conf := apimodels.ProvisionedAlertRule{Provenance: "api"}
 	if err := web.Bind(ctx.Req, &conf); err != nil {
 		return response.Error(http.StatusBadRequest, "bad request data", err)
 	}

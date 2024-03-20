@@ -278,7 +278,16 @@ func (hs *HTTPServer) getFrontendSettings(c *contextmodel.ReqContext) (*dtos.Fro
 		},
 
 		UnifiedAlerting: dtos.FrontendSettingsUnifiedAlertingDTO{
-			MinInterval: hs.Cfg.UnifiedAlerting.MinInterval.String(),
+			MinInterval:             hs.Cfg.UnifiedAlerting.MinInterval.String(),
+			ExternalAlertingEnabled: hs.Cfg.UnifiedAlerting.DefaultExternalEnabled,
+			DefaultGroup:            hs.Cfg.UnifiedAlerting.DefaultGroup,
+			DefaultFolder:           map[string]interface{}{"title": hs.Cfg.UnifiedAlerting.DefaultFolder},
+			DefaultNoDataState:      hs.Cfg.UnifiedAlerting.DefaultNoDataState,
+			DefaultExecErrState:     hs.Cfg.UnifiedAlerting.DefaultExecutionErrorState,
+			DefaultEvaluateEvery:    hs.Cfg.UnifiedAlerting.DefaultEvaluateEvery.String(),
+			DefaultEvaluateFor:      hs.Cfg.UnifiedAlerting.DefaultEvaluateFor.String(),
+			DefaultAnnotationKeys:   hs.Cfg.UnifiedAlerting.DefaultAnnotationKeys,
+			DefaultLabelKeys:        hs.Cfg.UnifiedAlerting.DefaultLabelKeys,
 		},
 
 		Oauth:                   hs.getEnabledOAuthProviders(),

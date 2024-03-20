@@ -13,7 +13,7 @@ func (s Series) Resample(refID string, interval time.Duration, downsampler strin
 	if newSeriesLength <= 0 {
 		return s, fmt.Errorf("the series cannot be sampled further; the time range is shorter than the interval")
 	}
-	resampled := NewSeries(refID, s.GetLabels(), newSeriesLength+1)
+	resampled := NewSeries(s.GetName(), refID, s.GetLabels(), newSeriesLength+1)
 	bookmark := 0
 	var lastSeen *float64
 	idx := 0

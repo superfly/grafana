@@ -66,6 +66,19 @@ export interface UnifiedAlertingConfig {
   alertStateHistoryBackend?: string;
   // will be undefined if implementation is not "multiple"
   alertStateHistoryPrimary?: string;
+  externalAlertingEnabled: boolean;
+  defaultGroup: string;
+  defaultFolder: {
+    title: string;
+    id: number;
+  } | null;
+  defaultNoDataState: string;
+  defaultExecErrState: string;
+  defaultEvaluateEvery: string;
+  defaultEvaluateFor: string;
+  hideFlowChart: boolean;
+  defaultAnnotationKeys: string[];
+  defaultLabelKeys: string[];
 }
 
 /** Supported OAuth services

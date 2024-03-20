@@ -23,19 +23,16 @@ func extractEvalString(frame *data.Frame) (s string) {
 		sb := strings.Builder{}
 
 		for i, m := range evalMatches {
-			sb.WriteString("[ ")
-			sb.WriteString(fmt.Sprintf("var='%s%v' ", frame.RefID, i))
-			sb.WriteString(fmt.Sprintf("metric='%s' ", m.Metric))
-			sb.WriteString(fmt.Sprintf("labels={%s} ", m.Labels))
-
 			valString := "null"
 			if m.Value != nil {
-				valString = fmt.Sprintf("%v", *m.Value)
+				if *m.Value == float64(int64(*m.Value)) {
+					valString = fmt.Sprintf("%d", int64(*m.Value))
+				} else {
+					valString = fmt.Sprintf("%.3f", *m.Value)
+				}
 			}
+			sb.WriteString(fmt.Sprintf("%s=%s", m.Metric, valString))
 
-			sb.WriteString(fmt.Sprintf("value=%v ", valString))
-
-			sb.WriteString("]")
 			if i < len(evalMatches)-1 {
 				sb.WriteString(", ")
 			}
@@ -49,18 +46,17 @@ func extractEvalString(frame *data.Frame) (s string) {
 			return captures[i].Var < captures[j].Var
 		})
 		sb := strings.Builder{}
-		for i, capture := range captures {
-			sb.WriteString("[ ")
-			sb.WriteString(fmt.Sprintf("var='%s' ", capture.Var))
-			sb.WriteString(fmt.Sprintf("labels={%s} ", capture.Labels))
-			valString := "null"
-			if capture.Value != nil {
-				valString = fmt.Sprintf("%v", *capture.Value)
-			}
-			sb.WriteString(fmt.Sprintf("value=%v ", valString))
-			sb.WriteString("]")
-			if i < len(captures)-1 {
-				sb.WriteString(", ")
+		for _, capture := range captures {
+			if capture.Var == frame.RefID {
+				valString := "null"
+				if capture.Value != nil {
+					if *capture.Value == float64(int64(*capture.Value)) {
+						valString = fmt.Sprintf("%d", int64(*capture.Value))
+					} else {
+						valString = fmt.Sprintf("%.3f", *capture.Value)
+					}
+				}
+				sb.WriteString(fmt.Sprintf("%s=%s", capture.Metric, valString))
 			}
 		}
 		return sb.String()
@@ -68,9 +64,8 @@ func extractEvalString(frame *data.Frame) (s string) {
 	return ""
 }
 
-// extractValues returns the RefID and value for all classic conditions, reduce, and math expressions in the frame.
-// For classic conditions the same refID can have multiple values due to multiple conditions, for them we use the index of
-// the condition in addition to the refID to distinguish between different values.
+// extractValues returns the metric name and value for the result expression in the frame.
+// For classic conditions the same metric name can have multiple values due to multiple conditions.
 // It returns nil if there are no results in the frame.
 func extractValues(frame *data.Frame) map[string]NumberValueCapture {
 	if frame == nil {
@@ -81,17 +76,22 @@ func extractValues(frame *data.Frame) map[string]NumberValueCapture {
 	}
 
 	if matches, ok := frame.Meta.Custom.([]classic.EvalMatch); ok {
-		// Classic evaluations only have a single match but it can contain multiple conditions.
-		// Conditions have a strict ordering which we can rely on to distinguish between values.
+		// Classic evaluations only have a single match but can contain multiple conditions.
+		// Conditions have a strict ordering which we can rely on to distinguish between values,
+		// in the case of duplicate names.
 		v := make(map[string]NumberValueCapture, len(matches))
 		for i, match := range matches {
-			// In classic conditions we use refID and the condition position as a way to distinguish between values.
+			// In classic conditions we can use the condition position as a suffix to distinguish between duplicate names.
 			// We can guarantee determinism as conditions are ordered and this order is preserved when marshaling.
-			refID := fmt.Sprintf("%s%d", frame.RefID, i)
-			v[refID] = NumberValueCapture{
+			metric := match.Metric
+			if _, ok := v[metric]; ok {
+				metric += fmt.Sprintf(" [%d]", i)
+			}
+			v[metric] = NumberValueCapture{
 				Var:    frame.RefID,
 				Labels: match.Labels,
 				Value:  match.Value,
+				Metric: match.Metric,
 			}
 		}
 		return v
@@ -100,7 +100,9 @@ func extractValues(frame *data.Frame) map[string]NumberValueCapture {
 	if captures, ok := frame.Meta.Custom.([]NumberValueCapture); ok {
 		v := make(map[string]NumberValueCapture, len(captures))
 		for _, capture := range captures {
-			v[capture.Var] = capture
+			if capture.Var == frame.RefID {
+				v[capture.Metric] = capture
+			}
 		}
 		return v
 	}

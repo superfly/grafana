@@ -49,6 +49,7 @@ import { getDefaultOrFirstCompatibleDataSource, GRAFANA_RULES_SOURCE_NAME, isGra
 import { arrayToRecord, recordToArray } from './misc';
 import { isAlertingRulerRule, isGrafanaRulerRule, isRecordingRulerRule } from './rules';
 import { parseInterval } from './time';
+import { config } from '@grafana/runtime';
 
 export type PromOrLokiQuery = PromQuery | LokiQuery;
 
@@ -62,21 +63,23 @@ export const getDefaultFormValues = (): RuleFormValues => {
   return Object.freeze({
     name: '',
     uid: '',
-    labels: [{ key: '', value: '' }],
-    annotations: defaultAnnotations,
+    labels: config.unifiedAlerting.defaultLabelKeys
+      .map(key => {return {key: key, value: ''}}),
+    annotations: config.unifiedAlerting.defaultAnnotationKeys
+      .map(key => {return {key: Annotation[key] || key, value: ''}}),
     dataSourceName: null,
     type: canCreateGrafanaRules ? RuleFormType.grafana : canCreateCloudRules ? RuleFormType.cloudAlerting : undefined, // viewers can't create prom alerts
-    group: '',
+    group: config.unifiedAlerting.defaultGroup,
 
     // grafana
-    folder: null,
+    folder: config.unifiedAlerting.defaultFolder,
     queries: [],
     recordingRulesQueries: [],
     condition: '',
-    noDataState: GrafanaAlertStateDecision.NoData,
-    execErrState: GrafanaAlertStateDecision.Error,
-    evaluateFor: '5m',
-    evaluateEvery: MINUTE,
+    noDataState: GrafanaAlertStateDecision[config.unifiedAlerting.defaultNoDataState],
+    execErrState: GrafanaAlertStateDecision[config.unifiedAlerting.defaultExecErrState],
+    evaluateFor: config.unifiedAlerting.defaultEvaluateFor,
+    evaluateEvery: config.unifiedAlerting.defaultEvaluateEvery,
     manualRouting: getDefautManualRouting(), // we default to true if the feature toggle is enabled and the user hasn't set local storage to false
     contactPoints: {},
     overrideGrouping: false,

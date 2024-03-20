@@ -2532,6 +2532,8 @@ github.com/grafana/grafana-openapi-client-go v0.0.0-20231213163343-bd475d63fb79/
 github.com/grafana/grafana-plugin-sdk-go v0.114.0/go.mod h1:D7x3ah+1d4phNXpbnOaxa/osSaZlwh9/ZUnGGzegRbk=
 github.com/grafana/grafana-plugin-sdk-go v0.211.0 h1:hYtieOoYvsv/BcFbtspml4OzfuYrv1d14nESdf13qxQ=
 github.com/grafana/grafana-plugin-sdk-go v0.211.0/go.mod h1:qsI4ktDf0lig74u8SLPJf9zRdVxWV/W4Wi+Ox6gifgs=
+github.com/grafana/grafana-plugin-sdk-go v0.212.0 h1:ohgMktFAasLTzAhKhcIzk81O60E29Za6ly02GhEqGIU=
+github.com/grafana/grafana-plugin-sdk-go v0.212.0/go.mod h1:qsI4ktDf0lig74u8SLPJf9zRdVxWV/W4Wi+Ox6gifgs=
 github.com/grafana/kindsys v0.0.0-20230508162304-452481b63482 h1:1YNoeIhii4UIIQpCPU+EXidnqf449d0C3ZntAEt4KSo=
 github.com/grafana/kindsys v0.0.0-20230508162304-452481b63482/go.mod h1:GNcfpy5+SY6RVbNGQW264gC0r336Dm+0zgQ5vt6+M8Y=
 github.com/grafana/prometheus-alertmanager v0.25.1-0.20240208102907-e82436ce63e6 h1:CBm0rwLCPDyarg9/bHJ50rBLYmyMDoyCWpgRMITZhdA=
@@ -3618,6 +3620,8 @@ github.com/vectordotdev/go-datemath v0.1.1-0.20220323213446-f3954d0b18ae h1:oyiy
 github.com/vectordotdev/go-datemath v0.1.1-0.20220323213446-f3954d0b18ae/go.mod h1:PnwzbSst7KD3vpBzzlntZU5gjVa455Uqa5QPiKSYJzQ=
 github.com/vultr/govultr/v2 v2.17.2 h1:gej/rwr91Puc/tgh+j33p/BLR16UrIPnSr+AIwYWZQs=
 github.com/vultr/govultr/v2 v2.17.2/go.mod h1:ZFOKGWmgjytfyjeyAdhQlSWwTjh2ig+X49cAp50dzXI=
+github.com/wjordan/grafana-alerting v0.0.0-20240221201508-8baf5f125bd4 h1:/tV7GeTIPBxEs7FHydb+lu8xriLb7V9uYeUmXmrJ5F0=
+github.com/wjordan/grafana-alerting v0.0.0-20240221201508-8baf5f125bd4/go.mod h1:brTFeACal/cSZAR8XO/4LPKs7rzNfS86okl6QjSP1eY=
 github.com/wk8/go-ordered-map v1.0.0 h1:BV7z+2PaK8LTSd/mWgY12HyMAo5CEgkHqbkVq2thqr8=
 github.com/wk8/go-ordered-map v1.0.0/go.mod h1:9ZIbRunKbuvfPKyBP1SIKLcXNlv74YCOZ3t3VTS6gRk=
 github.com/xanzy/go-gitlab v0.15.0/go.mod h1:8zdQa/ri1dfn8eS3Ir1SyfvOKlw7WBJ8DVThkpGiXrs=

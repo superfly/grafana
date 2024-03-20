@@ -141,7 +141,7 @@ func (e *State) walkUnary(node *parse.UnaryNode) (Results, error) {
 }
 
 func (e *State) unarySeries(s Series, op string) (Series, error) {
-	newSeries := NewSeries(e.RefID, s.GetLabels(), s.Len())
+	newSeries := NewSeries(s.GetName(), e.RefID, s.GetLabels(), s.Len())
 	for i := 0; i < s.Len(); i++ {
 		t, f := s.GetPoint(i)
 		if f == nil {
@@ -158,7 +158,7 @@ func (e *State) unarySeries(s Series, op string) (Series, error) {
 }
 
 func (e *State) unaryNumber(n Number, op string) (Number, error) {
-	newNumber := NewNumber(e.RefID, n.GetLabels())
+	newNumber := NewNumber(n.GetName(), n.GetLabels())
 
 	f := n.GetFloat64Value()
 	if f != nil {
@@ -398,13 +398,15 @@ func (e *State) walkBinary(node *parse.BinaryNode) (Results, error) {
 
 // binaryOp performs a binary operations (e.g. A+B or A>B) on two
 // float values
+// 'False' expressions are cast to 0.
+// 'True' expressions retain the value of the left operand (e.g. A).
 // nolint:gocyclo
 func binaryOp(op string, a, b float64) (r float64, err error) {
 	// Test short circuit before NaN.
 	switch op {
 	case "||":
 		if a != 0 {
-			return 1, nil
+			return a, nil
 		}
 	case "&&":
 		if a == 0 {
@@ -429,49 +431,51 @@ func binaryOp(op string, a, b float64) (r float64, err error) {
 		r = math.Mod(a, b)
 	case "==":
 		if a == b {
-			r = 1
+			r = a
 		} else {
 			r = 0
 		}
 	case ">":
 		if a > b {
-			r = 1
+			r = a
 		} else {
 			r = 0
 		}
 	case "!=":
 		if a != b {
-			r = 1
+			r = a
 		} else {
 			r = 0
 		}
 	case "<":
 		if a < b {
-			r = 1
+			r = a
 		} else {
 			r = 0
 		}
 	case ">=":
 		if a >= b {
-			r = 1
+			r = a
 		} else {
 			r = 0
 		}
 	case "<=":
 		if a <= b {
-			r = 1
+			r = a
 		} else {
 			r = 0
 		}
 	case "||":
-		if a != 0 || b != 0 {
-			r = 1
+		if a != 0 {
+			r = a
+		} else if b != 0 {
+			r = b
 		} else {
 			r = 0
 		}
 	case "&&":
 		if a != 0 && b != 0 {
-			r = 1
+			r = a
 		} else {
 			r = 0
 		}
@@ -482,7 +486,7 @@ func binaryOp(op string, a, b float64) (r float64, err error) {
 }
 
 func (e *State) biScalarNumber(labels data.Labels, op string, number Number, scalarVal *float64, numberFirst bool) (Number, error) {
-	newNumber := NewNumber(e.RefID, labels)
+	newNumber := NewNumber(number.GetName(), labels)
 	f := number.GetFloat64Value()
 	if f == nil || scalarVal == nil {
 		newNumber.SetValue(nil)
@@ -503,7 +507,7 @@ func (e *State) biScalarNumber(labels data.Labels, op string, number Number, sca
 }
 
 func (e *State) biSeriesNumber(labels data.Labels, op string, s Series, scalarVal *float64, seriesFirst bool) (Series, error) {
-	newSeries := NewSeries(e.RefID, labels, s.Len())
+	newSeries := NewSeries(s.GetName(), e.RefID, labels, s.Len())
 	var err error
 	for i := 0; i < s.Len(); i++ {
 		nF := math.NaN()
@@ -535,7 +539,7 @@ func (e *State) biSeriesSeries(labels data.Labels, op string, aSeries, bSeries S
 		bPoints[t.UTC().String()] = f
 	}
 
-	newSeries := NewSeries(e.RefID, labels, 0)
+	newSeries := NewSeries(fmt.Sprintf("%s %s %s", aSeries.GetName(), op, bSeries.GetName()), e.RefID, labels, 0)
 	for aIdx := 0; aIdx < aSeries.Len(); aIdx++ {
 		aTime, aF := aSeries.GetPoint(aIdx)
 		bF, ok := bPoints[aTime.UTC().String()]

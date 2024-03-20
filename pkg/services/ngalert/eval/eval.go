@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/grafana/grafana/pkg/expr/mathexp"
 	"runtime/debug"
 	"sort"
 	"strconv"
@@ -395,14 +396,15 @@ type NumberValueCapture struct {
 	Var    string // RefID
 	Labels data.Labels
 
-	Value *float64
+	Value  *float64
+	Metric string
 }
 
 //nolint:gocyclo
 func queryDataResponseToExecutionResults(c models.Condition, execResp *backend.QueryDataResponse) ExecutionResults {
 	// captures contains the values of all instant queries and expressions for each dimension
 	captures := make(map[string]map[data.Fingerprint]NumberValueCapture)
-	captureFn := func(refID string, labels data.Labels, value *float64) {
+	captureFn := func(refID string, labels data.Labels, name string, value *float64) {
 		m := captures[refID]
 		if m == nil {
 			m = make(map[data.Fingerprint]NumberValueCapture)
@@ -412,6 +414,7 @@ func queryDataResponseToExecutionResults(c models.Condition, execResp *backend.Q
 			Var:    refID,
 			Value:  value,
 			Labels: labels.Copy(),
+			Metric: name,
 		}
 		captures[refID] = m
 	}
@@ -460,16 +463,16 @@ func queryDataResponseToExecutionResults(c models.Condition, execResp *backend.Q
 		}
 
 		// for each frame within each response, the response can contain several data types including time-series data.
-		// For now, we favour simplicity and only care about single scalar values.
 		for _, frame := range res.Frames {
 			if len(frame.Fields) != 1 || frame.Fields[0].Type() != data.FieldTypeNullableFloat64 {
+				if series, err := mathexp.SeriesFromFrame(frame); err == nil {
+					// Capture nil value for time series data that contains multiple values.
+					captureFn(frame.RefID, series.GetLabels(), series.GetName(), nil)
+				}
 				continue
 			}
-			var v *float64
-			if frame.Fields[0].Len() == 1 {
-				v = frame.At(0, 0).(*float64) // type checked above
-			}
-			captureFn(frame.RefID, frame.Fields[0].Labels, v)
+			number := mathexp.Number{Frame: frame}
+			captureFn(frame.RefID, number.GetLabels(), number.GetName(), number.GetFloat64Value())
 		}
 
 		if refID == c.Condition {

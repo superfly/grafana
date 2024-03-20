@@ -1,5 +1,6 @@
 import { css } from '@emotion/css';
 import React, { useMemo } from 'react';
+import {config} from '@grafana/runtime';
 
 import { GrafanaTheme2, SelectableValue } from '@grafana/data';
 import { InlineField, Select, useStyles2 } from '@grafana/ui';
@@ -30,29 +31,33 @@ export const AlertManagerPicker = ({ disabled = false }: Props) => {
   }, [availableAlertManagers]);
 
   return (
-    <InlineField
-      className={styles.field}
-      label={disabled ? 'Alertmanager' : 'Choose Alertmanager'}
-      disabled={disabled || options.length === 1}
-      data-testid="alertmanager-picker"
-    >
-      <Select
-        aria-label={disabled ? 'Alertmanager' : 'Choose Alertmanager'}
-        width={29}
-        className="ds-picker select-container"
-        backspaceRemovesValue={false}
-        onChange={(value) => {
-          if (value?.value) {
-            setSelectedAlertmanager(value.value);
-          }
-        }}
-        options={options}
-        maxMenuHeight={500}
-        noOptionsMessage="No datasources found"
-        value={selectedAlertmanager}
-        getOptionLabel={(o) => o.label}
-      />
-    </InlineField>
+    <>
+      {config.unifiedAlerting.externalAlertingEnabled && (
+        <InlineField
+          className={styles.field}
+          label={disabled ? 'Alertmanager' : 'Choose Alertmanager'}
+          disabled={disabled || options.length === 1}
+          data-testid="alertmanager-picker"
+        >
+          <Select
+            aria-label={disabled ? 'Alertmanager' : 'Choose Alertmanager'}
+            width={29}
+            className="ds-picker select-container"
+            backspaceRemovesValue={false}
+            onChange={(value) => {
+              if (value?.value) {
+                setSelectedAlertmanager(value.value);
+              }
+            }}
+            options={options}
+            maxMenuHeight={500}
+            noOptionsMessage="No datasources found"
+            value={selectedAlertmanager}
+            getOptionLabel={(o) => o.label}
+          />
+        </InlineField>
+      )}
+    </>
   );
 };
 

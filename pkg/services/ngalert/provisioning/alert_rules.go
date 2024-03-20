@@ -394,7 +394,9 @@ func (service *AlertRuleService) UpdateAlertRule(ctx context.Context, rule model
 	if err != nil {
 		return models.AlertRule{}, err
 	}
-	if storedProvenance != provenance && storedProvenance != models.ProvenanceNone {
+	if storedProvenance != provenance &&
+		storedProvenance != models.ProvenanceNone &&
+		storedProvenance != models.ProvenanceAPI {
 		return models.AlertRule{}, fmt.Errorf("cannot change provenance from '%s' to '%s'", storedProvenance, provenance)
 	}
 	if len(rule.NotificationSettings) > 0 {

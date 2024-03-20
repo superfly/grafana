@@ -129,10 +129,10 @@ FIELDS:
 }
 
 // NewSeries returns a dataframe of type Series.
-func NewSeries(refID string, labels data.Labels, size int) Series {
+func NewSeries(name string, refID string, labels data.Labels, size int) Series {
 	fields := make([]*data.Field, 2)
 	fields[seriesTypeTimeIdx] = data.NewField("Time", nil, make([]time.Time, size))
-	fields[seriesTypeValIdx] = data.NewField(refID, labels, make([]*float64, size))
+	fields[seriesTypeValIdx] = data.NewField(name, labels, make([]*float64, size))
 	frame := data.NewFrame("", fields...)
 	frame.RefID = refID
 	frame.Meta = &data.FrameMeta{
@@ -187,7 +187,9 @@ func (s Series) GetLabels() data.Labels { return s.Frame.Fields[seriesTypeValIdx
 
 func (s Series) SetLabels(ls data.Labels) { s.Frame.Fields[seriesTypeValIdx].Labels = ls }
 
-func (s Series) GetName() string { return s.Frame.Fields[seriesTypeValIdx].Name }
+func (s Series) GetName() string {
+	return getFieldDisplayName(s.Frame, s.Frame.Fields[seriesTypeValIdx])
+}
 
 func (s Series) GetMeta() any {
 	return s.Frame.Meta.Custom
