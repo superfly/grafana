@@ -221,9 +221,9 @@ describe('getDefautManualRouting', () => {
     expect(getDefautManualRouting()).toBe(false);
   });
 
-  it('returns true if the feature toggle is enabled and localStorage is not set', () => {
+  it('returns false if the feature toggle is enabled and localStorage is not set', () => {
     config.featureToggles.alertingSimplifiedRouting = true;
-    expect(getDefautManualRouting()).toBe(true);
+    expect(getDefautManualRouting()).toBe(false);
   });
 
   it('returns false if the feature toggle is enabled and localStorage is set to "false"', () => {

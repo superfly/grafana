@@ -6,7 +6,6 @@ import { GrafanaTheme2, SelectableValue } from '@grafana/data';
 import {
   Field,
   Icon,
-  IconButton,
   Input,
   InputControl,
   Label,
@@ -132,7 +131,10 @@ function FolderGroupAndEvaluationInterval({
       <FolderAndGroup
         groupfoldersForGrafana={groupfoldersForGrafana?.result}
         enableProvisionedGroups={enableProvisionedGroups}
+        disabled={editGroupDisabled}
+        editGroup={onOpenEditGroupModal}
       />
+
       {folderName && isEditingGroup && (
         <EditCloudGroupModal
           namespace={existingNamespace ?? emptyNamespace}
@@ -142,7 +144,7 @@ function FolderGroupAndEvaluationInterval({
           hideFolder={true}
         />
       )}
-      {folderName && groupName && (
+      {/*folderName && groupName && (
         <div className={styles.evaluationContainer}>
           <Stack direction="column" gap={0}>
             <div className={styles.marginTop}>
@@ -164,7 +166,7 @@ function FolderGroupAndEvaluationInterval({
             </div>
           </Stack>
         </div>
-      )}
+      )*/}
     </div>
   );
 }
@@ -184,7 +186,7 @@ function ForInput({ evaluateEvery }: { evaluateEvery: string }) {
         label={
           <Label
             htmlFor="evaluateFor"
-            description="Period in which an alert rule can be in breach of the condition until the alert rule fires."
+            // description="Period in which an alert rule can be in breach of the condition until the alert rule fires."
           >
             Pending period
           </Label>
@@ -272,11 +274,11 @@ export function GrafanaEvaluationBehavior({
           </Field>
         )}
       </Stack>
-      <CollapseToggle
+      {/*<CollapseToggle
         isCollapsed={!showErrorHandling}
         onToggle={(collapsed) => setShowErrorHandling(!collapsed)}
         text="Configure no data and error handling"
-      />
+      />*/}
       {showErrorHandling && (
         <>
           <Field htmlFor="no-data-state-input" label="Alert state if no data or all values are null">

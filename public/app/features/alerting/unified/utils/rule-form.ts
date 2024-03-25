@@ -81,7 +81,18 @@ export const getDefaultFormValues = (): RuleFormValues => {
     evaluateFor: config.unifiedAlerting.defaultEvaluateFor,
     evaluateEvery: config.unifiedAlerting.defaultEvaluateEvery,
     manualRouting: getDefautManualRouting(), // we default to true if the feature toggle is enabled and the user hasn't set local storage to false
-    contactPoints: {},
+    contactPoints: {
+      "grafana": {
+        selectedContactPoint: "grafana-default-email",
+        overrideGrouping: false,
+        overrideTimings: false,
+        groupBy: [],
+        groupIntervalValue: "",
+        groupWaitValue: "",
+        muteTimeIntervals: [],
+        repeatIntervalValue: ""
+      }
+    },
     overrideGrouping: false,
     overrideTimings: false,
     muteTimeIntervals: [],
@@ -264,7 +275,7 @@ export function rulerRuleToFormValues(ruleWithLocation: RuleWithLocation): RuleF
         queries: ga.data,
         condition: ga.condition,
         annotations: normalizeDefaultAnnotations(listifyLabelsOrAnnotations(rule.annotations, false)),
-        labels: listifyLabelsOrAnnotations(rule.labels, true),
+        labels: listifyLabelsOrAnnotations(rule.labels, false),
         folder: { title: namespace, uid: ga.namespace_uid },
         isPaused: ga.is_paused,
 
@@ -467,18 +478,18 @@ const getDefaultExpressions = (...refIds: [string, string]): AlertQuery[] => {
   };
 
   return [
-    {
-      refId: refOne,
-      datasourceUid: ExpressionDatasourceUID,
-      queryType: '',
-      model: reduceExpression,
-    },
-    {
-      refId: refTwo,
-      datasourceUid: ExpressionDatasourceUID,
-      queryType: '',
-      model: thresholdExpression,
-    },
+    // {
+    //   refId: refOne,
+    //   datasourceUid: ExpressionDatasourceUID,
+    //   queryType: '',
+    //   model: reduceExpression,
+    // },
+    // {
+    //   refId: refTwo,
+    //   datasourceUid: ExpressionDatasourceUID,
+    //   queryType: '',
+    //   model: thresholdExpression,
+    // },
   ];
 };
 

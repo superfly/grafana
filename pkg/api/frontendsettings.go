@@ -162,6 +162,17 @@ func (hs *HTTPServer) getFrontendSettings(c *contextmodel.ReqContext) (*dtos.Fro
 	secretsManagerPluginEnabled := kvstore.EvaluateRemoteSecretsPlugin(c.Req.Context(), hs.secretsPluginManager, hs.Cfg) == nil
 	trustedTypesDefaultPolicyEnabled := (hs.Cfg.CSPEnabled && strings.Contains(hs.Cfg.CSPTemplate, "require-trusted-types-for")) || (hs.Cfg.CSPReportOnlyEnabled && strings.Contains(hs.Cfg.CSPReportOnlyTemplate, "require-trusted-types-for"))
 
+	defaultFolder := map[string]interface{}{}
+	alertingFolder, err := hs.folderService.Get(c.Req.Context(), &folder.GetFolderQuery{
+		Title:        &hs.Cfg.UnifiedAlerting.DefaultFolder,
+		OrgID:        c.OrgID,
+		SignedInUser: c.SignedInUser,
+	})
+	if err == nil {
+		defaultFolder["title"] = alertingFolder.Title
+		defaultFolder["uid"] = alertingFolder.UID
+	}
+
 	frontendSettings := &dtos.FrontendSettingsDTO{
 		DefaultDatasource:                   defaultDS,
 		Datasources:                         dataSources,
@@ -281,7 +292,7 @@ func (hs *HTTPServer) getFrontendSettings(c *contextmodel.ReqContext) (*dtos.Fro
 			MinInterval:             hs.Cfg.UnifiedAlerting.MinInterval.String(),
 			ExternalAlertingEnabled: hs.Cfg.UnifiedAlerting.DefaultExternalEnabled,
 			DefaultGroup:            hs.Cfg.UnifiedAlerting.DefaultGroup,
-			DefaultFolder:           map[string]interface{}{"title": hs.Cfg.UnifiedAlerting.DefaultFolder},
+			DefaultFolder:           defaultFolder,
 			DefaultNoDataState:      hs.Cfg.UnifiedAlerting.DefaultNoDataState,
 			DefaultExecErrState:     hs.Cfg.UnifiedAlerting.DefaultExecutionErrorState,
 			DefaultEvaluateEvery:    hs.Cfg.UnifiedAlerting.DefaultEvaluateEvery.String(),

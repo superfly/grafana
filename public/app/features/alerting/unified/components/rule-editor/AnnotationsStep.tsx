@@ -98,8 +98,8 @@ const AnnotationsStep = () => {
           Add more context in your notification messages.
         </Text>
         <NeedHelpInfo
-          contentText={`Annotations add metadata to provide more information on the alert in your alert notification messages. 
-          For example, add a Summary annotation to tell you which value caused the alert to fire or which server it happened on. 
+          contentText={`Annotations add metadata to provide more information on the alert in your alert notification messages.
+          For example, add a Summary annotation to tell you which value caused the alert to fire or which server it happened on.
           Annotations can contain a combination of text and template code.`}
           externalLink={docsLink}
           linkText={`Read about annotations`}
@@ -186,7 +186,7 @@ const AnnotationsStep = () => {
                 append({ key: '', value: '' });
               }}
             >
-              Add custom annotation
+              Custom annotation
             </Button>
             {!selectedDashboard && (
               <Button type="button" variant="secondary" icon="dashboard" onClick={() => setShowPanelSelector(true)}>

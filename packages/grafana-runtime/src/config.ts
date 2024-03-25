@@ -142,8 +142,8 @@ export class GrafanaBootConfig implements GrafanaConfig {
     defaultExecErrState: 'Error',
     defaultEvaluateEvery: '1m',
     defaultEvaluateFor: '0s', //'5m',
-    defaultAnnotationKeys: ['summary'], //, 'description', 'runbookURL'],
-    defaultLabelKeys: ['']
+    defaultAnnotationKeys: ['description'], //, 'summary', 'runbookURL'],
+    defaultLabelKeys: []
   };
   applicationInsightsConnectionString?: string;
   applicationInsightsEndpointUrl?: string;

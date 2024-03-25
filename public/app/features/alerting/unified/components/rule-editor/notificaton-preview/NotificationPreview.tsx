@@ -70,25 +70,6 @@ export const NotificationPreview = ({
   return (
     <Stack direction="column">
       <div className={styles.routePreviewHeaderRow}>
-        <div className={styles.previewHeader}>
-          <Text element="h5">Alert instance routing preview</Text>
-          {isLoading && previewUninitialized && (
-            <Text color="secondary" variant="bodySmall">
-              Loading...
-            </Text>
-          )}
-          {previewUninitialized ? (
-            <Text color="secondary" variant="bodySmall">
-              When you have your folder selected and your query and labels are configured, click &quot;Preview
-              routing&quot; to see the results here.
-            </Text>
-          ) : (
-            <Text color="secondary" variant="bodySmall">
-              Based on the labels added, alert instances are routed to the following notification policies. Expand each
-              notification policy below to view more details.
-            </Text>
-          )}
-        </div>
         <div className={styles.button}>
           <Button icon="sync" variant="secondary" type="button" onClick={onPreview} disabled={disabled}>
             Preview routing

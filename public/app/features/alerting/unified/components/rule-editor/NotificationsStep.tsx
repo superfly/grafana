@@ -56,21 +56,21 @@ export const NotificationsStep = ({ alertUid }: NotificationsStepProps) => {
       }
       fullWidth
     >
-      <LabelsField dataSourceName={dataSourceName} />
-      {shouldAllowSimplifiedRouting && (
+      {/*shouldAllowSimplifiedRouting && (
         <div className={styles.configureNotifications}>
           <Text element="h5">Notifications</Text>
           <Text variant="bodySmall" color="secondary">
             Select who should receive a notification when an alert rule fires.
           </Text>
         </div>
-      )}
+      )*/}
       {shouldAllowSimplifiedRouting ? ( // when simplified routing is enabled and is grafana rule
         <ManualAndAutomaticRouting alertUid={alertUid} />
       ) : // when simplified routing is not enabled, render the notification preview as we did before
       shouldRenderpreview ? (
         <AutomaticRooting alertUid={alertUid} />
       ) : null}
+      <LabelsField dataSourceName={dataSourceName} />
     </RuleEditorSection>
   );
 };
@@ -103,16 +103,16 @@ function ManualAndAutomaticRouting({ alertUid }: { alertUid?: string }) {
 
   return (
     <Stack direction="column">
-      <Stack direction="column">
+      {/*<Stack direction="column">
         <RadioButtonGroup
           options={routingOptions}
           value={manualRouting ? RoutingOptions.ContactPoint : RoutingOptions.NotificationPolicy}
           onChange={onRoutingOptionChange}
           className={styles.routingOptions}
         />
-      </Stack>
+      </Stack>*/}
 
-      <RoutingOptionDescription manualRouting={manualRouting} />
+      {/*<RoutingOptionDescription manualRouting={manualRouting} />*/}
 
       {manualRouting ? <SimplifiedRouting /> : <AutomaticRooting alertUid={alertUid} />}
     </Stack>

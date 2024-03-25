@@ -100,14 +100,14 @@ const AddButton: FC<{
 }> = ({ append, className }) => (
   <Button
     className={className}
-    icon="plus-circle"
+    icon="plus"
     type="button"
     variant="secondary"
     onClick={() => {
       append({ key: '', value: '' });
     }}
   >
-    Add label
+    Custom label
   </Button>
 );
 
@@ -280,19 +280,14 @@ const LabelsField: FC<Props> = ({ dataSourceName }) => {
 
   return (
     <div>
-      <Stack direction="column" gap={1}>
+      {/*<Stack direction="column" gap={1}>
         <Text element="h5">Labels</Text>
         <Stack direction={'row'} gap={1}>
           <Text variant="bodySmall" color="secondary">
-            Add labels to your rule to annotate your rules, ease searching, or route to a notification policy.
+            Add extra labels to customize routing to contact points.
           </Text>
-          <NeedHelpInfo
-            contentText="The dropdown only displays labels that you have previously used for alerts.
-            Select a label from the options below or type in a new one."
-            title="Labels"
-          />
         </Stack>
-      </Stack>
+      </Stack>*/}
       <div className={styles.labelsContainer}></div>
       {dataSourceName ? <LabelsWithSuggestions dataSourceName={dataSourceName} /> : <LabelsWithoutSuggestions />}
     </div>

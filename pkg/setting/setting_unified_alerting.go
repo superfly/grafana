@@ -59,12 +59,12 @@ const (
 	// with intervals that are not exactly divided by this number not to be evaluated
 	SchedulerBaseInterval = 10 * time.Second
 	// DefaultRuleEvaluationInterval indicates a default interval of for how long a rule should be evaluated to change state from Pending to Alerting
-	DefaultRuleEvaluationInterval = SchedulerBaseInterval * 6 // == 60 seconds
-	stateHistoryDefaultEnabled    = true
+	DefaultRuleEvaluationInterval      = SchedulerBaseInterval * 6 // == 60 seconds
+	stateHistoryDefaultEnabled         = true
 	alertingDefaultExternalEnabled     = true
-	alertingDefaultGroup       = ""
-	alertingDefaultFolder      = ""
-	alertingDefaultNoDataState = "NoData"
+	alertingDefaultGroup               = ""
+	alertingDefaultFolder              = ""
+	alertingDefaultNoDataState         = "NoData"
 	alertingDefaultExecutionErrorState = "Error"
 	alertingDefaultEvaluateEvery       = 1 * time.Minute
 	alertingDefaultEvaluateFor         = 1 * time.Minute
@@ -109,19 +109,19 @@ type UnifiedAlertingSettings struct {
 	RemoteAlertmanager            RemoteAlertmanagerSettings
 	Upgrade                       UnifiedAlertingUpgradeSettings
 	// MaxStateSaveConcurrency controls the number of goroutines (per rule) that can save alert state in parallel.
-	MaxStateSaveConcurrency   int
-	StatePeriodicSaveInterval time.Duration
-	RulesPerRuleGroupLimit    int64
-	DefaultExternalEnabled        bool
-	DefaultGroup       string
-	DefaultFolder      string
-	DefaultNoDataState string
-	DefaultExecutionErrorState    string
-	DefaultEvaluateEvery          time.Duration
-	DefaultEvaluateFor            time.Duration
-	DefaultHideFlowChart          bool
-	DefaultAnnotationKeys         []string
-	DefaultLabelKeys              []string
+	MaxStateSaveConcurrency    int
+	StatePeriodicSaveInterval  time.Duration
+	RulesPerRuleGroupLimit     int64
+	DefaultExternalEnabled     bool
+	DefaultGroup               string
+	DefaultFolder              string
+	DefaultNoDataState         string
+	DefaultExecutionErrorState string
+	DefaultEvaluateEvery       time.Duration
+	DefaultEvaluateFor         time.Duration
+	DefaultHideFlowChart       bool
+	DefaultAnnotationKeys      []string
+	DefaultLabelKeys           []string
 }
 
 // RemoteAlertmanagerSettings contains the configuration needed
@@ -475,8 +475,6 @@ func (cfg *Cfg) ReadUnifiedAlertingSettings(iniFile *ini.File) error {
 			labelKey = strings.TrimSpace(labelKey)
 			uaCfg.DefaultLabelKeys = append(uaCfg.DefaultLabelKeys, labelKey)
 		}
-	} else {
-		uaCfg.DefaultLabelKeys = append(uaCfg.DefaultLabelKeys, "")
 	}
 
 	cfg.UnifiedAlerting = uaCfg

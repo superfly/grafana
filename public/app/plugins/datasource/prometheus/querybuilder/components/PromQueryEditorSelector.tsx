@@ -157,7 +157,7 @@ export const PromQueryEditorSelector = React.memo<Props>((props) => {
             showExplain={explain}
           />
         )}
-        <PromQueryBuilderOptions query={query} app={props.app} onChange={onChange} onRunQuery={onRunQuery} />
+        {app !== CoreApp.UnifiedAlerting && <PromQueryBuilderOptions query={query} app={props.app} onChange={onChange} onRunQuery={onRunQuery} />}
       </EditorRows>
     </>
   );

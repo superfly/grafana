@@ -123,13 +123,13 @@ export const QueryWrapper = ({
     return (
       <Stack direction="row" alignItems="center" gap={1}>
         <SelectingDataSourceTooltip />
-        <QueryOptions
+        {/*<QueryOptions
           onChangeTimeRange={onChangeTimeRange}
           query={query}
           queryOptions={alertQueryOptions}
           onChangeQueryOptions={onChangeQueryOptions}
           index={index}
-        />
+        />*/}
         <ExpressionStatusIndicator onSetCondition={() => onSetCondition(query.refId)} isCondition={isAlertCondition} />
       </Stack>
     );
@@ -164,7 +164,7 @@ export const QueryWrapper = ({
           hideDisableQuery={true}
         />
       </div>
-      {showVizualisation && (
+      {showVizualisation && data && (
         <VizWrapper
           data={data}
           thresholds={thresholds}

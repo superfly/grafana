@@ -56,7 +56,7 @@ export const GrafanaRules = ({ namespaces, expandAll }: Props) => {
 
   return (
     <section className={styles.wrapper}>
-      <div className={styles.sectionHeader}>
+      {/*<div className={styles.sectionHeader}>
         <div className={styles.headerRow}>
           <h5>Grafana</h5>
           {loading ? <LoadingPlaceholder className={styles.loader} text="Loading..." /> : <div />}
@@ -73,7 +73,7 @@ export const GrafanaRules = ({ namespaces, expandAll }: Props) => {
             </Button>
           )}
         </div>
-      </div>
+      </div>*/}
 
       {pageItems.map(({ group, namespace }) => (
         <RulesGroup

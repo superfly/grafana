@@ -59,7 +59,7 @@ export function AlertManagerManualRouting({ alertManager }: AlertManagerManualRo
   }
   return (
     <Stack direction="column">
-      <Stack direction="row" alignItems="center">
+      {/*<Stack direction="row" alignItems="center">
         <div className={styles.firstAlertManagerLine}></div>
         <div className={styles.alertManagerName}>
           Alert manager:
@@ -67,7 +67,7 @@ export function AlertManagerManualRouting({ alertManager }: AlertManagerManualRo
           {alertManagerName}
         </div>
         <div className={styles.secondAlertManagerLine}></div>
-      </Stack>
+      </Stack>*/}
       <Stack direction="row" gap={1} alignItems="center">
         <ContactPointSelector
           alertManager={alertManagerName}
@@ -79,18 +79,16 @@ export function AlertManagerManualRouting({ alertManager }: AlertManagerManualRo
       {selectedContactPointWithMetadata?.grafana_managed_receiver_configs && (
         <ContactPointDetails receivers={selectedContactPointWithMetadata.grafana_managed_receiver_configs} />
       )}
-      <div className={styles.routingSection}>
-        <CollapsableSection
-          label="Muting, grouping and timings (optional)"
-          isOpen={hasRouteSettings}
-          className={styles.collapsableSection}
-        >
-          <Stack direction="column" gap={1}>
-            <MuteTimingFields alertManager={alertManagerName} />
-            <RoutingSettings alertManager={alertManagerName} />
-          </Stack>
-        </CollapsableSection>
-      </div>
+      <CollapsableSection
+        label="Override timings"
+        isOpen={hasRouteSettings}
+        className={styles.collapsableSection}
+      >
+        <Stack direction="column" gap={1}>
+          <MuteTimingFields alertManager={alertManagerName} />
+          <RoutingSettings alertManager={alertManagerName} />
+        </Stack>
+      </CollapsableSection>
     </Stack>
   );
 }
@@ -118,7 +116,7 @@ const getStyles = (theme: GrafanaTheme2) => ({
   }),
   collapsableSection: css({
     width: 'fit-content',
-    fontSize: theme.typography.body.fontSize,
+    fontSize: theme.typography.bodySmall.fontSize,
   }),
   routingSection: css({
     display: 'flex',

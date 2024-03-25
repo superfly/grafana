@@ -31,7 +31,7 @@ export const annotationLabels: Record<Annotation, string> = {
 };
 
 export const annotationDescriptions: Record<Annotation, string> = {
-  [Annotation.description]: 'Description of what the alert rule does.',
+  [Annotation.description]: 'Text displayed in alert notification',
   [Annotation.summary]: 'Short summary of what happened and why.',
   [Annotation.runbookURL]: 'Webpage where you keep your runbook for the alert.',
   [Annotation.dashboardUID]: '',
@@ -40,7 +40,7 @@ export const annotationDescriptions: Record<Annotation, string> = {
 };
 
 export const defaultAnnotations = [
-  { key: Annotation.summary, value: '' },
+  // { key: Annotation.summary, value: '' },
   { key: Annotation.description, value: '' },
-  { key: Annotation.runbookURL, value: '' },
+  // { key: Annotation.runbookURL, value: '' },
 ];

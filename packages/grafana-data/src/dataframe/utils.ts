@@ -29,6 +29,9 @@ export function isTimeSeriesFrame(frame: DataFrame) {
 }
 
 export function isTimeSeriesFrames(data: DataFrame[]) {
+  if (data.length === 0) {
+    return false;
+  }
   return !data.find((frame) => !isTimeSeriesFrame(frame));
 }
 

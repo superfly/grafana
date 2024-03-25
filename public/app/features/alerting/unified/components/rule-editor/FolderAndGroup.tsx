@@ -9,6 +9,7 @@ import {
   Box,
   Button,
   Field,
+  IconButton,
   Input,
   InputControl,
   Label,
@@ -89,9 +90,13 @@ const findGroupMatchingLabel = (group: SelectableValue<string>, query: string) =
 export function FolderAndGroup({
   groupfoldersForGrafana,
   enableProvisionedGroups,
+  disabled,
+  editGroup
 }: {
   groupfoldersForGrafana?: RulerRulesConfigDTO | null;
   enableProvisionedGroups: boolean;
+  disabled: boolean;
+  editGroup: () => void;
 }) {
   const {
     formState: { errors },
@@ -149,7 +154,7 @@ export function FolderAndGroup({
         {
           <Field
             label={
-              <Label htmlFor="folder" description={'Select a folder to store your rule.'}>
+              <Label htmlFor="folder">
                 Folder
               </Label>
             }
@@ -183,7 +188,7 @@ export function FolderAndGroup({
                       },
                     }}
                   />
-                  <Text color="secondary">or</Text>
+                  {/*<Text color="secondary">or</Text>*/}
                   <Button
                     onClick={onOpenFolderCreationModal}
                     type="button"
@@ -191,9 +196,7 @@ export function FolderAndGroup({
                     fill="outline"
                     variant="secondary"
                     disabled={!contextSrv.hasPermission(AccessControlAction.FoldersCreate)}
-                  >
-                    New folder
-                  </Button>
+                  />
                 </>
               )) || <div>Creating new folder...</div>}
             </Stack>
@@ -213,7 +216,7 @@ export function FolderAndGroup({
           <Field
             label="Evaluation group"
             data-testid="group-picker"
-            description="Rules within the same group are evaluated concurrently over the same time interval."
+            // description="Rules within the same group are evaluated concurrently over the same time interval."
             className={styles.formInput}
             error={errors.group?.message}
             invalid={!!errors.group?.message}
@@ -260,8 +263,13 @@ export function FolderAndGroup({
             />
           </Field>
         </div>
-        <Box marginTop={4} gap={1} display={'flex'} alignItems={'center'}>
-          <Text color="secondary">or</Text>
+        <IconButton
+            name="pen"
+            aria-label="Edit"
+            disabled={disabled}
+            onClick={editGroup}
+        />
+        <Box gap={1} display={'flex'} alignItems={'center'}>
           <Button
             onClick={onOpenEvaluationGroupCreationModal}
             type="button"
@@ -269,9 +277,7 @@ export function FolderAndGroup({
             fill="outline"
             variant="secondary"
             disabled={!folder}
-          >
-            New evaluation group
-          </Button>
+          />
         </Box>
         {isCreatingEvaluationGroup && (
           <EvaluationGroupCreationModal

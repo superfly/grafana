@@ -234,6 +234,9 @@ export const AlertRuleForm = ({ existing, prefill }: Props) => {
               {/* Step 3-4-5 */}
               {showDataSourceDependantStep && (
                 <>
+                  {/* Annotations only for cloud and Grafana */}
+                  {type !== RuleFormType.cloudRecording && <AnnotationsStep />}
+
                   {/* Step 3 */}
                   {type === RuleFormType.grafana && (
                     <GrafanaEvaluationBehavior
@@ -251,8 +254,6 @@ export const AlertRuleForm = ({ existing, prefill }: Props) => {
                   {/* Step 4 & 5 */}
                   {/* Notifications step*/}
                   <NotificationsStep alertUid={uidFromParams} />
-                  {/* Annotations only for cloud and Grafana */}
-                  {type !== RuleFormType.cloudRecording && <AnnotationsStep />}
                 </>
               )}
             </Stack>

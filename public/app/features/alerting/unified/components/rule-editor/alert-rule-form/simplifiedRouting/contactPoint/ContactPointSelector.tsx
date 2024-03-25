@@ -144,9 +144,12 @@ export function ContactPointSelector({
 function LinkToContactPoints() {
   const hrefToContactPoints = '/alerting/notifications';
   return (
-    <TextLink external href={createUrl(hrefToContactPoints)} aria-label="View or create contact points">
-      View or create contact points
-    </TextLink>
+    <TextLink
+      external
+      href={createUrl(hrefToContactPoints)}
+      aria-label="View or create contact points"
+      title="View or create contact points"
+    />
   );
 }
 

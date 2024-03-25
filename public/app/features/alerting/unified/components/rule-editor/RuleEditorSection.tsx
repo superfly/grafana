@@ -24,14 +24,8 @@ export const RuleEditorSection = ({
     <div className={styles.parent}>
       <FieldSet
         className={cx(fullWidth && styles.fullWidth)}
-        label={
-          <Text variant="h3">
-            {stepNo}. {title}
-          </Text>
-        }
       >
         <Stack direction="column">
-          {description && <div className={styles.description}>{description}</div>}
           {children}
         </Stack>
       </FieldSet>

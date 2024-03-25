@@ -391,6 +391,7 @@ export const QueryAndExpressionsStep = ({ editingExistingRule, onDataChange }: P
           />
         </Stack>
       }
+      fullWidth={true}
     >
       {/* This is the cloud data source selector */}
       {(type === RuleFormType.cloudRecording || type === RuleFormType.cloudAlerting) && (
@@ -455,33 +456,19 @@ export const QueryAndExpressionsStep = ({ editingExistingRule, onDataChange }: P
             condition={condition}
             onSetCondition={handleSetCondition}
           />
-          <Tooltip content={'You appear to have no compatible data sources'} show={noCompatibleDataSources}>
-            <Button
-              type="button"
-              onClick={() => {
-                dispatch(addNewDataQuery());
-              }}
-              variant="secondary"
-              data-testid={selectors.components.QueryTab.addQuery}
-              disabled={noCompatibleDataSources}
-              className={styles.addQueryButton}
-            >
-              Add query
-            </Button>
-          </Tooltip>
-          <SmartAlertTypeDetector
+          {/*<SmartAlertTypeDetector
             editingExistingRule={editingExistingRule}
             rulesSourcesWithRuler={rulesSourcesWithRuler}
             queries={queries}
             onClickSwitch={onClickSwitch}
-          />
+          />*/}
           {/* Expression Queries */}
-          <Stack direction="column" gap={0}>
+          {/*<Stack direction="column" gap={0}>
             <Text element="h5">Expressions</Text>
             <Text variant="bodySmall" color="secondary">
               Manipulate data returned from queries with math and other operations.
             </Text>
-          </Stack>
+          </Stack>*/}
 
           <ExpressionsEditor
             queries={queries}
@@ -501,6 +488,21 @@ export const QueryAndExpressionsStep = ({ editingExistingRule, onDataChange }: P
           />
           {/* action buttons */}
           <Stack direction="row">
+            <Tooltip content={'You appear to have no compatible data sources'} show={noCompatibleDataSources}>
+              <Button
+                type="button"
+                onClick={() => {
+                  dispatch(addNewDataQuery());
+                }}
+                variant="secondary"
+                data-testid={selectors.components.QueryTab.addQuery}
+                disabled={noCompatibleDataSources}
+                className={styles.addQueryButton}
+              >
+                Add query
+              </Button>
+            </Tooltip>
+
             {config.expressionsEnabled && <TypeSelectorButton onClickType={onClickType} />}
 
             {isPreviewLoading && (

@@ -38,9 +38,9 @@ export const RuleListGroupView = ({ namespaces, expandAll }: Props) => {
       <Authorize actions={[AlertingAction.ViewAlertRule]}>
         <GrafanaRules namespaces={grafanaNamespaces} expandAll={expandAll} />
       </Authorize>
-      <Authorize actions={[AlertingAction.ViewExternalAlertRule]}>
+      {/*<Authorize actions={[AlertingAction.ViewExternalAlertRule]}>
         <CloudRules namespaces={cloudNamespaces} expandAll={expandAll} />
-      </Authorize>
+      </Authorize>*/}
     </>
   );
 };

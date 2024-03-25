@@ -42,7 +42,7 @@ export const AlertRuleNameInput = () => {
             pattern: ruleFormType === RuleFormType.cloudRecording ? recordingRuleNameValidationPattern : undefined,
           })}
           aria-label="name"
-          placeholder={`Give your ${entityName} a name`}
+          placeholder="Enter name"
         />
       </Field>
     </RuleEditorSection>
