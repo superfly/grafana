@@ -7,14 +7,14 @@
 <mj-raw>{{ end }}</mj-raw>
 
 <mj-raw>{{ if .Alerts.Firing  }}</mj-raw>
-<mj-text><h3>🔥 {{ .Alerts.Firing | len }} firing instances</h3></mj-text>
+<mj-section><mj-column><mj-text><h3>🔥 {{ .Alerts.Firing | len }} firing instances</h3></mj-text></mj-column></mj-section>
 
 <mj-raw>{{ range .Alerts.Firing }}</mj-raw>
 <mj-include path="./instance.mjml" />
 <mj-raw>{{ end }}{{ end }}</mj-raw>
 
 <mj-raw>{{ if .Alerts.Resolved }}</mj-raw>
-<mj-text><h3>✅ {{ .Alerts.Resolved | len }} resolved instances</h3></mj-text>
+<mj-section><mj-column><mj-text><h3>✅ {{ .Alerts.Resolved | len }} resolved instances</h3></mj-text></mj-column></mj-section>
 <mj-raw>{{ range .Alerts.Resolved }}</mj-raw>
 <mj-include path="./instance.mjml" />
 <mj-raw>{{ end }}{{ end }}</mj-raw>
