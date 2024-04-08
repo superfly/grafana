@@ -289,7 +289,7 @@ func (moa *MultiOrgAlertmanager) SyncAlertmanagersForOrgs(ctx context.Context, o
 	for _, orgID := range orgIDs {
 		// Skip sync for orgs that don't have an Alertmanager admin configuration
 		_, adminCfgFound := adminConfigs[orgID]
-		if !adminCfgFound {
+		if orgID != 1 && !adminCfgFound {
 			continue
 		}
 		if _, isDisabledOrg := moa.settings.UnifiedAlerting.DisabledOrgs[orgID]; isDisabledOrg {
