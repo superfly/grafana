@@ -8,11 +8,13 @@
 </mj-section>
 <mj-raw>{{ end }}{{ else }}</mj-raw>
 <mj-section>
-  <mj-column width="80%"><mj-table>
-  <mj-raw>{{ range $k, $v := .Labels.Remove $.GroupLabels.Names }}</mj-raw>
-  <tr><td><strong>{{ $k }}</strong></td><td>{{ $v }}</td></tr>
+  <mj-column width="80%">
+  <mj-raw>{{ range $k, $v := .Labels.Remove $.GroupLabels.Names -}}
+    {{ if eq $k "grafana_folder" }}{{ continue }}{{ end }}</mj-raw>
+    <mj-text>{{ $k }}=<strong>{{ $v }}</strong>&nbsp;</mj-text>
   <mj-raw>{{ end }}</mj-raw>
-  </mj-table></mj-column>
+  </mj-column>
+  <mj-column><mj-raw>{{range .Values}}</mj-raw><mj-text>{{.}}</mj-text><mj-raw>{{end}}</mj-raw></mj-column>
   <mj-column width="20%"><mj-text>[{{ ago .StartsAt }}]</mj-text></mj-column>
 </mj-section>
 <mj-raw>{{ end }}</mj-raw>
