@@ -421,7 +421,7 @@
                             <tr>
                               <td align="left" class="txt" style="font-size:0px;padding:0;word-break:break-word;">
                                 <table cellpadding="0" cellspacing="0" width="100%" border="0" style="color:#000000;font-family:Inter, Helvetica, Arial;font-size:13px;line-height:22px;table-layout:auto;width:100%;border:none;">
-                                  <mj-raw>{{ range $k, $v := .Labels.Remove .GroupLabels.Names }}</mj-raw>
+                                  <mj-raw>{{ range $k, $v := .Labels.Remove $.GroupLabels.Names }}</mj-raw>
                                   <tr>
                                     <td><strong>{{ $k }}</strong></td>
                                     <td>{{ $v }}</td>
@@ -622,7 +622,7 @@
                             <tr>
                               <td align="left" class="txt" style="font-size:0px;padding:0;word-break:break-word;">
                                 <table cellpadding="0" cellspacing="0" width="100%" border="0" style="color:#000000;font-family:Inter, Helvetica, Arial;font-size:13px;line-height:22px;table-layout:auto;width:100%;border:none;">
-                                  <mj-raw>{{ range $k, $v := .Labels.Remove .GroupLabels.Names }}</mj-raw>
+                                  <mj-raw>{{ range $k, $v := .Labels.Remove $.GroupLabels.Names }}</mj-raw>
                                   <tr>
                                     <td><strong>{{ $k }}</strong></td>
                                     <td>{{ $v }}</td>

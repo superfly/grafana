@@ -19,8 +19,8 @@
       </mj-column>
     </mj-section>
 
-    <!-- end custom email message -->
     <mj-raw>{{ else }}</mj-raw>
+    <!-- default email message -->
     <mj-include path="./partials/alerting/default.mjml" />
     <mj-raw>{{ end }}</mj-raw>
 
