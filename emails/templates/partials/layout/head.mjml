@@ -6,8 +6,8 @@
   <mj-table css-class="txt" />
   <mj-button background-color="#3D71D9" rel="noopener" />
   <mj-body css-class="canvas" />
-  <mj-all font-family="Inter, Helvetica, Arial" />
-  <mj-section padding="0px" />
+  <mj-all font-family="Inter, Helvetica, Arial" padding="0" />
+  <mj-section padding="0" />
 </mj-attributes>
 
 <mj-style inline="inline">

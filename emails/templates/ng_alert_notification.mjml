@@ -1,6 +1,7 @@
 <mjml>
   <mj-head>
     <mj-title>{{ Subject .Subject .TemplateData "{{ .Title }}" }}</mj-title>
+    <mj-include path="./partials/layout/head.mjml" />
     <mj-include path="./partials/alerting/summary.mjml" />
   </mj-head>
   <mj-body>
