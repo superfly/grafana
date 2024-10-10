@@ -895,7 +895,14 @@ func (m *managedFolderAlertingSilencesActionsMigrator) Exec(sess *xorm.Session, 
 	}
 
 	var permissions []ac.Permission
-	if err := sess.SQL("SELECT role_id, action, scope FROM permission WHERE role_id IN(?"+strings.Repeat(" ,?", len(ids)-1)+") AND scope LIKE 'folders:%'", ids...).Find(&permissions); err != nil {
+	if err := batch(len(ids), 100, func(start, end int) error {
+		var batchPermissions []ac.Permission
+		if err := sess.SQL("SELECT role_id, action, scope FROM permission WHERE role_id IN(?"+strings.Repeat(" ,?", len(ids[start:end])-1)+") AND scope LIKE 'folders:%'", ids[start:end]...).Find(&batchPermissions); err != nil {
+			return err
+		}
+		permissions = append(permissions, batchPermissions...)
+		return nil
+	}); err != nil {
 		return err
 	}
 
